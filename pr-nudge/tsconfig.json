@@ -1,12 +1,17 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
+    // Widen rootDir to the repo root and include packages/checks source
+    // directly. ncc's TS resolver prefers source over the compiled dist when
+    // the workspace package is symlinked under node_modules, so we let it
+    // see the source and emit a single bundled dist/index.js anyway.
+    "rootDir": "..",
     "outDir": "dist",
     "composite": false,
     "declaration": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "paths": {}
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../packages/checks/src/**/*"],
   "exclude": ["dist", "node_modules"]
 }

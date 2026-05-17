@@ -26,8 +26,8 @@ Two kinds of consumer sit on top of it:
 2. **Local CLI** — `cli/`, exposed as `maintainer-tools triage`. Runs on a
    maintainer's laptop; reads the same library, scans configured repos via
    the SQLite cache, classifies each open PR into one of seven attention
-   buckets, and writes a self-contained HTML (or markdown) triage report.
-   Never touches the GitHub write API.
+   buckets, and writes a self-contained HTML triage report. Never touches
+   the GitHub write API.
 
 Both consumers share **one** TypeScript definition of every check predicate
 ("DCO missing", "merge conflict", "CI failing", …). That's the central
@@ -255,10 +255,10 @@ Hide rules run before bucket assignment. The lone exception is
 `review-requested-on-you`: an explicit review request from a maintainer
 overrides hide rules because GitHub's request is a deliberate signal.
 
-Renderers (`cli/src/render/html.ts`, `markdown.ts`) consume the classified
-list as-is. The HTML output is self-contained (inline CSS, no external
-assets), organized repo → bucket, with high-signal buckets expanded and
-low-signal collapsed.
+The renderer (`cli/src/render/html.ts`) consumes the classified list
+as-is. The HTML output is self-contained (inline CSS, no external assets),
+organized repo → bucket, with high-signal buckets expanded and low-signal
+collapsed.
 
 ## Repository conventions
 

@@ -199,6 +199,13 @@ function isFirstTimeContributor(pr: PullRequest): boolean {
   );
 }
 
+// Any review or comment from any maintainer (the viewer included) counts.
+// This matches the RFC's "no maintainer response" wording for the
+// first-response buckets: once someone from the team has engaged, the PR is
+// no longer in the "first response" state and should drop out of those
+// buckets. Subsequent staleness — e.g. a first-timer's reply that nobody
+// followed up on — is the job of the `stale_on_author` / nudge surfaces,
+// not this bucket.
 function hasMaintainerActivity(pr: PullRequest, maintainers: Set<string>): boolean {
   for (const r of pr.reviews) {
     if (r.author && maintainers.has(r.author)) return true;

@@ -7,7 +7,7 @@
     "maintainer-tools": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

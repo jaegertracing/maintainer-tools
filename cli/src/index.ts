@@ -157,9 +157,11 @@ async function openCacheIfEnabled(
     mkdirSync(dirname(path), { recursive: true });
     return cacheMod.openCache(path);
   } catch (err) {
-    // `better-sqlite3` is an optional dep; if it failed to build locally, we
-    // proceed cache-less rather than crashing. The triage still works, just
-    // pays full GraphQL cost on every run.
+    // `node:sqlite` is built into Node 22.5+, so the realistic failure modes
+    // here are (a) running on an older Node where the module isn't available,
+    // or (b) a filesystem error opening the cache file (perms, full disk,
+    // path unwritable). Either way, fall back to cacheless rather than
+    // crashing; the triage still works, just pays full GraphQL cost.
     log(`warning: cache disabled (${err instanceof Error ? err.message : String(err)})`);
     return null;
   }

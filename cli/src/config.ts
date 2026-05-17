@@ -59,7 +59,7 @@ export function loadConfig(explicitPath?: string): TriageConfig {
   if (!path) {
     throw new Error(
       `No config found. Looked at: ${DEFAULT_CONFIG_PATHS.join(', ')}. ` +
-        `Pass --config <path> or create one of the above.`,
+        `Pass --config <path>, set $MAINTAINER_TOOLS_CONFIG, or create one of the default paths.`,
     );
   }
 
