@@ -122,12 +122,12 @@ near zero: only PRs that actually moved are re-fetched.
 
 ### Who uses what
 
-| Consumer                       | Where it runs                       | Uses the cache? |
-| ------------------------------ | ----------------------------------- | --------------- |
-| `pr-nudge` action              | GitHub-hosted runner, per PR event  | No              |
-| `pr-quota` action (P4)         | GitHub-hosted runner, per PR event  | No              |
-| `pr-weekly-digest` action      | GitHub-hosted runner, daily cron    | No              |
-| `maintainer-tools triage` CLI  | Maintainer's laptop, on demand      | Yes             |
+| Consumer                      | Where it runs                      | Uses the cache? |
+| ----------------------------- | ---------------------------------- | --------------- |
+| `pr-nudge` action             | GitHub-hosted runner, per PR event | No              |
+| `pr-quota` action (P4)        | GitHub-hosted runner, per PR event | No              |
+| `pr-weekly-digest` action     | GitHub-hosted runner, daily cron   | No              |
+| `maintainer-tools triage` CLI | Maintainer's laptop, on demand     | Yes             |
 
 Two reasons the actions don't use it. (a) Ephemeral filesystem: GitHub-hosted
 runners are wiped after every job, so a SQLite file would never survive to
