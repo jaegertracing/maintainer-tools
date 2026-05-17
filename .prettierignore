@@ -10,3 +10,4 @@ docs/
 pr-nudge/dist/
 pr-quota/dist/
 pr-weekly-digest/dist/
+.claude/
