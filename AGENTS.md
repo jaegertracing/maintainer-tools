@@ -30,25 +30,31 @@ maintainer-tools/
 │   ├── action.yml
 │   ├── src/
 │   └── dist/                  # ncc-bundled, COMMITTED — see "Action bundles" below
+├── cli/                       # local maintainer CLI: `maintainer-tools triage`
+│   ├── src/
+│   └── config.example.json
 ├── docs/rfc/                  # design docs
 └── .github/workflows/         # CI for this repo (not the actions it ships)
 ```
 
-Each top-level `<tool>/` is a published GitHub Action subfolder. New tools
-follow the same pattern: `<tool>/action.yml`, `<tool>/src/`, `<tool>/dist/`.
+Each top-level `<tool>/` is either a published GitHub Action subfolder
+(`pr-nudge/`, with committed `dist/`) or the local CLI (`cli/`, no
+committed build output — users `npm ci && npm run build`). New actions
+follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
+`<tool>/dist/`.
 
 ## Development Setup
 
-- Node.js >= 20
+- Node.js >= 22.5 (the CLI's SQLite cache uses the built-in `node:sqlite`
+  module, added in 22.5.0). Actions still ship on the `node20` runtime —
+  they don't touch the cache.
 - npm (workspaces, so use the repo root)
 
 ```bash
 npm ci   # use this, not `npm install`
 ```
 
-If `better-sqlite3` fails to build locally (it's an `optionalDependency` used
-only by the cache module): `npm ci --ignore-scripts` is fine. The cache is
-loaded via a subpath import and is not part of any action bundle.
+No native build steps — everything pure JS + builtin Node modules.
 
 ## Build, Lint, and Test Commands
 

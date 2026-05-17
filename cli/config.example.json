@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to ~/.config/maintainer-tools/config.json or pass via --config. All keys but `repos` are optional.",
+  "viewer": "yurishkuro",
+  "repos": ["jaegertracing/jaeger", "jaegertracing/jaeger-ui", "jaegertracing/jaeger-idl"],
+  "maintainers": ["yurishkuro", "albertteoh", "joe-elliott", "mahadzaryab1"],
+  "interns": [],
+  "codeowners": {
+    "jaegertracing/jaeger": ["cmd/jaeger/**", "internal/**"],
+    "jaegertracing/jaeger-ui": ["packages/jaeger-ui/src/**"]
+  }
+}

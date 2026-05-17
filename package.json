@@ -9,11 +9,12 @@
     "url": "https://github.com/jaegertracing/maintainer-tools.git"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.5.0"
   },
   "workspaces": [
     "packages/*",
-    "pr-nudge"
+    "pr-nudge",
+    "cli"
   ],
   "scripts": {
     "build": "npm run --workspaces --if-present build",
@@ -21,6 +22,7 @@
     "fmt": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "prettier-check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "tsc-lint": "tsc -p tsconfig.json --noEmit",
+    "triage": "node cli/dist/index.js triage",
     "test": "npm run --workspaces --if-present test"
   },
   "devDependencies": {

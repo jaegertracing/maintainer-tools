@@ -2,9 +2,9 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     // Widen rootDir to the repo root and include packages/checks source
-    // directly. ncc's TS resolver prefers source over the compiled dist when
-    // the workspace package is symlinked under node_modules, so we let it
-    // see the source and emit a single bundled dist/index.js anyway.
+    // directly. Same workspace-symlink workaround as pr-nudge — see comment
+    // there. The CLI bundles via ncc and emits a single dist/index.js, so
+    // the wider rootDir has no effect on the final layout.
     "rootDir": "..",
     "outDir": "dist",
     "composite": false,

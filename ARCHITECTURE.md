@@ -14,7 +14,7 @@ packages/checks/                  shared predicate library
 ├── src/types.ts                  CheckResult + PullRequest shape
 ├── src/predicates/*.ts           pure functions: (PR) → CheckResult
 ├── src/graphql.ts                Octokit GraphQL data layer
-└── src/cache.ts                  optional SQLite cache (CLI use, see below)
+└── src/cache.ts                  SQLite cache via node:sqlite (CLI use, see below)
 ```
 
 Two kinds of consumer sit on top of it:
@@ -23,9 +23,11 @@ Two kinds of consumer sit on top of it:
    Each is a self-contained subfolder with its own `action.yml` and a
    committed `dist/index.js` produced by `@vercel/ncc`. Triggered by repo
    events; writes back via the GitHub API (Check Runs, labels, comments).
-2. **Local CLI** (P1, not yet implemented) — `cli/maintainer-tools`.
-   Runs on a maintainer's laptop; reads the same library, writes an HTML
-   triage report instead of touching the GitHub API.
+2. **Local CLI** — `cli/`, exposed as `maintainer-tools triage`. Runs on a
+   maintainer's laptop; reads the same library, scans configured repos via
+   the SQLite cache, classifies each open PR into one of seven attention
+   buckets, and writes a self-contained HTML triage report. Never touches
+   the GitHub write API.
 
 Both consumers share **one** TypeScript definition of every check predicate
 ("DCO missing", "merge conflict", "CI failing", …). That's the central
@@ -141,11 +143,14 @@ job), the options are (a) accept the cold-fetch cost, (b) plug in
 `actions/cache` around the SQLite file, or (c) keep state in a GitHub issue
 body / gist. None of those are on the roadmap.
 
-To keep `better-sqlite3` (a native module) out of every action's ncc bundle,
-the cache is exposed only via a **subpath** import
-(`@jaegertracing/maintainer-tools-checks/cache`) and `better-sqlite3` is
-listed as an `optionalDependency`. Action code touches the library only
-through the main barrel, which does not re-export the cache.
+The cache is backed by Node's built-in `node:sqlite` module (added in
+22.5.0, stable in recent releases). No native compilation, no install
+scripts, no platform-specific binaries. Repo engines requirement is
+`>=22.5.0` for that reason; GitHub Actions still ship on the `node20`
+runtime since they don't touch the cache. To keep the cache out of every
+action's ncc bundle, it is exposed via a **subpath** import
+(`@jaegertracing/maintainer-tools-checks/cache`) rather than from the
+main barrel; the action runtime never imports `node:sqlite`.
 
 ## Actions: layout and bundling
 
@@ -227,6 +232,34 @@ the consumer. A predicate that wants to surface in the digest sets
 - Secondary-rate-limit handling: **not yet**. Will batch using `node-octokit`
   throttling plugin once we have a multi-PR consumer (CLI).
 
+## Triage CLI: bucket classifier
+
+`cli/src/buckets.ts` is a pure function that lands every open PR in
+exactly one of seven priority-ordered buckets:
+
+1. **review-requested-on-you** — viewer in `reviewRequests`. Strongest
+   signal; overrides every hide rule.
+2. **youre-the-bottleneck** — viewer has reviewed previously, author has
+   pushed or commented since.
+3. **high-trust-awaiting-first-response** — author is in the configured
+   `maintainers` or `interns` list, no maintainer has reviewed/commented.
+4. **first-timer-awaiting** — `authorAssociation` is `FIRST_TIME_*`, no
+   maintainer activity yet.
+5. **codeowners-hits** — PR files match the viewer's configured CODEOWNERS
+   globs for the repo.
+6. **fyi** — catch-all for open PRs with no stronger signal.
+7. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
+   predicate marked `hidesFromTriage`. Counts only; not listed.
+
+Hide rules run before bucket assignment. The lone exception is
+`review-requested-on-you`: an explicit review request from a maintainer
+overrides hide rules because GitHub's request is a deliberate signal.
+
+The renderer (`cli/src/render/html.ts`) consumes the classified list
+as-is. The HTML output is self-contained (inline CSS, no external assets),
+organized repo → bucket, with high-signal buckets expanded and low-signal
+collapsed.
+
 ## Repository conventions
 
 - ES modules everywhere (`"type": "module"`, NodeNext resolution). Relative
@@ -247,6 +280,8 @@ the consumer. A predicate that wants to surface in the digest sets
 | Add a new action        | New top-level `<tool>/` subfolder following `pr-nudge/`'s layout                 |
 | Change a surface        | The mapping is in each action's `src/index.ts` (e.g. `pr-nudge/src/index.ts`)    |
 | Add a new event trigger | Update `resolvePrRef()` in the relevant action; document in `action.yml`         |
+| Add/rebalance a bucket  | `cli/src/buckets.ts` — adjust `BUCKET_ORDER` and the branches in `classify()`    |
+| Adjust HTML look        | `cli/src/render/html.ts` — CSS is inlined at the bottom of the file              |
 
 ## See also
 

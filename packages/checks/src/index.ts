@@ -11,4 +11,4 @@ export {
   staleOnAuthor,
 } from './predicates/index.js';
 export { createGraphqlClient } from './graphql.js';
-export type { GraphqlClient } from './graphql.js';
+export type { GraphqlClient, PrSummary } from './graphql.js';

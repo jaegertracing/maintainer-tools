@@ -1,9 +1,14 @@
 // SQLite cache keyed by (owner, repo, number, updated_at). Only PRs whose
 // `updated_at` advanced since the last fetch are re-queried; everything else
 // is served from cache. Keeps steady-state cost near zero for the triage
-// scanner and avoids API-quota blowups on large repos.
+// scanner.
+//
+// Backed by Node's built-in `node:sqlite` (added in Node 22.5, stable in
+// recent releases), so the cache has zero native-dep overhead — no gyp,
+// no Xcode CLT, no platform-specific install scripts. The repo engines
+// requirement is bumped to >= 22.5.0 in package.json.
 
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import type { PullRequest } from './types.js';
 
 const SCHEMA = `
@@ -24,15 +29,19 @@ export interface PrCache {
   close(): void;
 }
 
+interface CacheRow {
+  payload: string;
+}
+
 export function openCache(path: string): PrCache {
-  const db = new Database(path);
-  db.pragma('journal_mode = WAL');
+  const db = new DatabaseSync(path);
+  db.exec('PRAGMA journal_mode = WAL');
   db.exec(SCHEMA);
 
-  const getStmt = db.prepare<[string, string, number]>(
+  const getStmt = db.prepare(
     'SELECT payload FROM pr_cache WHERE owner = ? AND repo = ? AND number = ?',
   );
-  const putStmt = db.prepare<[string, string, number, string, string, string]>(
+  const putStmt = db.prepare(
     `INSERT INTO pr_cache (owner, repo, number, updated_at, payload, fetched_at)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(owner, repo, number) DO UPDATE SET
@@ -43,7 +52,7 @@ export function openCache(path: string): PrCache {
 
   return {
     get(owner, repo, number) {
-      const row = getStmt.get(owner, repo, number) as { payload: string } | undefined;
+      const row = getStmt.get(owner, repo, number) as CacheRow | undefined;
       return row ? (JSON.parse(row.payload) as PullRequest) : null;
     },
     put(pr) {
