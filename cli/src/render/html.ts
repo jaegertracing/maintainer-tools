@@ -137,15 +137,14 @@ function renderRow(
       </tr>`;
 }
 
-// Inline favicon: rounded blue tile with three white rows (mnemonic for the
-// repo → bucket → rows layout). SVG works in every modern browser and stays
-// tiny even base64-encoded (~250 bytes), so the HTML report keeps its
-// self-contained-file property.
+// Inline favicon: a white funnel (the triage metaphor — many PRs in, a
+// narrow stream out) on an amber tile, matching the "review-requested"
+// bucket accent. SVG works in every modern browser and stays tiny even
+// base64-encoded (~300 bytes), so the HTML report keeps its self-contained
+// property.
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
-<rect width="16" height="16" rx="3" fill="#0969da"/>
-<rect x="3" y="4" width="10" height="2" rx="1" fill="white"/>
-<rect x="3" y="7.5" width="10" height="2" rx="1" fill="white"/>
-<rect x="3" y="11" width="10" height="2" rx="1" fill="white"/>
+<rect width="16" height="16" rx="3" fill="#d29922"/>
+<path d="M2.5 3 L13.5 3 L9.5 8 L9.5 13 L6.5 13 L6.5 8 Z" fill="white"/>
 </svg>`;
 const FAVICON_DATA_URL = `data:image/svg+xml;base64,${Buffer.from(FAVICON_SVG).toString('base64')}`;
 
