@@ -9,7 +9,7 @@
     "url": "https://github.com/jaegertracing/maintainer-tools.git"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.5.0"
   },
   "workspaces": [
     "packages/*",

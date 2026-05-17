@@ -14,7 +14,7 @@ packages/checks/                  shared predicate library
 ├── src/types.ts                  CheckResult + PullRequest shape
 ├── src/predicates/*.ts           pure functions: (PR) → CheckResult
 ├── src/graphql.ts                Octokit GraphQL data layer
-└── src/cache.ts                  optional SQLite cache (CLI use, see below)
+└── src/cache.ts                  SQLite cache via node:sqlite (CLI use, see below)
 ```
 
 Two kinds of consumer sit on top of it:
@@ -143,11 +143,14 @@ job), the options are (a) accept the cold-fetch cost, (b) plug in
 `actions/cache` around the SQLite file, or (c) keep state in a GitHub issue
 body / gist. None of those are on the roadmap.
 
-To keep `better-sqlite3` (a native module) out of every action's ncc bundle,
-the cache is exposed only via a **subpath** import
-(`@jaegertracing/maintainer-tools-checks/cache`) and `better-sqlite3` is
-listed as an `optionalDependency`. Action code touches the library only
-through the main barrel, which does not re-export the cache.
+The cache is backed by Node's built-in `node:sqlite` module (added in
+22.5.0, stable in recent releases). No native compilation, no install
+scripts, no platform-specific binaries. Repo engines requirement is
+`>=22.5.0` for that reason; GitHub Actions still ship on the `node20`
+runtime since they don't touch the cache. To keep the cache out of every
+action's ncc bundle, it is exposed via a **subpath** import
+(`@jaegertracing/maintainer-tools-checks/cache`) rather than from the
+main barrel; the action runtime never imports `node:sqlite`.
 
 ## Actions: layout and bundling
 

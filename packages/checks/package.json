@@ -25,11 +25,5 @@
   "dependencies": {
     "@octokit/graphql": "8.1.2",
     "@octokit/graphql-schema": "15.26.0"
-  },
-  "optionalDependencies": {
-    "better-sqlite3": "11.7.0"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "7.6.12"
   }
 }

@@ -45,16 +45,16 @@ follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
 
 ## Development Setup
 
-- Node.js >= 20
+- Node.js >= 22.5 (the CLI's SQLite cache uses the built-in `node:sqlite`
+  module, added in 22.5.0). Actions still ship on the `node20` runtime —
+  they don't touch the cache.
 - npm (workspaces, so use the repo root)
 
 ```bash
 npm ci   # use this, not `npm install`
 ```
 
-If `better-sqlite3` fails to build locally (it's an `optionalDependency` used
-only by the cache module): `npm ci --ignore-scripts` is fine. The cache is
-loaded via a subpath import and is not part of any action bundle.
+No native build steps — everything pure JS + builtin Node modules.
 
 ## Build, Lint, and Test Commands
 
