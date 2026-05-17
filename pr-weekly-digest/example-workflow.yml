@@ -1,0 +1,40 @@
+# Example workflow consuming the pr-weekly-digest action. Drop this in
+# `.github/workflows/maintainer-tools-weekly-digest.yml` of a consuming
+# repository, pin the @ref to a tagged release (not @main), and review the
+# log output for 2–4 weeks before flipping `dry-run` to `false`.
+
+name: 'PR Weekly Digest'
+
+on:
+  schedule:
+    # Daily at 09:00 UTC — the action is idempotent within an ISO week, so
+    # running daily just gives same-week reruns a chance to edit the
+    # existing comment (e.g. an item dropped off the list because the
+    # author addressed it) instead of waiting a whole week to refresh.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Log what would be posted without writing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: write # to post / edit digest comments
+  issues: write # GitHub's REST issues-comments API governs PR comments too
+
+concurrency:
+  group: pr-weekly-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: jaegertracing/maintainer-tools/pr-weekly-digest@v0.4.0
+        with:
+          # Default `true`; flip after the calibration window.
+          dry-run: ${{ inputs.dry-run || true }}
+          # wait-days: 7    # default
+          # label: waiting-for-author    # default

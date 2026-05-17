@@ -26,6 +26,10 @@ export interface PrSummary {
 export interface GraphqlClient {
   fetchViewerLogin(): Promise<string>;
   listOpenPRs(owner: string, repo: string): Promise<PrSummary[]>;
+  // Same shape as `listOpenPRs`, but server-side filtered to PRs carrying
+  // the given label. Used by `pr-weekly-digest` to scope down to the
+  // `waiting-for-author` set without paying for every open PR's details.
+  listOpenPRsByLabel(owner: string, repo: string, label: string): Promise<PrSummary[]>;
   fetchPullRequest(owner: string, repo: string, number: number): Promise<PullRequest>;
   // Count merged PRs by `author` in `owner/repo`. Used by the quota
   // computation in the CLI. Implemented via GraphQL search, which returns
@@ -188,6 +192,32 @@ const LIST_QUERY = `
   }
 `;
 
+// Same shape as LIST_QUERY but server-filtered to a single label. The
+// `labels` arg on `pullRequests` is an AND across all values, which is
+// what we want — pass one label and you get exactly the PRs with that
+// label. Used by `pr-weekly-digest` for the `waiting-for-author` set.
+const LIST_BY_LABEL_QUERY = `
+  query ListPRsByLabel($owner: String!, $repo: String!, $label: String!, $cursor: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequests(states: OPEN, labels: [$label], first: 100, after: $cursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          number
+          updatedAt
+          commits(last: 1) {
+            nodes {
+              commit {
+                oid
+                statusCheckRollup { state }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 const VIEWER_QUERY = `query Viewer { viewer { login } }`;
 
 // `first: 1` (not 0 — GraphQL search rejects 0) and we read only issueCount;
@@ -199,6 +229,56 @@ const MERGED_COUNT_QUERY = `
     }
   }
 `;
+
+// Shared pagination loop for any query that returns a `repository.
+// pullRequests` connection with PrSummary-shaped nodes. The two list
+// queries (with/without label filter) differ only in their `$label` var,
+// so the loop is identical — extracting it keeps the two methods
+// trivially short and avoids drift.
+async function paginateListQuery(
+  gql: typeof graphql,
+  query: string,
+  vars: Record<string, string>,
+): Promise<PrSummary[]> {
+  type ListNode = {
+    number: number;
+    updatedAt: string;
+    commits: {
+      nodes: Array<{
+        commit: {
+          oid: string;
+          statusCheckRollup: { state: PullRequest['statusCheckRollup'] } | null;
+        };
+      }>;
+    };
+  };
+  type ListResp = {
+    repository: {
+      pullRequests: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: ListNode[];
+      };
+    };
+  };
+  const out: PrSummary[] = [];
+  let cursor: string | null = null;
+  do {
+    const data: ListResp = await gql<ListResp>(query, { ...vars, cursor });
+    for (const n of data.repository.pullRequests.nodes) {
+      const head = n.commits.nodes[0]?.commit;
+      out.push({
+        number: n.number,
+        updatedAt: n.updatedAt,
+        headSha: head?.oid ?? null,
+        headRollup: head?.statusCheckRollup?.state ?? null,
+      });
+    }
+    cursor = data.repository.pullRequests.pageInfo.hasNextPage
+      ? data.repository.pullRequests.pageInfo.endCursor
+      : null;
+  } while (cursor);
+  return out;
+}
 
 export function createGraphqlClient(token: string): GraphqlClient {
   const gql = graphql.defaults({
@@ -219,45 +299,11 @@ export function createGraphqlClient(token: string): GraphqlClient {
     },
 
     async listOpenPRs(owner, repo) {
-      type ListNode = {
-        number: number;
-        updatedAt: string;
-        commits: {
-          nodes: Array<{
-            commit: {
-              oid: string;
-              statusCheckRollup: { state: PullRequest['statusCheckRollup'] } | null;
-            };
-          }>;
-        };
-      };
-      type ListResp = {
-        repository: {
-          pullRequests: {
-            pageInfo: { hasNextPage: boolean; endCursor: string | null };
-            nodes: ListNode[];
-          };
-        };
-      };
-      const out: PrSummary[] = [];
-      let cursor: string | null = null;
-      // Paginate until exhausted. 100 PRs per page; most repos have one page.
-      do {
-        const data: ListResp = await gql<ListResp>(LIST_QUERY, { owner, repo, cursor });
-        for (const n of data.repository.pullRequests.nodes) {
-          const head = n.commits.nodes[0]?.commit;
-          out.push({
-            number: n.number,
-            updatedAt: n.updatedAt,
-            headSha: head?.oid ?? null,
-            headRollup: head?.statusCheckRollup?.state ?? null,
-          });
-        }
-        cursor = data.repository.pullRequests.pageInfo.hasNextPage
-          ? data.repository.pullRequests.pageInfo.endCursor
-          : null;
-      } while (cursor);
-      return out;
+      return paginateListQuery(gql, LIST_QUERY, { owner, repo });
+    },
+
+    async listOpenPRsByLabel(owner, repo, label) {
+      return paginateListQuery(gql, LIST_BY_LABEL_QUERY, { owner, repo, label });
     },
 
     async fetchPullRequest(owner, repo, number) {
