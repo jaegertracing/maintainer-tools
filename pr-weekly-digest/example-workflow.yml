@@ -34,7 +34,12 @@ jobs:
     steps:
       - uses: jaegertracing/maintainer-tools/pr-weekly-digest@v0.4.0
         with:
-          # Default `true`; flip after the calibration window.
-          dry-run: ${{ inputs.dry-run || true }}
+          # Defaults to `true`; flip after the calibration window. The
+          # conditional honors a deliberate `dry-run: false` from manual
+          # workflow_dispatch (a naive `inputs.dry-run || true` collapses
+          # `false || true` to `true` and silently disables manual live
+          # runs); on cron triggers `inputs` is null and we fall back to
+          # the literal string `'true'`.
+          dry-run: ${{ inputs.dry-run == null && 'true' || inputs.dry-run }}
           # wait-days: 7    # default
           # label: waiting-for-author    # default
