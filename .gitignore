@@ -83,6 +83,20 @@ out
 dist
 .output
 
+# Re-include ncc-bundled action entrypoints. GitHub JS actions ship as
+# `action.yml` + a committed `dist/index.js`; that bundle is the artifact users
+# pin via `uses: jaegertracing/maintainer-tools/<tool>@vX.Y.Z`.
+!pr-nudge/dist/
+!pr-nudge/dist/**
+!pr-quota/dist/
+!pr-quota/dist/**
+!pr-weekly-digest/dist/
+!pr-weekly-digest/dist/**
+
+# Local SQLite cache for the predicate library.
+*.sqlite
+*.sqlite-journal
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js

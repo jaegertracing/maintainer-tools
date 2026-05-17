@@ -1,0 +1,25 @@
+name: 'Jaeger maintainer-tools PR Nudge'
+description: >
+  Computes PR predicates (DCO, CI rollup, merge conflict, staleness) and
+  publishes results to the GitHub Checks panel + manages a small set of state
+  labels. P0 scope; see docs/rfc/maintainer-pr-triage-tooling.md.
+author: 'Jaeger maintainers'
+inputs:
+  github-token:
+    description: 'Token used for GraphQL reads and Check Run / label writes.'
+    required: false
+    default: ${{ github.token }}
+  rules:
+    description: >
+      Comma-separated predicate IDs to run. Defaults to the full P0 set:
+      `dco_missing,ci_failing,merge_conflict,stale_on_author`.
+    required: false
+    default: 'dco_missing,ci_failing,merge_conflict,stale_on_author'
+  dry-run:
+    description: 'If `true`, log intended writes but do not call the GitHub API.'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
