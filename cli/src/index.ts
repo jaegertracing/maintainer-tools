@@ -34,6 +34,9 @@ Options:
   --format <fmt>      html | markdown (default: html).
   --output <path>     Write report here (default: stdout).
   --no-cache          Bypass the SQLite cache for this run.
+  --limit <n>         Cap PRs scanned per repo (for testing). PRs are
+                      list-ordered by updated-desc, so this samples the
+                      most recently active.
   --viewer <login>    Override the viewer (default: GraphQL viewer).
   --help              Show this help.
 
@@ -62,6 +65,7 @@ async function runTriage(argv: string[]): Promise<void> {
       format: { type: 'string', default: 'html' },
       output: { type: 'string' },
       'no-cache': { type: 'boolean', default: false },
+      limit: { type: 'string' },
       viewer: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -75,6 +79,8 @@ async function runTriage(argv: string[]): Promise<void> {
   if (values.format !== 'html' && values.format !== 'markdown') {
     throw new Error(`Unknown --format: ${values.format} (expected html|markdown)`);
   }
+
+  const limit = parseLimit(values.limit);
 
   log('loading config');
   const cfg = loadConfig(values.config);
@@ -98,8 +104,11 @@ async function runTriage(argv: string[]): Promise<void> {
     log(`viewer: @${viewer}`);
   }
 
-  log(`scanning ${cfg.repos.length} repo(s): ${cfg.repos.join(', ')}`);
-  const { prs, cacheHits, cacheMisses } = await scanRepos(cfg.repos, client, cache);
+  log(
+    `scanning ${cfg.repos.length} repo(s): ${cfg.repos.join(', ')}` +
+      (limit !== undefined ? ` (limit ${limit} per repo)` : ''),
+  );
+  const { prs, cacheHits, cacheMisses } = await scanRepos(cfg.repos, client, cache, { limit });
   log(`scan complete: ${prs.length} open PR(s) — ${cacheHits} cached, ${cacheMisses} fetched`);
 
   cache?.close();
@@ -124,6 +133,15 @@ async function runTriage(argv: string[]): Promise<void> {
     log('writing report to stdout');
     process.stdout.write(report);
   }
+}
+
+function parseLimit(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new Error(`--limit must be a positive integer (got ${raw})`);
+  }
+  return n;
 }
 
 function formatBucketTotals(classified: ClassifiedPR[]): string {

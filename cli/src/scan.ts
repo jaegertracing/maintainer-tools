@@ -23,10 +23,18 @@ export interface ScanResult {
   cacheHits: number;
 }
 
+export interface ScanOptions {
+  // Cap per-repo PR count. Caller-supplied for testing; production runs leave
+  // this undefined to scan everything. The list query returns PRs
+  // updated-desc, so this samples the most recently active.
+  limit?: number;
+}
+
 export async function scanRepos(
   repos: string[],
   client: GraphqlClient,
   cache: PrCache | null,
+  opts: ScanOptions = {},
 ): Promise<ScanResult> {
   const all: PullRequest[] = [];
   let misses = 0;
@@ -35,8 +43,15 @@ export async function scanRepos(
   for (const slug of repos) {
     const [owner, name] = slug.split('/', 2) as [string, string];
     log(`  ${slug}: listing open PRs...`);
-    const summaries = await client.listOpenPRs(owner, name);
-    log(`  ${slug}: ${summaries.length} open PR(s)`);
+    const fullList = await client.listOpenPRs(owner, name);
+    const summaries =
+      opts.limit !== undefined && fullList.length > opts.limit
+        ? fullList.slice(0, opts.limit)
+        : fullList;
+    log(
+      `  ${slug}: ${summaries.length} open PR(s)` +
+        (summaries.length < fullList.length ? ` (truncated from ${fullList.length})` : ''),
+    );
 
     let repoHits = 0;
     let repoMisses = 0;
