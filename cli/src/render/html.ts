@@ -148,7 +148,7 @@ const CSS = `
   details.bucket-youre-the-bottleneck { border-left-color: #cf222e; }
   details.bucket-high-trust-awaiting-first-response { border-left-color: #1f883d; }
   details.bucket-first-timer-awaiting { border-left-color: #8250df; }
-  details.bucket-codeowners-hits, details.bucket-fyi, details.bucket-hidden { border-left-color: #d0d7de; }
+  details.bucket-codeowners-hits, details.bucket-fyi, details.bucket-dependency-bots, details.bucket-hidden { border-left-color: #d0d7de; }
   summary { cursor: pointer; padding: 0.3em 0; font-weight: 600; }
   summary .count { font-weight: normal; color: #57606a; }
   /* table-layout: fixed + <col> widths keep columns aligned across every

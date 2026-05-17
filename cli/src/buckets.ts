@@ -23,6 +23,7 @@ export type Bucket =
   | 'first-timer-awaiting'
   | 'codeowners-hits'
   | 'fyi'
+  | 'dependency-bots'
   | 'hidden';
 
 export const BUCKET_ORDER: Bucket[] = [
@@ -32,6 +33,7 @@ export const BUCKET_ORDER: Bucket[] = [
   'first-timer-awaiting',
   'codeowners-hits',
   'fyi',
+  'dependency-bots',
   'hidden',
 ];
 
@@ -42,8 +44,20 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
   'first-timer-awaiting': 'First-time contributors awaiting first response',
   'codeowners-hits': 'CODEOWNERS hits',
   fyi: 'FYI',
+  'dependency-bots': 'Dependency bots',
   hidden: 'Hidden',
 };
+
+// Logins treated as "dependency bots" — PRs they open are reviewable
+// merges, just authored by a service account. They follow the same hide
+// rules as humans (draft / merge-conflict / CI red still send them to
+// Hidden) but otherwise get their own section so they don't drown out
+// human-authored PRs in CODEOWNERS hits / FYI.
+const DEPENDENCY_BOT_LOGINS = new Set<string>([
+  'dependabot[bot]',
+  'renovate[bot]',
+  'renovate-bot[bot]',
+]);
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
@@ -95,17 +109,28 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (pr.isDraft && !explicitlyRequested) {
     return mk('hidden', ['draft'], pr, checks, flags);
   }
-  if (isBotAuthor(pr) && !explicitlyRequested) {
-    return mk('hidden', ['bot-authored'], pr, checks, flags);
-  }
   if (hiddenByCheck && !explicitlyRequested) {
     return mk('hidden', [`hide:${hiddenByCheck.id}`], pr, checks, flags);
+  }
+  // Non-dependency bots (anything matching __typename=Bot or `*[bot]`
+  // login that we don't know about) → Hidden. Dependency bots get their
+  // own bucket below.
+  if (isBotAuthor(pr) && !isDependencyBot(pr) && !explicitlyRequested) {
+    return mk('hidden', ['bot-authored'], pr, checks, flags);
   }
 
   // --- Priority 1: someone clicked the viewer in Reviewers.
   if (explicitlyRequested) {
     reasons.push('viewer in reviewRequests');
     return mk('review-requested-on-you', reasons, pr, checks, flags);
+  }
+
+  // --- Dependency bots that survived the hide rules go to their own
+  // bucket regardless of CODEOWNERS / FYI signals. A dependabot PR
+  // touching a viewer-owned path is still a dependabot PR.
+  if (isDependencyBot(pr)) {
+    reasons.push('dependency bot');
+    return mk('dependency-bots', reasons, pr, checks, flags);
   }
 
   // --- Priority 2: viewer previously reviewed, author has acted since.
@@ -161,6 +186,11 @@ function isBotAuthor(pr: PullRequest): boolean {
   // Some bots (e.g. renovate, dependabot) sometimes show as User typename.
   // The conventional `[bot]` suffix is a reliable fallback signal.
   return pr.author.login.endsWith('[bot]');
+}
+
+function isDependencyBot(pr: PullRequest): boolean {
+  if (!pr.author) return false;
+  return DEPENDENCY_BOT_LOGINS.has(pr.author.login.toLowerCase());
 }
 
 function isFirstTimeContributor(pr: PullRequest): boolean {
