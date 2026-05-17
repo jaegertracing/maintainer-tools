@@ -2,12 +2,12 @@
 // `maintainer-tools` CLI entrypoint.
 //
 // Subcommands:
-//   triage   — scan configured repos and emit an HTML/markdown report
+//   triage   — scan configured repos and emit an HTML report
 //
 // Run `maintainer-tools triage --help` for flags.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
@@ -15,7 +15,6 @@ import { classify, type ClassifiedPR } from './buckets.js';
 import { loadConfig } from './config.js';
 import { log } from './log.js';
 import { renderHtml } from './render/html.js';
-import { renderMarkdown } from './render/markdown.js';
 import { makeClient, scanRepos } from './scan.js';
 import { resolveToken } from './token.js';
 
@@ -27,12 +26,14 @@ Commands:
 Run \`maintainer-tools <command> --help\` for command-specific flags.
 `;
 
+const DEFAULT_OUTPUT = 'triage.html';
+
 const TRIAGE_HELP = `Usage: maintainer-tools triage [options]
 
 Options:
   --config <path>     Path to JSON config (overrides discovery).
-  --format <fmt>      html | markdown (default: html).
-  --output <path>     Write report here (default: stdout).
+  --output <path>     Where to write the HTML report. Pass \`-\` for stdout.
+                      Default: ./${DEFAULT_OUTPUT}
   --no-cache          Bypass the SQLite cache for this run.
   --limit <n>         Cap PRs scanned per repo (for testing). PRs are
                       list-ordered by updated-desc, so this samples the
@@ -62,7 +63,6 @@ async function runTriage(argv: string[]): Promise<void> {
     args: argv,
     options: {
       config: { type: 'string' },
-      format: { type: 'string', default: 'html' },
       output: { type: 'string' },
       'no-cache': { type: 'boolean', default: false },
       limit: { type: 'string' },
@@ -76,11 +76,9 @@ async function runTriage(argv: string[]): Promise<void> {
     process.stdout.write(TRIAGE_HELP);
     return;
   }
-  if (values.format !== 'html' && values.format !== 'markdown') {
-    throw new Error(`Unknown --format: ${values.format} (expected html|markdown)`);
-  }
 
   const limit = parseLimit(values.limit);
+  const output = values.output ?? DEFAULT_OUTPUT;
 
   log('loading config');
   const cfg = loadConfig(values.config);
@@ -119,20 +117,19 @@ async function runTriage(argv: string[]): Promise<void> {
   const perRepoCounts = computePerRepoOpenCounts(prs);
   log(`bucket totals: ${formatBucketTotals(classified)}`);
 
-  log(`rendering ${values.format}`);
-  const report =
-    values.format === 'markdown'
-      ? renderMarkdown(classified, { viewer, now, authorOpenCounts: perRepoCounts })
-      : renderHtml(classified, { viewer, now, authorOpenCounts: perRepoCounts });
+  log('rendering HTML');
+  const report = renderHtml(classified, { viewer, now, authorOpenCounts: perRepoCounts });
 
-  if (values.output) {
-    mkdirSync(dirname(values.output), { recursive: true });
-    writeFileSync(values.output, report);
-    log(`wrote ${values.output} (${report.length} bytes)`);
-  } else {
+  if (output === '-') {
     log('writing report to stdout');
     process.stdout.write(report);
+    return;
   }
+
+  const absPath = resolve(output);
+  mkdirSync(dirname(absPath), { recursive: true });
+  writeFileSync(absPath, report);
+  log(`wrote ${absPath} (${report.length} bytes)`);
 }
 
 function parseLimit(raw: string | undefined): number | undefined {

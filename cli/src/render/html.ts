@@ -62,6 +62,20 @@ function renderRepoBlock(
 </section>`;
 }
 
+// Shared `<colgroup>` so every bucket-section table within a repo renders
+// with identical column widths. Combined with `table-layout: fixed` in the
+// CSS, this is what keeps the #/diff/title/author/flags/age columns lined
+// up across the per-bucket tables — without it, each table sizes its
+// columns independently based on its own content.
+const COLGROUP = `<colgroup>
+        <col class="col-num">
+        <col class="col-diff">
+        <col class="col-title">
+        <col class="col-author">
+        <col class="col-flags">
+        <col class="col-age">
+      </colgroup>`;
+
 function renderSection(
   section: BucketSection,
   repo: string,
@@ -82,7 +96,8 @@ function renderSection(
   void repo; // unused; reserved for per-repo link templating
   return `<details class="bucket bucket-${section.bucket}"${expanded}>
     <summary>${escape(label)} <span class="count">(${count})</span></summary>
-    <table>
+    <table class="pr-table">
+      ${COLGROUP}
       <thead><tr><th>#</th><th>diff</th><th>title</th><th>author</th><th>flags</th><th>age</th></tr></thead>
       <tbody>
       ${rows}
@@ -136,8 +151,19 @@ const CSS = `
   details.bucket-codeowners-hits, details.bucket-fyi, details.bucket-hidden { border-left-color: #d0d7de; }
   summary { cursor: pointer; padding: 0.3em 0; font-weight: 600; }
   summary .count { font-weight: normal; color: #57606a; }
-  table { border-collapse: collapse; width: 100%; margin: 0.5em 0 1em 0; font-size: 0.9em; }
-  th, td { padding: 0.3em 0.5em; text-align: left; vertical-align: top; }
+  /* table-layout: fixed + <col> widths keep columns aligned across every
+     per-bucket table in a repo. Without this, each table would size its
+     own columns based on its content and rows wouldn't line up vertically. */
+  table.pr-table { border-collapse: collapse; width: 100%; margin: 0.5em 0 1em 0; font-size: 0.9em; table-layout: fixed; }
+  table.pr-table .col-num    { width: 5em; }
+  table.pr-table .col-diff   { width: 7em; }
+  table.pr-table .col-title  { width: auto; }
+  table.pr-table .col-author { width: 14em; }
+  table.pr-table .col-flags  { width: 11em; }
+  table.pr-table .col-age    { width: 4em; }
+  /* word-break lets long titles wrap inside the fixed-width title column
+     instead of overflowing. */
+  th, td { padding: 0.3em 0.5em; text-align: left; vertical-align: top; word-wrap: break-word; word-break: break-word; }
   thead { color: #57606a; font-size: 0.85em; }
   tbody tr { border-top: 1px solid #eaeef2; }
   tbody tr:hover { background: #f6f8fa; }
