@@ -105,9 +105,10 @@ fan-out cost constant regardless of how many predicates exist.
 
 ## The cache
 
-`packages/checks/src/cache.ts` is a **persistent** SQLite cache, not
-per-run scratch space. The key is `(owner, repo, number)`; the freshness
-column is `updated_at` (ISO 8601 from GitHub).
+`packages/checks/src/cache.ts` is a **persistent** SQLite cache that lives
+on a maintainer's laptop, not per-run scratch space and not anything the
+actions touch. The key is `(owner, repo, number)`; the freshness column is
+`updated_at` (ISO 8601 from GitHub).
 
 Workflow when the CLI runs:
 
@@ -119,13 +120,32 @@ Workflow when the CLI runs:
 This keeps the steady-state cost of a daily `maintainer-tools triage` run
 near zero: only PRs that actually moved are re-fetched.
 
-The actions (`pr-nudge` etc.) don't use the cache — each event fires on
-one PR and the cache hit rate is approximately zero. To keep
-`better-sqlite3` (a native module) out of every action's ncc bundle, the
-cache is exposed only via a **subpath** import
+### Who uses what
+
+| Consumer                       | Where it runs                       | Uses the cache? |
+| ------------------------------ | ----------------------------------- | --------------- |
+| `pr-nudge` action              | GitHub-hosted runner, per PR event  | No              |
+| `pr-quota` action (P4)         | GitHub-hosted runner, per PR event  | No              |
+| `pr-weekly-digest` action      | GitHub-hosted runner, daily cron    | No              |
+| `maintainer-tools triage` CLI  | Maintainer's laptop, on demand      | Yes             |
+
+Two reasons the actions don't use it. (a) Ephemeral filesystem: GitHub-hosted
+runners are wiped after every job, so a SQLite file would never survive to
+the next invocation without `actions/cache`. (b) Wrong access pattern: each
+action fires on one PR and exits — cache hit rate is approximately zero. The
+cache's value comes from amortizing "fetch 250 PRs across 5 repos" down to
+"fetch the 3 that moved overnight," which is a CLI scenario.
+
+If we ever want multi-PR scanning inside an action (e.g. an org-wide nightly
+job), the options are (a) accept the cold-fetch cost, (b) plug in
+`actions/cache` around the SQLite file, or (c) keep state in a GitHub issue
+body / gist. None of those are on the roadmap.
+
+To keep `better-sqlite3` (a native module) out of every action's ncc bundle,
+the cache is exposed only via a **subpath** import
 (`@jaegertracing/maintainer-tools-checks/cache`) and `better-sqlite3` is
-listed as an `optionalDependency`. Action code touches it only through
-the main barrel, which does not re-export the cache.
+listed as an `optionalDependency`. Action code touches the library only
+through the main barrel, which does not re-export the cache.
 
 ## Actions: layout and bundling
 
