@@ -130,7 +130,7 @@ near zero: only PRs that actually moved are re-fetched.
 | Consumer                      | Where it runs                      | Uses the cache? |
 | ----------------------------- | ---------------------------------- | --------------- |
 | `pr-nudge` action             | GitHub-hosted runner, per PR event | No              |
-| `pr-quota` action (P5)        | GitHub-hosted runner, per PR event | No              |
+| `pr-quota` action (P6)        | GitHub-hosted runner, per PR event | No              |
 | `pr-weekly-digest` action     | GitHub-hosted runner, daily cron   | No              |
 | `maintainer-tools triage` CLI | Maintainer's laptop, on demand     | Yes             |
 
@@ -218,7 +218,7 @@ Three output surfaces, in decreasing volume:
    native UI affordance.
 2. **Labels** — state. `waiting-for-author`, `awaiting-maintainer-input`,
    `pr-quota-reached`. Searchable, filterable. Currently read-only;
-   write support lands in P4 (`pr-nudge` migration) and P5 (`pr-quota`).
+   write support lands in P5 (`pr-nudge` migration) and P6 (`pr-quota`).
 3. **Comments** — rare. Weekly digest, slash-command acks, `quota_exceeded`'s
    one-shot explanation. Every bot comment ends with an HTML-comment
    footer the bot uses to find and **edit in place** rather than reposting.
@@ -231,7 +231,7 @@ the consumer. A predicate that wants to surface in the digest sets
 
 - Cache: **implemented**, CLI-only.
 - Per-PR retries on transient GraphQL failures: **not yet** — relying on
-  Octokit's defaults. Likely needed before P4 cutover.
+  Octokit's defaults. Likely needed before P5 cutover.
 - Secondary-rate-limit handling: **not yet**. Will batch using `node-octokit`
   throttling plugin once we have a multi-PR consumer (CLI).
 

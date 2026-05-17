@@ -1,7 +1,7 @@
 # RFC: Maintainer PR Triage and Nudge Tooling
 
 * **Status**: RFC
-* **Last Updated**: 2026-05-18
+* **Last Updated**: 2026-05-17
 
 ---
 
@@ -236,32 +236,41 @@ Within each bucket, PRs sort by staleness (oldest first). Per-row fields: `[+X/-
 
 ## Implementation Plan
 
-Phases are ordered by dependency, not calendar. **Dry-run is a rollout
-*mode*, not a phase**: every action that writes to GitHub (P4 onward)
-ships with `dry-run: true` as its default, runs in that mode for 2–4
-weeks against real PR state, and gets a follow-up PR that flips the
-default once a maintainer is satisfied with the log output. The same
-decision tree executes either way; only the final HTTP mutation is
-gated.
+Phases are ordered by dependency and risk, not calendar. **Dry-run is a
+rollout *mode*, not a phase**: every action that writes to GitHub (P4
+onward) ships with `dry-run: true` as its default, runs in that mode
+for 2–4 weeks against real PR state, and gets a follow-up PR that flips
+the default once a maintainer is satisfied with the log output. The
+same decision tree executes either way; only the final HTTP mutation
+is gated.
 
-The check predicates (P3) land *before* the workflow migrations (P4/P5)
-because every new check is consumed by the triage CLI immediately — they
-need no GitHub writes — and the migrations want the full predicate set
-available so they don't regress signal coverage when they replace the
-existing JS.
+Ordering rationale:
+
+- **P3 (predicates) before P4 (first action)** — the new checks are
+  consumed by the triage CLI immediately with no GitHub writes, and
+  the action wants the full predicate set available so it doesn't
+  regress signal coverage at launch.
+- **P4 (weekly digest) before P5/P6 (migrations)** — the digest is
+  greenfield: there's no existing script it's replacing, so the only
+  failure mode is a quirky comment on a PR rather than regressing a
+  load-bearing workflow. Shipping it first exercises the entire action
+  pipeline (`action.yml`, ncc bundle, workflow YAML, event wiring, the
+  P2 publisher, footer-based idempotency) end-to-end on a low-stakes
+  surface. The migrations that *replace* existing scripts (P5, P6)
+  follow once the plumbing has cycled in production.
 
 | Phase | Scope |
 |---|---|
 | **P0** ✅ | New `jaegertracing/maintainer-tools` repo. Workspace layout, shared `packages/checks/` predicate library + Octokit GraphQL data layer + SQLite cache (`node:sqlite`). Four most-load-bearing checks (`dco_missing`, `ci_failing`, `merge_conflict`, `stale_on_author`). First action subfolder (`pr-nudge/`) with its `action.yml`, committed `dist/index.js` built by `@vercel/ncc`. |
 | **P1** ✅ | Triage HTML output. All seven attention buckets, hide rules wired to predicate library, dependency-bots split out from generic-bot Hidden. CLI-side quota enrichment so the first-timer bucket is accurate without depending on the upstream `pr-quota-reached` label. Run locally; zero contributor-visible risk. |
-| **P2** ✅ | Shared comment publisher in `packages/checks/`. Pure helpers (`formatFooter`, `parseFooter`, `bodyHash`, `isoWeek`) plus a `publishComment({kind, scope, body}, client, {dryRun})` writer that does the read → footer-parse → render → SHA-hash → POST/PATCH/SKIP decision in one place. Every later phase that posts or edits a PR comment consumes this module — without it, P4's slash-command acks, P5's quota one-shot, and P5.5's weekly digest would each reinvent the same idempotency logic. `--dry-run` is a flag on the publisher; the decision tree runs identically, only the mutation step is replaced with a log line. |
-| **P3** | Net-new check predicates: `description_empty`, `no_linked_issue`, `no_tests_for_code_change`, `unresolved_from_reviewer`, `resolved_without_reply`. (`bot_authored` is already covered by the classifier's existing dep-bot / generic-bot split.) Implemented in `packages/checks/src/predicates/`, wired into the triage CLI's classifier as hide-rules or per-row flags as appropriate. Local-only; no contributor-visible surface — the Checks-panel and digest outputs come later when the actions land. Each ships as `triggered: bool` only; calibration data over a few weeks of triage reports decides whether they're ready to surface on contributor-facing channels. |
-| **P4** | Migrate `waiting-for-author.yml`. Replace the `curl + actions/github-script` block with `uses: jaegertracing/maintainer-tools/pr-nudge@vX.Y.Z` configured for the `waiting_for_author` rule. State-based composite predicate, heuristic suppression of unanswered-author-comment PRs, slash-command handler (`/awaiting-input` / `/no-awaiting-input`) for the `awaiting-maintainer-input` label — using the P2 publisher for the ack comments. Ship with the `dry-run` default on; compare would-be label transitions against the existing JS for ≥ 1 week of real events before flipping. Same change applied to every consuming repo's workflow YAML in the same wave. |
-| **P5** | Add `pr-quota/` action subfolder. Migrate `pr-quota-manager.yml` to `uses: jaegertracing/maintainer-tools/pr-quota@vX.Y.Z`. Preserve `workflow_dispatch` + `dryRun` input. Quota math moves from `cli/src/quota.ts` into `packages/checks/` so the action and the CLI share one policy implementation (the CLI's existing computation pre-figures this — same tiers, same `pr-quota-reached` label). One-shot blocking / unblocking comments use the P2 publisher (`kind=quota_blocked` / `kind=quota_unblocked`). Same dry-run default rollout. |
-| **P5.5** | Add `pr-weekly-digest/` action subfolder. New `maintainer-tools-weekly-digest.yml` workflow with `uses: jaegertracing/maintainer-tools/pr-weekly-digest@vX.Y.Z` on a daily cron; one digest comment per PR per ISO week, idempotent via the P2 publisher's `kind=weekly_digest week=YYYY-Www` footer (same-week reruns edit in place, next-week run posts fresh). Same dry-run default rollout. P3's checks are what populate the digest body, so this phase mostly wires the cron, not new signal. |
-| **P6** *(optional)* | Cross-maintainer dashboard summarizing buckets for the whole maintainer group. Build only if maintainers want it. |
+| **P2** ✅ | Shared comment publisher in `packages/checks/`. Pure helpers (`formatFooter`, `parseFooter`, `bodyHash`, `isoWeek`) plus a `publishComment({kind, scope, body}, client, {dryRun})` writer that does the read → footer-parse → render → SHA-hash → POST/PATCH/SKIP decision in one place. Every later phase that posts or edits a PR comment consumes this module — without it, P4's weekly digest, P5's slash-command acks, and P6's quota one-shot would each reinvent the same idempotency logic. `--dry-run` is a flag on the publisher; the decision tree runs identically, only the mutation step is replaced with a log line. |
+| **P3** ✅ | Net-new check predicates: `description_empty`, `no_linked_issue`, `no_tests_for_code_change`, `unresolved_from_reviewer`, `resolved_without_reply`. (`bot_authored` is already covered by the classifier's existing dep-bot / generic-bot split.) Implemented in `packages/checks/src/predicates/`, wired into the triage CLI's classifier as hide-rules or per-row flags as appropriate. Local-only; no contributor-visible surface yet — the Checks-panel and digest outputs come later when the actions land. Each ships as `triggered: bool` only; calibration data over a few weeks of triage reports decides whether they're ready to surface on contributor-facing channels. |
+| **P4** | Add `pr-weekly-digest/` action subfolder. New `maintainer-tools-weekly-digest.yml` workflow with `uses: jaegertracing/maintainer-tools/pr-weekly-digest@vX.Y.Z` on a daily cron; one digest comment per PR per ISO week, idempotent via the P2 publisher's `kind=weekly_digest week=YYYY-Www` footer (same-week reruns edit in place, next-week run posts fresh). P3's checks populate the digest body. Greenfield — no existing script being replaced — so it's the safest place to first exercise the full ncc-bundled-action + workflow plumbing. Ship with `dry-run: true` default; flip after a calibration window. |
+| **P5** | Migrate `waiting-for-author.yml`. Replace the `curl + actions/github-script` block with `uses: jaegertracing/maintainer-tools/pr-nudge@vX.Y.Z` configured for the `waiting_for_author` rule. State-based composite predicate, heuristic suppression of unanswered-author-comment PRs, slash-command handler (`/awaiting-input` / `/no-awaiting-input`) for the `awaiting-maintainer-input` label — using the P2 publisher for the ack comments. Ship with the `dry-run` default on; compare would-be label transitions against the existing JS for ≥ 1 week of real events before flipping. Same change applied to every consuming repo's workflow YAML in the same wave. |
+| **P6** | Add `pr-quota/` action subfolder. Migrate `pr-quota-manager.yml` to `uses: jaegertracing/maintainer-tools/pr-quota@vX.Y.Z`. Preserve `workflow_dispatch` + `dryRun` input. Quota math moves from `cli/src/quota.ts` into `packages/checks/` so the action and the CLI share one policy implementation (the CLI's existing computation pre-figures this — same tiers, same `pr-quota-reached` label). One-shot blocking / unblocking comments use the P2 publisher (`kind=quota_blocked` / `kind=quota_unblocked`). Same dry-run default rollout. |
+| **P7** *(optional)* | Cross-maintainer dashboard summarizing buckets for the whole maintainer group. Build only if maintainers want it. |
 
-After P5, `stale.yml` is untouched. The two migrated workflow files (`waiting-for-author.yml`, `pr-quota-manager.yml`) stay in place — their `curl + actions/github-script` blocks are replaced by a single `uses: jaegertracing/maintainer-tools/<tool>@vX.Y.Z` step. Once all consuming repos migrate, the old JS files in `jaegertracing/jaeger/.github/scripts/` are deleted (or frozen at a `v0` tag for laggard repos still curl-fetching).
+After P6, `stale.yml` is untouched. The two migrated workflow files (`waiting-for-author.yml`, `pr-quota-manager.yml`) stay in place — their `curl + actions/github-script` blocks are replaced by a single `uses: jaegertracing/maintainer-tools/<tool>@vX.Y.Z` step. Once all consuming repos migrate, the old JS files in `jaegertracing/jaeger/.github/scripts/` are deleted (or frozen at a `v0` tag for laggard repos still curl-fetching).
 
 ---
 
@@ -269,7 +278,7 @@ After P5, `stale.yml` is untouched. The two migrated workflow files (`waiting-fo
 
 - **False positives.** A bot publishing a failing Check or a digest line on a correctly-signed-off PR is reputationally damaging. Per-check comments are eliminated in favor of the once-per-week digest *specifically* because comments are far more visible than Checks panel entries. Heuristic checks (`no_tests_for_code_change`, `resolved_without_reply`) ship as `neutral` with `inDigest: false` until calibration. Every rule has a per-repo opt-out.
 
-- **Migration regression.** The two migrated scripts currently work; the replacement must match, not approximate. For P4 and P5, run dry-run alongside the existing script for ~50 real PR events, diff would-be outputs, only flip after the diff is empty or explainable.
+- **Migration regression.** The two migrated scripts currently work; the replacement must match, not approximate. For P5 and P6, run dry-run alongside the existing script for ~50 real PR events, diff would-be outputs, only flip after the diff is empty or explainable.
 
 - **Cross-repo cutover coordination.** The JS files are consumed by every Jaeger-org repo. Migrating one repo to `uses:` while others still curl-fetch the old JS leaves two implementations running side-by-side. Mitigation: migrate the central `jaegertracing/jaeger` repo first (or in the same wave), and freeze the old JS at a `v0` tag — so any laggard repo continues to work unchanged until it's ready to switch to `uses:`. The new `uses:` syntax also makes per-repo version pinning explicit (Renovate/Dependabot will surface upgrade PRs), so subsequent rollouts are visible rather than implicit.
 
