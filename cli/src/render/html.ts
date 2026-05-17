@@ -175,7 +175,7 @@ const CSS = `
   .open-count { color: #57606a; font-size: 0.85em; }
   .flag { font-size: 0.7em; padding: 0.1em 0.4em; border-radius: 3px; background: #eaeef2; margin-right: 0.2em; }
   .flag-BLOCKER { background: #cf222e; color: white; }
-  .flag-CONFLICT { background: #ffebe9; color: #82071e; }
+  .flag-MERGE-CONFLICT { background: #ffebe9; color: #82071e; }
   .flag-STALE { background: #fff8c5; color: #66533d; }
   .flag-QUESTION { background: #ddf4ff; color: #0550ae; }
   .flag-POSSIBLE-QUESTION { background: #fff1e5; color: #66533d; }

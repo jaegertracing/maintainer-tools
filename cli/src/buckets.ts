@@ -77,7 +77,7 @@ export type RowFlag =
   | 'POSSIBLE-QUESTION'
   | 'QUESTION'
   | 'STALE'
-  | 'CONFLICT'
+  | 'MERGE-CONFLICT'
   | 'DRAFT'
   | 'BOT';
 
@@ -238,7 +238,7 @@ function computeFlags(pr: PullRequest, checks: CheckResult[]): RowFlag[] {
   if (pr.isDraft) flags.push('DRAFT');
   if (isBotAuthor(pr)) flags.push('BOT');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
-  if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('CONFLICT');
+  if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
   if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');
   if (pr.labels.includes('awaiting-maintainer-input')) flags.push('QUESTION');
   return flags;
