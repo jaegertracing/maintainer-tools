@@ -26,19 +26,41 @@ export interface CheckResult {
   hidesFromTriage: boolean;
 }
 
-// Minimal PR shape consumed by the predicates. Sourced from a single GraphQL
-// query (see graphql.ts) and intentionally narrower than the full GraphQL
-// schema so predicates don't depend on transport details.
+// GitHub's PR-author association enum.
+export type AuthorAssociation =
+  | 'COLLABORATOR'
+  | 'CONTRIBUTOR'
+  | 'FIRST_TIMER'
+  | 'FIRST_TIME_CONTRIBUTOR'
+  | 'MANNEQUIN'
+  | 'MEMBER'
+  | 'NONE'
+  | 'OWNER';
+
+export type ReviewState = 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | 'PENDING';
+
+// Minimal PR shape consumed by the predicates and the triage CLI. Sourced
+// from a single GraphQL query (see graphql.ts) and intentionally narrower
+// than the full GraphQL schema so predicates don't depend on transport
+// details. Triage-only fields (additions/files/reviews/...) live alongside
+// the P0 fields because the same query fills them both; predicates ignore
+// what they don't need.
 export interface PullRequest {
   repo: { owner: string; name: string };
   number: number;
   title: string;
   url: string;
-  author: { login: string } | null;
+  author: { login: string; typename: AuthorTypename } | null;
+  authorAssociation: AuthorAssociation;
   isDraft: boolean;
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
-  updatedAt: string; // ISO 8601
+  createdAt: string;
+  updatedAt: string;
   labels: string[];
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  files: string[]; // first 100 paths
   // Status check rollup state from the head commit; STATUS_ROLLUP can be
   // EXPECTED | ERROR | FAILURE | PENDING | SUCCESS, or null if no checks.
   statusCheckRollup: 'EXPECTED' | 'ERROR' | 'FAILURE' | 'PENDING' | 'SUCCESS' | null;
@@ -49,5 +71,25 @@ export interface PullRequest {
     messageHeadline: string;
     messageBody: string;
     authorEmail: string | null;
+    committedDate: string;
   }>;
+  // Pending requests (no review submitted yet). Users + teams.
+  reviewRequests: Array<{ kind: 'user' | 'team'; login: string }>;
+  // Submitted reviews (most recent per reviewer is typically what matters).
+  reviews: Array<{
+    author: string | null;
+    state: ReviewState;
+    submittedAt: string;
+  }>;
+  // Issue-style PR comments (last 50). Used by triage to decide whether a
+  // maintainer has responded yet; not used by predicates.
+  comments: Array<{ author: string | null; createdAt: string }>;
 }
+
+// Subset of GraphQL Actor __typename we care about.
+export type AuthorTypename =
+  | 'User'
+  | 'Bot'
+  | 'EnterpriseUserAccount'
+  | 'Mannequin'
+  | 'Organization';

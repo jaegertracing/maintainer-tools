@@ -23,9 +23,11 @@ Two kinds of consumer sit on top of it:
    Each is a self-contained subfolder with its own `action.yml` and a
    committed `dist/index.js` produced by `@vercel/ncc`. Triggered by repo
    events; writes back via the GitHub API (Check Runs, labels, comments).
-2. **Local CLI** (P1, not yet implemented) — `cli/maintainer-tools`.
-   Runs on a maintainer's laptop; reads the same library, writes an HTML
-   triage report instead of touching the GitHub API.
+2. **Local CLI** — `cli/`, exposed as `maintainer-tools triage`. Runs on a
+   maintainer's laptop; reads the same library, scans configured repos via
+   the SQLite cache, classifies each open PR into one of seven attention
+   buckets, and writes a self-contained HTML (or markdown) triage report.
+   Never touches the GitHub write API.
 
 Both consumers share **one** TypeScript definition of every check predicate
 ("DCO missing", "merge conflict", "CI failing", …). That's the central
@@ -227,6 +229,34 @@ the consumer. A predicate that wants to surface in the digest sets
 - Secondary-rate-limit handling: **not yet**. Will batch using `node-octokit`
   throttling plugin once we have a multi-PR consumer (CLI).
 
+## Triage CLI: bucket classifier
+
+`cli/src/buckets.ts` is a pure function that lands every open PR in
+exactly one of seven priority-ordered buckets:
+
+1. **review-requested-on-you** — viewer in `reviewRequests`. Strongest
+   signal; overrides every hide rule.
+2. **youre-the-bottleneck** — viewer has reviewed previously, author has
+   pushed or commented since.
+3. **high-trust-awaiting-first-response** — author is in the configured
+   `maintainers` or `interns` list, no maintainer has reviewed/commented.
+4. **first-timer-awaiting** — `authorAssociation` is `FIRST_TIME_*`, no
+   maintainer activity yet.
+5. **codeowners-hits** — PR files match the viewer's configured CODEOWNERS
+   globs for the repo.
+6. **fyi** — catch-all for open PRs with no stronger signal.
+7. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
+   predicate marked `hidesFromTriage`. Counts only; not listed.
+
+Hide rules run before bucket assignment. The lone exception is
+`review-requested-on-you`: an explicit review request from a maintainer
+overrides hide rules because GitHub's request is a deliberate signal.
+
+Renderers (`cli/src/render/html.ts`, `markdown.ts`) consume the classified
+list as-is. The HTML output is self-contained (inline CSS, no external
+assets), organized repo → bucket, with high-signal buckets expanded and
+low-signal collapsed.
+
 ## Repository conventions
 
 - ES modules everywhere (`"type": "module"`, NodeNext resolution). Relative
@@ -247,6 +277,8 @@ the consumer. A predicate that wants to surface in the digest sets
 | Add a new action        | New top-level `<tool>/` subfolder following `pr-nudge/`'s layout                 |
 | Change a surface        | The mapping is in each action's `src/index.ts` (e.g. `pr-nudge/src/index.ts`)    |
 | Add a new event trigger | Update `resolvePrRef()` in the relevant action; document in `action.yml`         |
+| Add/rebalance a bucket  | `cli/src/buckets.ts` — adjust `BUCKET_ORDER` and the branches in `classify()`    |
+| Adjust HTML look        | `cli/src/render/html.ts` — CSS is inlined at the bottom of the file              |
 
 ## See also
 

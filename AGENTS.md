@@ -30,12 +30,18 @@ maintainer-tools/
 │   ├── action.yml
 │   ├── src/
 │   └── dist/                  # ncc-bundled, COMMITTED — see "Action bundles" below
+├── cli/                       # local maintainer CLI: `maintainer-tools triage`
+│   ├── src/
+│   └── config.example.json
 ├── docs/rfc/                  # design docs
 └── .github/workflows/         # CI for this repo (not the actions it ships)
 ```
 
-Each top-level `<tool>/` is a published GitHub Action subfolder. New tools
-follow the same pattern: `<tool>/action.yml`, `<tool>/src/`, `<tool>/dist/`.
+Each top-level `<tool>/` is either a published GitHub Action subfolder
+(`pr-nudge/`, with committed `dist/`) or the local CLI (`cli/`, no
+committed build output — users `npm ci && npm run build`). New actions
+follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
+`<tool>/dist/`.
 
 ## Development Setup
 
