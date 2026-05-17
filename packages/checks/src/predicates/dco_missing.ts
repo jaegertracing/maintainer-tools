@@ -12,6 +12,11 @@ function hasSignoff(message: string): boolean {
 
 export function dcoMissing(pr: PullRequest): CheckResult {
   const unsigned = pr.commits.filter((c) => {
+    // Merge commits are exempt — the standard DCO check (apps/dco)
+    // excludes them because they're not authored by the contributor,
+    // just record the merge. A PR with green DCO upstream but a string
+    // of unsigned merge commits used to false-positive here.
+    if (c.parents > 1) return false;
     const message = `${c.messageHeadline}\n${c.messageBody}`;
     return !hasSignoff(message);
   });
@@ -22,9 +27,9 @@ export function dcoMissing(pr: PullRequest): CheckResult {
     triggered,
     summary: triggered
       ? `DCO missing on ${unsigned.length} commit(s): ${unsigned.map((c) => c.sha.slice(0, 7)).join(', ')}`
-      : 'DCO present on all commits',
+      : 'DCO present on all non-merge commits',
     details: triggered
-      ? 'Each commit must include a `Signed-off-by: Name <email>` trailer. Run `git commit --amend -s` or `git rebase --signoff` and force-push.'
+      ? 'Each non-merge commit must include a `Signed-off-by: Name <email>` trailer. Run `git commit --amend -s` or `git rebase --signoff` and force-push.'
       : undefined,
     publishesCheck: true,
     checkConclusion: triggered ? 'failure' : 'success',
