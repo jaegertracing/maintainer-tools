@@ -21,6 +21,7 @@ const KNOWN_IDS: ReadonlySet<CheckId> = new Set<CheckId>([
   'ci_failing',
   'merge_conflict',
   'stale_on_author',
+  'quota_exceeded',
 ]);
 
 interface PrRef {

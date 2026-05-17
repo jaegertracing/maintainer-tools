@@ -14,6 +14,7 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { classify, type ClassifiedPR } from './buckets.js';
 import { loadConfig } from './config.js';
 import { log } from './log.js';
+import { enrichQuotaState } from './quota.js';
 import { renderHtml } from './render/html.js';
 import { makeClient, scanRepos } from './scan.js';
 import { resolveToken } from './token.js';
@@ -35,6 +36,9 @@ Options:
   --output <path>     Where to write the HTML report. Pass \`-\` for stdout.
                       Default: ./${DEFAULT_OUTPUT}
   --no-cache          Bypass the SQLite cache for this run.
+  --no-quota          Skip the per-author quota computation. Faster, but
+                      relies solely on the \`pr-quota-reached\` label for
+                      identifying quota-blocked PRs.
   --limit <n>         Cap PRs scanned per repo (for testing). PRs are
                       list-ordered by updated-desc, so this samples the
                       most recently active.
@@ -65,6 +69,7 @@ async function runTriage(argv: string[]): Promise<void> {
       config: { type: 'string' },
       output: { type: 'string' },
       'no-cache': { type: 'boolean', default: false },
+      'no-quota': { type: 'boolean', default: false },
       limit: { type: 'string' },
       viewer: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
@@ -110,6 +115,13 @@ async function runTriage(argv: string[]): Promise<void> {
   log(`scan complete: ${prs.length} open PR(s) — ${cacheHits} cached, ${cacheMisses} fetched`);
 
   cache?.close();
+
+  if (values['no-quota']) {
+    log('quota: computation skipped (--no-quota); label-only mode');
+  } else {
+    const exemptLogins = new Set([...cfg.maintainers, ...cfg.interns]);
+    await enrichQuotaState(prs, client, { exemptLogins });
+  }
 
   log('classifying PRs into buckets');
   const now = new Date();

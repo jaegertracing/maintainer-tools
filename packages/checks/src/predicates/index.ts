@@ -2,18 +2,21 @@ export { dcoMissing } from './dco_missing.js';
 export { ciFailing } from './ci_failing.js';
 export { mergeConflict } from './merge_conflict.js';
 export { staleOnAuthor } from './stale_on_author.js';
+export { quotaExceeded } from './quota_exceeded.js';
 
 import type { CheckId, CheckResult, PullRequest } from '../types.js';
 import { dcoMissing } from './dco_missing.js';
 import { ciFailing } from './ci_failing.js';
 import { mergeConflict } from './merge_conflict.js';
 import { staleOnAuthor } from './stale_on_author.js';
+import { quotaExceeded } from './quota_exceeded.js';
 
 export const P0_PREDICATES: Record<CheckId, (pr: PullRequest) => CheckResult> = {
   dco_missing: dcoMissing,
   ci_failing: ciFailing,
   merge_conflict: mergeConflict,
   stale_on_author: staleOnAuthor,
+  quota_exceeded: quotaExceeded,
 };
 
 export function runAll(pr: PullRequest, ids?: readonly CheckId[]): CheckResult[] {

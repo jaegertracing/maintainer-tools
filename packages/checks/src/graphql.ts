@@ -27,6 +27,11 @@ export interface GraphqlClient {
   fetchViewerLogin(): Promise<string>;
   listOpenPRs(owner: string, repo: string): Promise<PrSummary[]>;
   fetchPullRequest(owner: string, repo: string, number: number): Promise<PullRequest>;
+  // Count merged PRs by `author` in `owner/repo`. Used by the quota
+  // computation in the CLI. Implemented via GraphQL search, which returns
+  // an exact `issueCount` without paginating — far cheaper than walking
+  // closed PRs page-by-page.
+  countMergedPRs(owner: string, repo: string, author: string): Promise<number>;
 }
 
 interface PullRequestNode {
@@ -160,6 +165,16 @@ const LIST_QUERY = `
 
 const VIEWER_QUERY = `query Viewer { viewer { login } }`;
 
+// `first: 1` (not 0 — GraphQL search rejects 0) and we read only issueCount;
+// the actual node is discarded. issueCount is the authoritative total.
+const MERGED_COUNT_QUERY = `
+  query MergedCount($q: String!) {
+    search(query: $q, type: ISSUE, first: 1) {
+      issueCount
+    }
+  }
+`;
+
 export function createGraphqlClient(token: string): GraphqlClient {
   const gql = graphql.defaults({
     headers: { authorization: `token ${token}` },
@@ -169,6 +184,13 @@ export function createGraphqlClient(token: string): GraphqlClient {
     async fetchViewerLogin() {
       const data = await gql<{ viewer: { login: string } }>(VIEWER_QUERY);
       return data.viewer.login;
+    },
+
+    async countMergedPRs(owner, repo, author) {
+      const data = await gql<{ search: { issueCount: number } }>(MERGED_COUNT_QUERY, {
+        q: `repo:${owner}/${repo} author:${author} is:pr is:merged`,
+      });
+      return data.search.issueCount;
     },
 
     async listOpenPRs(owner, repo) {
