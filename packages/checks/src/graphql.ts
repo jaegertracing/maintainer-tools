@@ -12,9 +12,20 @@
 import { graphql } from '@octokit/graphql';
 import type { AuthorAssociation, AuthorTypename, PullRequest, ReviewState } from './types.js';
 
+// Fields returned by listOpenPRs. Together (updatedAt, headSha, headRollup)
+// they form the cache freshness key — see scan.ts. `updatedAt` alone is not
+// enough because GitHub does not advance it when CI checks complete or when
+// the base branch advances under the PR.
+export interface PrSummary {
+  number: number;
+  updatedAt: string;
+  headSha: string | null;
+  headRollup: PullRequest['statusCheckRollup'];
+}
+
 export interface GraphqlClient {
   fetchViewerLogin(): Promise<string>;
-  listOpenPRs(owner: string, repo: string): Promise<Array<{ number: number; updatedAt: string }>>;
+  listOpenPRs(owner: string, repo: string): Promise<PrSummary[]>;
   fetchPullRequest(owner: string, repo: string, number: number): Promise<PullRequest>;
 }
 
@@ -130,7 +141,18 @@ const LIST_QUERY = `
     repository(owner: $owner, name: $repo) {
       pullRequests(states: OPEN, first: 100, after: $cursor, orderBy: {field: UPDATED_AT, direction: DESC}) {
         pageInfo { hasNextPage endCursor }
-        nodes { number updatedAt }
+        nodes {
+          number
+          updatedAt
+          commits(last: 1) {
+            nodes {
+              commit {
+                oid
+                statusCheckRollup { state }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -150,20 +172,40 @@ export function createGraphqlClient(token: string): GraphqlClient {
     },
 
     async listOpenPRs(owner, repo) {
+      type ListNode = {
+        number: number;
+        updatedAt: string;
+        commits: {
+          nodes: Array<{
+            commit: {
+              oid: string;
+              statusCheckRollup: { state: PullRequest['statusCheckRollup'] } | null;
+            };
+          }>;
+        };
+      };
       type ListResp = {
         repository: {
           pullRequests: {
             pageInfo: { hasNextPage: boolean; endCursor: string | null };
-            nodes: Array<{ number: number; updatedAt: string }>;
+            nodes: ListNode[];
           };
         };
       };
-      const out: Array<{ number: number; updatedAt: string }> = [];
+      const out: PrSummary[] = [];
       let cursor: string | null = null;
       // Paginate until exhausted. 100 PRs per page; most repos have one page.
       do {
         const data: ListResp = await gql<ListResp>(LIST_QUERY, { owner, repo, cursor });
-        out.push(...data.repository.pullRequests.nodes);
+        for (const n of data.repository.pullRequests.nodes) {
+          const head = n.commits.nodes[0]?.commit;
+          out.push({
+            number: n.number,
+            updatedAt: n.updatedAt,
+            headSha: head?.oid ?? null,
+            headRollup: head?.statusCheckRollup?.state ?? null,
+          });
+        }
         cursor = data.repository.pullRequests.pageInfo.hasNextPage
           ? data.repository.pullRequests.pageInfo.endCursor
           : null;

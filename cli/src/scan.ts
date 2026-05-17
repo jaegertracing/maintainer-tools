@@ -1,9 +1,16 @@
 // Cross-repo PR scanner.
 //
 // For each configured repo:
-//   1. listOpenPRs() — cheap pagination, returns {number, updatedAt} pairs.
-//   2. For each PR, look up the cache by updatedAt; on miss, fetch via the
-//      full-PR query and write back.
+//   1. listOpenPRs() — cheap pagination; returns each PR's updatedAt, head
+//      SHA, and head-commit status check rollup.
+//   2. For each PR, check the cache against all three fields; on miss,
+//      fetch the full PR and overwrite.
+//
+// All three fields matter because GitHub does not advance `updatedAt`
+// when CI completes (rollup state changes on the commit, not the PR) or
+// when the base branch advances under the PR (mergeable flips silently).
+// Comparing the head SHA also catches force-pushes that somehow didn't
+// bump updatedAt.
 //
 // Logs each phase so the user can see what's happening — long fetch loops
 // against large repos would otherwise look hung.
@@ -11,6 +18,7 @@
 import {
   createGraphqlClient,
   type GraphqlClient,
+  type PrSummary,
   type PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
 import { type PrCache } from '@jaegertracing/maintainer-tools-checks/cache';
@@ -58,7 +66,7 @@ export async function scanRepos(
     for (let i = 0; i < summaries.length; i++) {
       const s = summaries[i]!;
       const cached = cache?.get(owner, name, s.number);
-      if (cached && cached.updatedAt === s.updatedAt) {
+      if (cached && isFresh(cached, s)) {
         all.push(cached);
         hits++;
         repoHits++;
@@ -75,6 +83,19 @@ export async function scanRepos(
   }
 
   return { prs: all, cacheMisses: misses, cacheHits: hits };
+}
+
+// Three-part freshness check. If updatedAt drifted, the PR moved (push,
+// comment, review, label). If headSha drifted, the branch was force-pushed
+// without bumping updatedAt — rare but possible. If headRollup drifted, CI
+// completed and the cached `statusCheckRollup` is stale.
+function isFresh(cached: PullRequest, s: PrSummary): boolean {
+  const cachedHead = cached.commits[cached.commits.length - 1];
+  return (
+    cached.updatedAt === s.updatedAt &&
+    (cachedHead?.sha ?? null) === s.headSha &&
+    cached.statusCheckRollup === s.headRollup
+  );
 }
 
 export function makeClient(token: string): GraphqlClient {
