@@ -47,6 +47,7 @@ interface PullRequestNode {
   changedFiles: number;
   authorAssociation: AuthorAssociation;
   author: { login: string; __typename: AuthorTypename } | null;
+  body: string | null;
   labels: { nodes: Array<{ name: string }> };
   files: { nodes: Array<{ path: string }> };
   reviewRequests: {
@@ -62,6 +63,15 @@ interface PullRequestNode {
       author: { login: string } | null;
       state: ReviewState;
       submittedAt: string | null;
+    }>;
+  };
+  reviewThreads: {
+    nodes: Array<{
+      isResolved: boolean;
+      resolvedBy: { login: string } | null;
+      comments: {
+        nodes: Array<{ author: { login: string } | null; createdAt: string }>;
+      };
     }>;
   };
   comments: {
@@ -100,6 +110,7 @@ const PR_QUERY = `
         changedFiles
         authorAssociation
         author { login __typename }
+        body
         labels(first: 50) { nodes { name } }
         files(first: 100) { nodes { path } }
         reviewRequests(first: 50) {
@@ -116,6 +127,18 @@ const PR_QUERY = `
             author { login }
             state
             submittedAt
+          }
+        }
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+            resolvedBy { login }
+            comments(first: 50) {
+              nodes {
+                author { login }
+                createdAt
+              }
+            }
           }
         }
         comments(last: 50) {
@@ -287,6 +310,15 @@ export function createGraphqlClient(token: string): GraphqlClient {
         comments: pr.comments.nodes.map((c) => ({
           author: c.author?.login ?? null,
           createdAt: c.createdAt,
+        })),
+        body: pr.body ?? '',
+        reviewThreads: pr.reviewThreads.nodes.map((t) => ({
+          isResolved: t.isResolved,
+          resolvedBy: t.resolvedBy?.login ?? null,
+          comments: t.comments.nodes.map((c) => ({
+            author: c.author?.login ?? null,
+            createdAt: c.createdAt,
+          })),
         })),
       };
     },

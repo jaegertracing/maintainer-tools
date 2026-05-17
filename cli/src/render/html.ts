@@ -87,30 +87,21 @@ function renderSection(
   const expanded = BUCKETS_EXPANDED_BY_DEFAULT.has(section.bucket) ? ' open' : '';
   const label = BUCKET_LABELS[section.bucket];
   const count = section.prs.length;
-
-  if (section.bucket === 'hidden') {
-    // Hidden bucket renders as count + breakdown, no individual rows.
-    return renderHiddenSection(section, label, count);
-  }
-
+  const isHidden = section.bucket === 'hidden';
+  // Last column is "flags" for actionable buckets, "reason" for hidden ones
+  // (why the row isn't surfaced). Same column position so widths align.
+  const lastHeader = isHidden ? 'reason' : 'flags';
   const rows = section.prs.map((c) => renderRow(c, viewer, now, counts)).join('\n      ');
   void repo; // unused; reserved for per-repo link templating
   return `<details class="bucket bucket-${section.bucket}"${expanded}>
     <summary>${escape(label)} <span class="count">(${count})</span></summary>
     <table class="pr-table">
       ${COLGROUP}
-      <thead><tr><th>#</th><th>diff</th><th>title</th><th>author</th><th>flags</th><th>age</th></tr></thead>
+      <thead><tr><th>#</th><th>diff</th><th>title</th><th>author</th><th>${lastHeader}</th><th>age</th></tr></thead>
       <tbody>
       ${rows}
       </tbody>
     </table>
-  </details>`;
-}
-
-function renderHiddenSection(section: BucketSection, label: string, count: number): string {
-  return `<details class="bucket bucket-hidden">
-    <summary>${escape(label)} <span class="count">(${count})</span></summary>
-    <p class="hidden-note">PRs in this bucket aren't actionable until the contributor moves: waiting-for-author, drafts, bot-authored. Listed here for completeness.</p>
   </details>`;
 }
 
@@ -125,16 +116,31 @@ function renderRow(
   const author = pr.author?.login ?? '(unknown)';
   const openCount = counts.get(author) ?? 1;
   const authorTag = author === viewer ? ' <span class="role-tag">you</span>' : '';
-  const flags = c.flags.map((f) => `<span class="flag flag-${f}">${escape(f)}</span>`).join(' ');
+  const lastCell =
+    c.bucket === 'hidden'
+      ? renderHideReason(c.reasons[0] ?? 'unknown')
+      : c.flags.map((f) => `<span class="flag flag-${f}">${escape(f)}</span>`).join(' ');
   const age = formatAge(pr, now);
   return `<tr>
         <td><a href="${pr.url}">#${pr.number}</a></td>
         <td>${diff}</td>
         <td>${escape(pr.title)}</td>
         <td><a href="https://github.com/${escape(author)}">@${escape(author)}</a>${authorTag} <span class="open-count">[${openCount} open]</span></td>
-        <td>${flags}</td>
+        <td>${lastCell}</td>
         <td>${escape(age)}</td>
       </tr>`;
+}
+
+// Renders the classifier's hide reason as a small neutral chip. Reasons
+// come from the bucket classifier in one of three forms:
+//   - `draft`              -> author opened it as a draft
+//   - `bot-authored`       -> non-dependency bot author
+//   - `hide:<predicate_id>` -> a predicate with hidesFromTriage=true fired
+// Normalize to a SHORT-DASH-CASE label.
+function renderHideReason(raw: string): string {
+  const stripped = raw.startsWith('hide:') ? raw.slice(5) : raw;
+  const label = stripped.replace(/_/g, '-').toUpperCase();
+  return `<span class="flag flag-HIDE">${escape(label)}</span>`;
 }
 
 // Inline favicon: a white funnel (the triage metaphor — many PRs in, a
@@ -191,8 +197,7 @@ const CSS = `
   .flag-STALE { background: #fff8c5; color: #66533d; }
   .flag-QUESTION { background: #ddf4ff; color: #0550ae; }
   .flag-POSSIBLE-QUESTION { background: #fff1e5; color: #66533d; }
-  .flag-DRAFT, .flag-BOT { background: #eaeef2; color: #57606a; }
-  .hidden-note { color: #57606a; font-size: 0.85em; margin: 0.5em 0; }
+  .flag-DRAFT, .flag-BOT, .flag-HIDE { background: #eaeef2; color: #57606a; }
   footer { margin-top: 4em; color: #8b949e; font-size: 0.8em; border-top: 1px solid #eaeef2; padding-top: 1em; }
 `;
 
