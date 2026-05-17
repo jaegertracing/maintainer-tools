@@ -75,13 +75,16 @@ export interface PullRequest {
   // EXPECTED | ERROR | FAILURE | PENDING | SUCCESS, or null if no checks.
   statusCheckRollup: 'EXPECTED' | 'ERROR' | 'FAILURE' | 'PENDING' | 'SUCCESS' | null;
   // Per-commit DCO inspection. A commit fails DCO if no message line matches
-  // `Signed-off-by: <name> <email>` for the commit author.
+  // `Signed-off-by: <name> <email>` for the commit author. Merge commits
+  // (`parents > 1`) are exempt — they're not authored by the contributor
+  // and the standard DCO action excludes them.
   commits: Array<{
     sha: string;
     messageHeadline: string;
     messageBody: string;
     authorEmail: string | null;
     committedDate: string;
+    parents: number;
   }>;
   // Pending requests (no review submitted yet). Users + teams.
   reviewRequests: Array<{ kind: 'user' | 'team'; login: string }>;
