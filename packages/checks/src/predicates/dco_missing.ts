@@ -1,11 +1,19 @@
 import type { CheckResult, PullRequest } from '../types.js';
 
-const SIGNED_OFF_RE = /^Signed-off-by: .+ <[^>]+>\s*$/m;
+// Tested per-line so `[^<]+<[^>]+>` is unambiguous (the boundary characters
+// can't appear in the adjacent character classes), avoiding the polynomial
+// backtracking the previous multi-line `.+ <[^>]+>` pattern allowed on
+// inputs like `Signed-off-by: a <a <a <…` with no closing `>`.
+const SIGNED_OFF_LINE_RE = /^Signed-off-by: [^<]+<[^>]+>\s*$/;
+
+function hasSignoff(message: string): boolean {
+  return message.split('\n').some((line) => SIGNED_OFF_LINE_RE.test(line));
+}
 
 export function dcoMissing(pr: PullRequest): CheckResult {
   const unsigned = pr.commits.filter((c) => {
     const message = `${c.messageHeadline}\n${c.messageBody}`;
-    return !SIGNED_OFF_RE.test(message);
+    return !hasSignoff(message);
   });
 
   const triggered = unsigned.length > 0;
