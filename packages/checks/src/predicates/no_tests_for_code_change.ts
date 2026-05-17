@@ -8,16 +8,25 @@ const CODE_EXTENSIONS = new Set(['go', 'ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'ja
 // language test convention, or the path crosses a known test directory.
 function isTestFile(path: string): boolean {
   const lower = path.toLowerCase();
+  const basename = path.split('/').pop() ?? '';
+
+  // Lowercase-safe conventions.
   if (
     lower.endsWith('_test.go') ||
     /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(lower) ||
-    /^test_.*\.py$/.test(lower.split('/').pop() ?? '') ||
+    /^test_.*\.py$/.test(basename.toLowerCase()) ||
     /_test\.py$/.test(lower) ||
-    /_test\.rs$/.test(lower) ||
-    /test\.java$/.test(lower)
+    /_test\.rs$/.test(lower)
   ) {
     return true;
   }
+
+  // Java requires case-sensitive matching on the basename. JUnit
+  // conventions: `TestFoo.java`, `FooTest.java`, `FooTests.java`,
+  // `FooIT.java`. Lowercasing here would mis-match e.g. `Contest.java`
+  // → `contest.java` ends with `test.java` but is obviously not a test.
+  if (basename.endsWith('.java') && isJavaTest(basename)) return true;
+
   // Match path segments rather than substrings so `tests/foo.go` (no
   // leading slash, at the repo root) and `pkg/tests/foo.go` are both
   // recognised.
@@ -27,6 +36,20 @@ function isTestFile(path: string): boolean {
     segments.includes('tests') ||
     segments.includes('__tests__') ||
     segments.includes('spec')
+  );
+}
+
+function isJavaTest(basename: string): boolean {
+  // Capital T (or I for IT) preceded by a lowercase letter, digit, or
+  // underscore, OR a `TestX` / `Test.java` prefix. The boundary excludes
+  // basenames like `Contest.java` where `test` is part of a longer word.
+  return (
+    /[a-z0-9_]Test\.java$/.test(basename) ||
+    /[a-z0-9_]Tests\.java$/.test(basename) ||
+    /[a-z0-9_]IT\.java$/.test(basename) ||
+    /^Test[A-Z]/.test(basename) ||
+    basename === 'Test.java' ||
+    basename === 'Tests.java'
   );
 }
 

@@ -119,7 +119,7 @@ function renderRow(
   const lastCell =
     c.bucket === 'hidden'
       ? renderHideReason(c.reasons[0] ?? 'unknown')
-      : c.flags.map((f) => `<span class="flag flag-${f}">${escape(f)}</span>`).join(' ');
+      : c.flags.map(renderFlag).join(' ');
   const age = formatAge(pr, now);
   return `<tr>
         <td><a href="${pr.url}">#${pr.number}</a></td>
@@ -129,6 +129,16 @@ function renderRow(
         <td>${lastCell}</td>
         <td>${escape(age)}</td>
       </tr>`;
+}
+
+// Render one row flag. CSS class is the alphanumeric+dash prefix of the
+// label (everything before the first colon) with non-class-safe chars
+// rewritten to `-` — so `RESOLVED-W/O-REPLY: 3` displays the full label
+// but uses `flag-RESOLVED-W-O-REPLY` as its class.
+function renderFlag(label: string): string {
+  const head = (label.split(':')[0] ?? label).trim();
+  const cls = head.replace(/[^A-Za-z0-9-]/g, '-');
+  return `<span class="flag flag-${cls}">${escape(label)}</span>`;
 }
 
 // Renders the classifier's hide reason as a small neutral chip. Reasons
@@ -198,6 +208,12 @@ const CSS = `
   .flag-QUESTION { background: #ddf4ff; color: #0550ae; }
   .flag-POSSIBLE-QUESTION { background: #fff1e5; color: #66533d; }
   .flag-DRAFT, .flag-BOT, .flag-HIDE { background: #eaeef2; color: #57606a; }
+  /* P3 advisory flags — distinct muted tones so the column is scannable
+     but the flags don't compete with BLOCKER/MERGE-CONFLICT for attention. */
+  .flag-NO-ISSUE { background: #fff1e5; color: #66533d; }
+  .flag-NO-TESTS { background: #fff1e5; color: #66533d; }
+  .flag-UNRESOLVED { background: #fff8c5; color: #66533d; }
+  .flag-RESOLVED-W-O-REPLY { background: #ffebe9; color: #82071e; }
   footer { margin-top: 4em; color: #8b949e; font-size: 0.8em; border-top: 1px solid #eaeef2; padding-top: 1em; }
 `;
 

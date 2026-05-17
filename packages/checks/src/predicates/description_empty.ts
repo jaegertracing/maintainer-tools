@@ -31,9 +31,36 @@ export function descriptionEmpty(pr: PullRequest): CheckResult {
 // HTML comments, and whitespace. Doesn't try to be perfect — just enough to
 // distinguish a real description from `## What\n\n## Why\n\n## How\n`.
 function strippedLength(body: string): number {
-  return body
-    .replace(/<!--[\s\S]*?-->/g, '') // HTML comments (PR templates)
+  return stripHtmlComments(body)
     .replace(/^#+\s.*$/gm, '') // markdown headings
     .replace(/^[-*]\s*$/gm, '') // empty list markers
     .replace(/\s+/g, '').length; // all whitespace
+}
+
+// Linear-time HTML-comment stripper. Avoids the polynomial backtracking
+// CodeQL flags on `/<!--[\s\S]*?-->/g` against pathological input like
+// `<!--<!--<!--...` with no closing `-->`. Also forecloses the "incomplete
+// multi-character sanitization" warning since each `<!-- ... -->` pair is
+// consumed by index slice rather than a regex substitution that could
+// leave a partial marker behind.
+function stripHtmlComments(s: string): string {
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const start = s.indexOf('<!--', i);
+    if (start === -1) {
+      out += s.slice(i);
+      break;
+    }
+    out += s.slice(i, start);
+    const end = s.indexOf('-->', start + 4);
+    if (end === -1) {
+      // Unclosed comment — match the prior regex's behavior of leaving the
+      // tail alone rather than swallowing the rest of the input.
+      out += s.slice(start);
+      break;
+    }
+    i = end + 3;
+  }
+  return out;
 }

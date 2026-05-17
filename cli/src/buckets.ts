@@ -86,14 +86,11 @@ export interface ClassifiedPR {
   flags: RowFlag[];
 }
 
-export type RowFlag =
-  | 'BLOCKER'
-  | 'POSSIBLE-QUESTION'
-  | 'QUESTION'
-  | 'STALE'
-  | 'MERGE-CONFLICT'
-  | 'DRAFT'
-  | 'BOT';
+// Row-flag labels rendered in the `flags` column of each PR row. The
+// `RESOLVED-W/O-REPLY:N` variant carries a count appended after a colon;
+// the renderer splits on `:` to derive a stable CSS class. `string` rather
+// than a tighter union so dynamic forms compose cleanly.
+export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const checks = runAll(pr);
@@ -278,5 +275,41 @@ function computeFlags(pr: PullRequest, checks: CheckResult[]): RowFlag[] {
   if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
   if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');
   if (pr.labels.includes('awaiting-maintainer-input')) flags.push('QUESTION');
+
+  // P3 predicates: each fires as a visible row flag when triggered. These
+  // checks are advisory (no hide rule beyond `description_empty`, which
+  // hides via its own `hidesFromTriage: true`), so they show up here so a
+  // maintainer can spot them at a glance in the triage table.
+  if (checks.some((c) => c.id === 'no_linked_issue' && c.triggered)) flags.push('NO-ISSUE');
+  if (checks.some((c) => c.id === 'no_tests_for_code_change' && c.triggered)) {
+    flags.push('NO-TESTS');
+  }
+  if (checks.some((c) => c.id === 'unresolved_from_reviewer' && c.triggered)) {
+    flags.push('UNRESOLVED');
+  }
+  if (checks.some((c) => c.id === 'resolved_without_reply' && c.triggered)) {
+    // Per the RFC, surface the offender count so a maintainer can decide
+    // whether to re-open. Recomputed here from pr.reviewThreads rather
+    // than threaded through CheckResult — same data, no extra plumbing.
+    const count = countResolvedWithoutReply(pr);
+    flags.push(`RESOLVED-W/O-REPLY: ${count}`);
+  }
   return flags;
+}
+
+function countResolvedWithoutReply(pr: PullRequest): number {
+  const authorLogin = pr.author?.login;
+  if (!authorLogin) return 0;
+  let n = 0;
+  for (const t of pr.reviewThreads ?? []) {
+    if (!t.isResolved || t.resolvedBy !== authorLogin) continue;
+    const reviewerComments = t.comments.filter((c) => c.author && c.author !== authorLogin);
+    if (reviewerComments.length === 0) continue;
+    const latest = Math.max(...reviewerComments.map((c) => Date.parse(c.createdAt)));
+    const replied = t.comments.some(
+      (c) => c.author === authorLogin && Date.parse(c.createdAt) > latest,
+    );
+    if (!replied) n++;
+  }
+  return n;
 }
