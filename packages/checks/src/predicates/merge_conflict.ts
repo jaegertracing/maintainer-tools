@@ -14,8 +14,11 @@ export function mergeConflict(pr: PullRequest): CheckResult {
     publishesCheck: true,
     checkConclusion: triggered ? 'failure' : 'success',
     inDigest: triggered,
-    // `merge_conflict` keeps the PR visible in triage — a maintainer may still
-    // want to comment direction even while conflicts are unresolved. See RFC.
-    hidesFromTriage: false,
+    // A merge conflict puts the ball in the author's court — nothing for a
+    // maintainer to do until the rebase lands. Hide from triage; pr-nudge
+    // will surface it to the author via the `waiting-for-author` composite.
+    // (The RFC predicate table had `Hidden: no` here, but that's
+    // inconsistent with `waiting_for_author` being OR'd over this predicate.)
+    hidesFromTriage: triggered,
   };
 }
