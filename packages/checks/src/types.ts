@@ -5,7 +5,12 @@
 // report) it publishes to, independently of whether the check `triggered`.
 // See the RFC: docs/rfc/maintainer-pr-triage-tooling.md ("Predicate library").
 
-export type CheckId = 'dco_missing' | 'ci_failing' | 'merge_conflict' | 'stale_on_author';
+export type CheckId =
+  | 'dco_missing'
+  | 'ci_failing'
+  | 'merge_conflict'
+  | 'stale_on_author'
+  | 'quota_exceeded';
 
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
 
@@ -84,6 +89,18 @@ export interface PullRequest {
   // Issue-style PR comments (last 50). Used by triage to decide whether a
   // maintainer has responded yet; not used by predicates.
   comments: Array<{ author: string | null; createdAt: string }>;
+
+  // Optional computed annotations. Filled in by enrichment passes that have
+  // cross-PR context the per-PR GraphQL query can't supply (e.g. the quota
+  // computation in cli/src/quota.ts, which needs the author's other open
+  // PRs in the same repo plus their merged-PR history). Predicates may
+  // consult these if set, but should remain functional when they're not.
+  computed?: {
+    // True iff a cross-PR quota computation has determined this PR is
+    // beyond the author's allowed concurrent-open-PR cap for this repo.
+    // Independent of (but congruent with) the `pr-quota-reached` label.
+    quotaExceeded?: boolean;
+  };
 }
 
 // Subset of GraphQL Actor __typename we care about.
