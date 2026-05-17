@@ -42,6 +42,12 @@ Options:
   --limit <n>         Cap PRs scanned per repo (for testing). PRs are
                       list-ordered by updated-desc, so this samples the
                       most recently active.
+  --pr <spec>         Triage just one PR. \`spec\` may be:
+                        owner/repo#NNN
+                        https://github.com/owner/repo/pull/NNN
+                        NNN  (uses the first configured repo)
+                      Bypasses the per-repo list query — useful for
+                      investigating a specific PR.
   --viewer <login>    Override the viewer (default: GraphQL viewer).
   --help              Show this help.
 
@@ -71,6 +77,7 @@ async function runTriage(argv: string[]): Promise<void> {
       'no-cache': { type: 'boolean', default: false },
       'no-quota': { type: 'boolean', default: false },
       limit: { type: 'string' },
+      pr: { type: 'string' },
       viewer: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -107,12 +114,24 @@ async function runTriage(argv: string[]): Promise<void> {
     log(`viewer: @${viewer}`);
   }
 
-  log(
-    `scanning ${cfg.repos.length} repo(s): ${cfg.repos.join(', ')}` +
-      (limit !== undefined ? ` (limit ${limit} per repo)` : ''),
-  );
-  const { prs, cacheHits, cacheMisses } = await scanRepos(cfg.repos, client, cache, { limit });
-  log(`scan complete: ${prs.length} open PR(s) — ${cacheHits} cached, ${cacheMisses} fetched`);
+  let prs: PullRequest[];
+  if (values.pr) {
+    const ref = parsePrSpec(values.pr, cfg.repos);
+    log(`single PR mode: ${ref.owner}/${ref.repo}#${ref.number} (bypassing list query)`);
+    const fresh = await client.fetchPullRequest(ref.owner, ref.repo, ref.number);
+    cache?.put(fresh);
+    prs = [fresh];
+  } else {
+    log(
+      `scanning ${cfg.repos.length} repo(s): ${cfg.repos.join(', ')}` +
+        (limit !== undefined ? ` (limit ${limit} per repo)` : ''),
+    );
+    const result = await scanRepos(cfg.repos, client, cache, { limit });
+    log(
+      `scan complete: ${result.prs.length} open PR(s) — ${result.cacheHits} cached, ${result.cacheMisses} fetched`,
+    );
+    prs = result.prs;
+  }
 
   cache?.close();
 
@@ -142,6 +161,36 @@ async function runTriage(argv: string[]): Promise<void> {
   mkdirSync(dirname(absPath), { recursive: true });
   writeFileSync(absPath, report);
   log(`wrote ${absPath} (${report.length} bytes)`);
+}
+
+// Parse `--pr <spec>` into a fully-qualified PR reference. Accepted forms:
+//   owner/repo#NNN
+//   https://github.com/owner/repo/pull/NNN
+//   NNN  (falls back to the first configured repo)
+function parsePrSpec(
+  raw: string,
+  configuredRepos: string[],
+): { owner: string; repo: string; number: number } {
+  // Full GitHub URL form.
+  const urlMatch = raw.match(/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/);
+  if (urlMatch) {
+    return { owner: urlMatch[1]!, repo: urlMatch[2]!, number: Number(urlMatch[3]) };
+  }
+  // owner/repo#NNN form.
+  const slugMatch = raw.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
+  if (slugMatch) {
+    return { owner: slugMatch[1]!, repo: slugMatch[2]!, number: Number(slugMatch[3]) };
+  }
+  // Bare number → first configured repo.
+  const bare = raw.replace(/^#/, '');
+  if (/^\d+$/.test(bare)) {
+    if (configuredRepos.length === 0) {
+      throw new Error(`--pr ${raw}: no repos configured to default to`);
+    }
+    const [owner, repo] = configuredRepos[0]!.split('/', 2) as [string, string];
+    return { owner, repo, number: Number(bare) };
+  }
+  throw new Error(`--pr ${raw}: expected owner/repo#NNN, a GitHub PR URL, or a bare number`);
 }
 
 function parseLimit(raw: string | undefined): number | undefined {

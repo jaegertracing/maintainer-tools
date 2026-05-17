@@ -33,6 +33,23 @@ interface CacheRow {
   payload: string;
 }
 
+// Bump whenever the PullRequest shape gains, removes, or changes the
+// meaning of a field that predicates read. Cached rows whose stored
+// version doesn't match are treated as cache misses and re-fetched,
+// which avoids stale-shape bugs (e.g. a PR cached before `commits[].parents`
+// was added would return undefined for it, defeating the merge-commit
+// exemption in `dco_missing` and causing a false positive).
+//
+// History:
+//   1 — initial shape (P0 + P1)
+//   2 — added commits[].parents for dco_missing merge exemption
+const SCHEMA_VERSION = 2;
+
+interface CachePayload {
+  v: number;
+  pr: PullRequest;
+}
+
 export function openCache(path: string): PrCache {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL');
@@ -53,15 +70,25 @@ export function openCache(path: string): PrCache {
   return {
     get(owner, repo, number) {
       const row = getStmt.get(owner, repo, number) as CacheRow | undefined;
-      return row ? (JSON.parse(row.payload) as PullRequest) : null;
+      if (!row) return null;
+      let parsed: CachePayload;
+      try {
+        parsed = JSON.parse(row.payload) as CachePayload;
+      } catch {
+        return null;
+      }
+      // Schema mismatch (or legacy un-wrapped payload with no `v`) → miss.
+      if (parsed.v !== SCHEMA_VERSION || !parsed.pr) return null;
+      return parsed.pr;
     },
     put(pr) {
+      const payload: CachePayload = { v: SCHEMA_VERSION, pr };
       putStmt.run(
         pr.repo.owner,
         pr.repo.name,
         pr.number,
         pr.updatedAt,
-        JSON.stringify(pr),
+        JSON.stringify(payload),
         new Date().toISOString(),
       );
     },
