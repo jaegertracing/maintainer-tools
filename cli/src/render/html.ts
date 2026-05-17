@@ -32,6 +32,7 @@ export function renderHtml(classified: ClassifiedPR[], opts: RenderOptions): str
 <head>
 <meta charset="utf-8">
 <title>PR Triage — ${escape(date)} — @${escape(opts.viewer)}</title>
+<link rel="icon" type="image/svg+xml" href="${FAVICON_DATA_URL}">
 <style>${CSS}</style>
 </head>
 <body>
@@ -135,6 +136,18 @@ function renderRow(
         <td>${escape(age)}</td>
       </tr>`;
 }
+
+// Inline favicon: rounded blue tile with three white rows (mnemonic for the
+// repo → bucket → rows layout). SVG works in every modern browser and stays
+// tiny even base64-encoded (~250 bytes), so the HTML report keeps its
+// self-contained-file property.
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+<rect width="16" height="16" rx="3" fill="#0969da"/>
+<rect x="3" y="4" width="10" height="2" rx="1" fill="white"/>
+<rect x="3" y="7.5" width="10" height="2" rx="1" fill="white"/>
+<rect x="3" y="11" width="10" height="2" rx="1" fill="white"/>
+</svg>`;
+const FAVICON_DATA_URL = `data:image/svg+xml;base64,${Buffer.from(FAVICON_SVG).toString('base64')}`;
 
 const CSS = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1200px; margin: 2em auto; padding: 0 1em; color: #1f2328; line-height: 1.4; }
