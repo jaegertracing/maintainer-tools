@@ -10,7 +10,12 @@ export type CheckId =
   | 'ci_failing'
   | 'merge_conflict'
   | 'stale_on_author'
-  | 'quota_exceeded';
+  | 'quota_exceeded'
+  | 'description_empty'
+  | 'no_linked_issue'
+  | 'no_tests_for_code_change'
+  | 'unresolved_from_reviewer'
+  | 'resolved_without_reply';
 
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
 
@@ -89,6 +94,23 @@ export interface PullRequest {
   // Issue-style PR comments (last 50). Used by triage to decide whether a
   // maintainer has responded yet; not used by predicates.
   comments: Array<{ author: string | null; createdAt: string }>;
+
+  // PR description body. Used by `description_empty` and `no_linked_issue`.
+  // May be empty string (PR opened with no body) or undefined (legacy
+  // cache entry from before this field was added — predicates treat as
+  // empty without warning).
+  body?: string;
+
+  // Review threads (inline review comments grouped by file/line). Used by
+  // `unresolved_from_reviewer` and `resolved_without_reply`. Optional for
+  // the same legacy-cache reason as `body`.
+  reviewThreads?: Array<{
+    isResolved: boolean;
+    // Login of the user who resolved the thread, if resolved. Used by
+    // `resolved_without_reply` to detect author-resolved-without-reply.
+    resolvedBy: string | null;
+    comments: Array<{ author: string | null; createdAt: string }>;
+  }>;
 
   // Optional computed annotations. Filled in by enrichment passes that have
   // cross-PR context the per-PR GraphQL query can't supply (e.g. the quota
