@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util';
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { classify, type ClassifiedPR } from './buckets.js';
 import { loadConfig } from './config.js';
+import { log } from './log.js';
 import { renderHtml } from './render/html.js';
 import { renderMarkdown } from './render/markdown.js';
 import { makeClient, scanRepos } from './scan.js';
@@ -75,26 +76,41 @@ async function runTriage(argv: string[]): Promise<void> {
     throw new Error(`Unknown --format: ${values.format} (expected html|markdown)`);
   }
 
+  log('loading config');
   const cfg = loadConfig(values.config);
-  const token = resolveToken();
+  log(
+    `config: ${cfg.repos.length} repo(s), ${cfg.maintainers.length} maintainer(s), ${cfg.interns.length} intern(s)`,
+  );
+
+  const { token, source } = resolveToken();
+  log(`token: ${source}`);
   const client = makeClient(token);
 
   const cache = await openCacheIfEnabled(cfg.cachePath, values['no-cache']);
+  log(cache ? `cache: ${cfg.cachePath}` : 'cache: disabled');
 
-  const viewer = values.viewer ?? cfg.viewer ?? (await client.fetchViewerLogin());
-  process.stderr.write(`maintainer-tools triage: viewer=@${viewer}, repos=${cfg.repos.length}\n`);
+  let viewer = values.viewer ?? cfg.viewer;
+  if (viewer) {
+    log(`viewer: @${viewer} (from config)`);
+  } else {
+    log('viewer: fetching from GraphQL...');
+    viewer = await client.fetchViewerLogin();
+    log(`viewer: @${viewer}`);
+  }
 
+  log(`scanning ${cfg.repos.length} repo(s): ${cfg.repos.join(', ')}`);
   const { prs, cacheHits, cacheMisses } = await scanRepos(cfg.repos, client, cache);
-  process.stderr.write(
-    `scanned ${prs.length} open PRs (cache hits: ${cacheHits}, fetched: ${cacheMisses})\n`,
-  );
+  log(`scan complete: ${prs.length} open PR(s) — ${cacheHits} cached, ${cacheMisses} fetched`);
 
   cache?.close();
 
+  log('classifying PRs into buckets');
   const now = new Date();
   const classified = classifyAll(prs, viewer, cfg, now);
   const perRepoCounts = computePerRepoOpenCounts(prs);
+  log(`bucket totals: ${formatBucketTotals(classified)}`);
 
+  log(`rendering ${values.format}`);
   const report =
     values.format === 'markdown'
       ? renderMarkdown(classified, { viewer, now, authorOpenCounts: perRepoCounts })
@@ -103,10 +119,17 @@ async function runTriage(argv: string[]): Promise<void> {
   if (values.output) {
     mkdirSync(dirname(values.output), { recursive: true });
     writeFileSync(values.output, report);
-    process.stderr.write(`wrote ${values.output}\n`);
+    log(`wrote ${values.output} (${report.length} bytes)`);
   } else {
+    log('writing report to stdout');
     process.stdout.write(report);
   }
+}
+
+function formatBucketTotals(classified: ClassifiedPR[]): string {
+  const counts = new Map<string, number>();
+  for (const c of classified) counts.set(c.bucket, (counts.get(c.bucket) ?? 0) + 1);
+  return [...counts.entries()].map(([k, v]) => `${k}=${v}`).join(', ') || '(none)';
 }
 
 async function openCacheIfEnabled(
@@ -122,9 +145,7 @@ async function openCacheIfEnabled(
     // `better-sqlite3` is an optional dep; if it failed to build locally, we
     // proceed cache-less rather than crashing. The triage still works, just
     // pays full GraphQL cost on every run.
-    process.stderr.write(
-      `warning: cache disabled (${err instanceof Error ? err.message : String(err)})\n`,
-    );
+    log(`warning: cache disabled (${err instanceof Error ? err.message : String(err)})`);
     return null;
   }
 }

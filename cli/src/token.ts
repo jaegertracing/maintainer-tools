@@ -4,15 +4,24 @@
 
 import { execSync } from 'node:child_process';
 
-export function resolveToken(): string {
-  const fromEnv = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
-  if (fromEnv) return fromEnv;
+export type TokenSource = 'GH_TOKEN' | 'GITHUB_TOKEN' | 'gh auth token';
+
+export interface ResolvedToken {
+  token: string;
+  source: TokenSource;
+}
+
+export function resolveToken(): ResolvedToken {
+  if (process.env.GH_TOKEN) return { token: process.env.GH_TOKEN, source: 'GH_TOKEN' };
+  if (process.env.GITHUB_TOKEN) {
+    return { token: process.env.GITHUB_TOKEN, source: 'GITHUB_TOKEN' };
+  }
   try {
     const token = execSync('gh auth token', {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    if (token) return token;
+    if (token) return { token, source: 'gh auth token' };
   } catch {
     // gh not installed or not authenticated; fall through to error.
   }
