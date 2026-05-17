@@ -1,0 +1,16 @@
+{
+  "name": "@jaegertracing/maintainer-tools-pr-nudge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
+    "tsc-lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@actions/core": "1.11.1",
+    "@actions/github": "6.0.0",
+    "@jaegertracing/maintainer-tools-checks": "*"
+  }
+}

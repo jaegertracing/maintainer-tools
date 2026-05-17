@@ -1,0 +1,13 @@
+node_modules/
+**/dist/
+*.tsbuildinfo
+package-lock.json
+
+# RFC and other long-form docs aren't reformatted to avoid noisy churn.
+docs/
+
+# Ncc bundle output is generated; never format.
+pr-nudge/dist/
+pr-quota/dist/
+pr-weekly-digest/dist/
+.claude/

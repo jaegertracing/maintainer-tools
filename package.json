@@ -1,0 +1,33 @@
+{
+  "private": true,
+  "name": "@jaegertracing/maintainer-tools",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jaegertracing/maintainer-tools.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "pr-nudge"
+  ],
+  "scripts": {
+    "build": "npm run --workspaces --if-present build",
+    "lint": "npm-run-all -ln --parallel tsc-lint prettier-check",
+    "fmt": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
+    "prettier-check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
+    "tsc-lint": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run --workspaces --if-present test"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@vercel/ncc": "0.38.3",
+    "npm-run-all2": "7.0.2",
+    "prettier": "3.4.2",
+    "typescript": "5.7.2"
+  }
+}
