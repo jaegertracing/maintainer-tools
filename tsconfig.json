@@ -20,9 +20,15 @@
     "baseUrl": ".",
     "paths": {
       "@jaegertracing/maintainer-tools-checks": ["./packages/checks/src/index.ts"],
-      "@jaegertracing/maintainer-tools-checks/cache": ["./packages/checks/src/cache.ts"]
+      "@jaegertracing/maintainer-tools-checks/cache": ["./packages/checks/src/cache.ts"],
+      "@jaegertracing/maintainer-tools-checks/comments": ["./packages/checks/src/comments/index.ts"]
     }
   },
-  "include": ["packages/*/src/**/*", "pr-nudge/src/**/*", "cli/src/**/*"],
+  "include": [
+    "packages/*/src/**/*",
+    "pr-nudge/src/**/*",
+    "pr-weekly-digest/src/**/*",
+    "cli/src/**/*"
+  ],
   "exclude": ["**/dist/**", "**/node_modules/**"]
 }

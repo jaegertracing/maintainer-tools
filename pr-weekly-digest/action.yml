@@ -1,0 +1,39 @@
+name: 'Jaeger maintainer-tools PR Weekly Digest'
+description: >
+  Scans open PRs carrying the `waiting-for-author` label, identifies those
+  that have been idle for at least `wait-days`, and posts (or edits)
+  one digest comment per PR per ISO week summarising what the author
+  needs to address. Idempotent across same-week reruns via the
+  comment-publisher's footer.
+author: 'Jaeger maintainers'
+inputs:
+  github-token:
+    description: 'Token used for reads and comment writes.'
+    required: false
+    default: ${{ github.token }}
+  wait-days:
+    description: >
+      Minimum number of days since the PR was last updated before the
+      digest will nudge. Defaults to 7 — matches the RFC's
+      "≥ 7 days waiting-for-author" rule.
+    required: false
+    default: '7'
+  label:
+    description: >
+      Label that gates which PRs the digest considers. Defaults to
+      `waiting-for-author`. Set to a different label if a consuming
+      repo uses non-standard naming.
+    required: false
+    default: 'waiting-for-author'
+  dry-run:
+    description: >
+      If `true` (the default), log every would-be POST/PATCH/SKIP but
+      do not call the GitHub API. Per the RFC, this phase ships
+      dry-run-on for a 2–4 week calibration window; flip to `false`
+      via a follow-up PR once the log output looks right.
+    required: false
+    default: 'true'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
