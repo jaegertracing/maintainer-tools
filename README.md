@@ -55,7 +55,8 @@ Make a config file at `~/.config/maintainer-tools/config.json`:
   "interns": [],
   "codeowners": {
     "jaegertracing/jaeger": ["cmd/jaeger/**", "internal/**"]
-  }
+  },
+  "priorityLabels": ["priority:high", "priority:medium", "priority:low"]
 }
 ```
 
@@ -84,16 +85,17 @@ The CLI looks for a JSON config in this order:
 
 Schema:
 
-| Field         | Type                  | Description                                                                                                                                                                                                                 |
-| ------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repos`       | `string[]` (required) | Repos to scan, `"owner/name"` form.                                                                                                                                                                                         |
-| `viewer`      | `string`              | Your GitHub login. If omitted, the CLI fetches it via the `viewer` GraphQL query.                                                                                                                                           |
-| `maintainers` | `string[]`            | Logins whose review or comment activity counts as "a maintainer has engaged" for the "awaiting first response" buckets, AND whose PRs are quota-exempt.                                                                     |
-| `interns`     | `string[]`            | Logins whose PRs surface in the high-trust-author bucket and are quota-exempt. Unlike `maintainers`, intern activity on other PRs does NOT count as a maintainer response — put reviewer logins in `maintainers`, not here. |
-| `codeowners`  | `{[repo]: string[]}`  | Per-repo path globs you co-own; PRs touching matching files appear in the CODEOWNERS-hits bucket. Glob syntax: `*` (one segment), `**` (any depth).                                                                         |
-| `cachePath`   | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                                                                                        |
+| Field            | Type                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `repos`          | `string[]` (required) | Repos to scan, `"owner/name"` form.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `viewer`         | `string`              | Your GitHub login. If omitted, the CLI fetches it via the `viewer` GraphQL query.                                                                                                                                                                                                                                                                                                                                                              |
+| `maintainers`    | `string[]`            | Logins whose review or comment activity counts as "a maintainer has engaged" for the "awaiting first response" buckets, AND whose PRs are quota-exempt.                                                                                                                                                                                                                                                                                        |
+| `interns`        | `string[]`            | Logins whose PRs surface in the high-trust-author bucket and are quota-exempt. Unlike `maintainers`, intern activity on other PRs does NOT count as a maintainer response — put reviewer logins in `maintainers`, not here.                                                                                                                                                                                                                    |
+| `codeowners`     | `{[repo]: string[]}`  | Per-repo path globs you co-own; PRs touching matching files appear in the CODEOWNERS-hits bucket. Glob syntax: `*` (one segment), `**` (any depth).                                                                                                                                                                                                                                                                                            |
+| `cachePath`      | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                                                                                                                                                                                                                                                                                                           |
+| `priorityLabels` | `string[]`            | Ordered list of GitHub labels used as priority tiers, highest to lowest (e.g. `["priority:high", "priority:medium", "priority:low"]`). When non-empty, the report adds a **priority grouping level** between repo and bucket: each PR is placed in the first matching tier; PRs carrying none of the listed labels fall into a separate **(no priority)** group rendered last. When omitted or empty, the report renders the flat bucket view. |
 
-A starter file is at [`cli/config.example.json`](cli/config.example.json).
+Starter files: [`cli/config.example.json`](cli/config.example.json) (generic template) and [`cli/config.example.jaeger.json`](cli/config.example.jaeger.json) (Jaeger org).
 
 For the available command-line flags, run:
 
@@ -105,9 +107,17 @@ Token resolution (in order): `$GH_TOKEN`, `$GITHUB_TOKEN`, `gh auth token`.
 
 ### What the report looks like
 
-Each repo gets its own block; within a repo, PRs are split into
+Each repo gets its own block. Within a repo, PRs are split into
 priority-ordered buckets. High-signal buckets are expanded by default,
 low-signal ones collapsed.
+
+When `priorityLabels` is configured, an additional grouping level sits between
+the repo header and the bucket sections. PRs are grouped by priority tier
+first (in the order the labels appear in the config), then further split into
+the usual buckets within each tier. PRs that carry none of the configured
+labels are collected under **(no priority)** and rendered last, visually
+de-emphasized. This lets maintainers focus on high-priority work while still
+seeing the full picture in a single report.
 
 | Bucket                                              | What it means                                                                                                                                                                                                                                       | Default state |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |

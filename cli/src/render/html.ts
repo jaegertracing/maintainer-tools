@@ -1,9 +1,9 @@
 // Self-contained HTML triage report. No external assets, all CSS inline,
 // double-clickable from the desktop.
 //
-// Layout: repo first, then bucket sections within each repo. Per the RFC,
-// the four high-signal buckets default expanded; CODEOWNERS/FYI/Hidden
-// default collapsed. Empty buckets are omitted entirely.
+// Layout: repo first, then (optionally) priority groups, then bucket sections.
+// Per the RFC, the four high-signal buckets default expanded; CODEOWNERS/FYI/
+// Hidden default collapsed. Empty buckets are omitted entirely.
 
 import {
   BUCKETS_EXPANDED_BY_DEFAULT,
@@ -11,16 +11,24 @@ import {
   type Bucket,
   type ClassifiedPR,
 } from '../buckets.js';
-import { type BucketSection, formatAge, groupByRepo, type RepoBlock } from './shared.js';
+import {
+  type BucketSection,
+  formatAge,
+  groupByRepo,
+  NO_PRIORITY_LABEL,
+  type PriorityGroup,
+  type RepoBlock,
+} from './shared.js';
 
 export interface RenderOptions {
   viewer: string;
   now: Date;
   authorOpenCounts: Map<string, Map<string, number>>; // repo -> author -> count
+  priorityLabels?: string[];
 }
 
 export function renderHtml(classified: ClassifiedPR[], opts: RenderOptions): string {
-  const blocks = groupByRepo(classified);
+  const blocks = groupByRepo(classified, opts.priorityLabels);
   const date = opts.now.toISOString().slice(0, 16).replace('T', ' ');
 
   const body = blocks
@@ -53,14 +61,32 @@ function renderRepoBlock(
   now: Date,
   counts: Map<string, number> | undefined,
 ): string {
-  const sections = block.sections.map((s) =>
-    renderSection(s, block.repo, viewer, now, counts ?? new Map()),
-  );
   const repoUrl = `https://github.com/${block.repo}`;
+  const inner =
+    block.priorityGroups.length > 0
+      ? block.priorityGroups
+          .map((g) => renderPriorityGroup(g, viewer, now, counts ?? new Map()))
+          .join('\n  ')
+      : block.sections.map((s) => renderSection(s, viewer, now, counts ?? new Map())).join('\n  ');
   return `<section class="repo">
   <h2><a href="${repoUrl}">${escape(block.repo)}</a> <span class="count">${block.visibleCount} / ${block.totalCount} visible</span></h2>
-  ${sections.join('\n  ')}
+  ${inner}
 </section>`;
+}
+
+function renderPriorityGroup(
+  group: PriorityGroup,
+  viewer: string,
+  now: Date,
+  counts: Map<string, number>,
+): string {
+  const sections = group.sections.map((s) => renderSection(s, viewer, now, counts)).join('\n    ');
+  const isNoPriority = group.label === NO_PRIORITY_LABEL;
+  const cls = isNoPriority ? 'priority-group priority-group-none' : 'priority-group';
+  return `<details class="${cls}" open>
+    <summary class="priority-label">${escape(group.label)} <span class="count">${group.visibleCount} / ${group.totalCount} visible</span></summary>
+    ${sections}
+  </details>`;
 }
 
 // Shared `<colgroup>` so every bucket-section table within a repo renders
@@ -79,7 +105,6 @@ const COLGROUP = `<colgroup>
 
 function renderSection(
   section: BucketSection,
-  repo: string,
   viewer: string,
   now: Date,
   counts: Map<string, number>,
@@ -92,7 +117,6 @@ function renderSection(
   // (why the row isn't surfaced). Same column position so widths align.
   const lastHeader = isHidden ? 'reason' : 'flags';
   const rows = section.prs.map((c) => renderRow(c, viewer, now, counts)).join('\n      ');
-  void repo; // unused; reserved for per-repo link templating
   return `<details class="bucket bucket-${section.bucket}"${expanded}>
     <summary>${escape(label)} <span class="count">(${count})</span></summary>
     <table class="pr-table">
@@ -171,6 +195,10 @@ const CSS = `
   section.repo { margin: 2em 0; }
   section.repo > h2 { border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
   section.repo .count { font-weight: normal; color: #57606a; font-size: 0.85em; }
+  details.priority-group { margin: 1em 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 0 0.8em 0.5em 0.8em; }
+  details.priority-group-none { opacity: 0.7; }
+  details.priority-group > summary.priority-label { cursor: pointer; padding: 0.4em 0; font-weight: 700; font-size: 1em; list-style: none; }
+  details.priority-group > summary.priority-label .count { font-weight: normal; color: #57606a; font-size: 0.85em; }
   details.bucket { margin: 0.5em 0; border-left: 3px solid #d0d7de; padding-left: 0.8em; }
   details.bucket-review-requested-on-you { border-left-color: #d29922; }
   details.bucket-youre-the-bottleneck { border-left-color: #cf222e; }
