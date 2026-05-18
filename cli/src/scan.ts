@@ -61,25 +61,30 @@ export async function scanRepos(
         (summaries.length < fullList.length ? ` (truncated from ${fullList.length})` : ''),
     );
 
-    let repoHits = 0;
-    let repoMisses = 0;
-    for (let i = 0; i < summaries.length; i++) {
-      const s = summaries[i]!;
+    // Split into cache-check + fetch passes so the fetch counter reads
+    // 1/N out of the number that actually need fetching, not 1/total.
+    const toFetch: PrSummary[] = [];
+    for (const s of summaries) {
       const cached = cache?.get(owner, name, s.number);
       if (cached && isFresh(cached, s)) {
         all.push(cached);
         hits++;
-        repoHits++;
         continue;
       }
-      log(`  ${slug}#${s.number}: fetching (${i + 1}/${summaries.length})`);
+      toFetch.push(s);
+    }
+    const repoHits = summaries.length - toFetch.length;
+    log(`  ${slug}: ${repoHits} cached, ${toFetch.length} to fetch`);
+
+    for (let i = 0; i < toFetch.length; i++) {
+      const s = toFetch[i]!;
+      log(`  ${slug}#${s.number}: fetching (${i + 1}/${toFetch.length})`);
       const fresh = await client.fetchPullRequest(owner, name, s.number);
       cache?.put(fresh);
       all.push(fresh);
       misses++;
-      repoMisses++;
     }
-    log(`  ${slug}: done (${repoHits} cached, ${repoMisses} fetched)`);
+    log(`  ${slug}: done`);
   }
 
   return { prs: all, cacheMisses: misses, cacheHits: hits };
