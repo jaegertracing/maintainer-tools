@@ -39,8 +39,11 @@ Never writes anything back to GitHub.
 git clone https://github.com/jaegertracing/maintainer-tools
 cd maintainer-tools
 npm ci
-npm run build
 ```
+
+No build step — the CLI runs straight from TypeScript source via
+[`tsx`](https://github.com/privatenumber/tsx). Edits to the CLI or the
+shared library take effect on the next `npm run triage`.
 
 Make a config file at `~/.config/maintainer-tools/config.json`:
 
@@ -92,23 +95,10 @@ Schema:
 
 A starter file is at [`cli/config.example.json`](cli/config.example.json).
 
-### Command-line flags
+For the available command-line flags, run:
 
-```
-maintainer-tools triage [options]
-
-  --config <path>     Path to JSON config (overrides discovery).
-  --output <path>     Where to write the HTML report. Pass `-` for stdout.
-                      Default: ./triage.html
-  --no-cache          Bypass the SQLite cache for this run.
-  --no-quota          Skip the per-author quota computation. Faster, but
-                      relies solely on the `pr-quota-reached` label for
-                      identifying quota-blocked PRs.
-  --limit <n>         Cap PRs scanned per repo (for testing).
-  --pr <spec>         Triage just one PR. Accepts `owner/repo#NNN`,
-                      a GitHub PR URL, or a bare number (uses first repo).
-  --viewer <login>    Override the viewer (default: from config or GraphQL).
-  --help              Show this help.
+```bash
+npm run triage -- --help
 ```
 
 Token resolution (in order): `$GH_TOKEN`, `$GITHUB_TOKEN`, `gh auth token`.
