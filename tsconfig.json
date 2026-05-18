@@ -17,7 +17,9 @@
     "outDir": "dist",
     "rootDir": ".",
     "types": ["node"],
-    "baseUrl": ".",
+    // No `baseUrl` — deprecated in TS 6, removed in 7. Since TS 5, `paths`
+    // resolves relative to the tsconfig file's directory when `baseUrl` is
+    // absent, so the mappings below behave the same way.
     "paths": {
       "@jaegertracing/maintainer-tools-checks": ["./packages/checks/src/index.ts"],
       "@jaegertracing/maintainer-tools-checks/cache": ["./packages/checks/src/cache.ts"],
