@@ -95,7 +95,7 @@ Schema:
 | `cachePath`      | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                                                                                                                                                                                                                                                                                                           |
 | `priorityLabels` | `string[]`            | Ordered list of GitHub labels used as priority tiers, highest to lowest (e.g. `["priority:high", "priority:medium", "priority:low"]`). When non-empty, the report adds a **priority grouping level** between repo and bucket: each PR is placed in the first matching tier; PRs carrying none of the listed labels fall into a separate **(no priority)** group rendered last. When omitted or empty, the report renders the flat bucket view. |
 
-A starter file is at [`cli/config.example.json`](cli/config.example.json).
+Starter files: [`cli/config.example.json`](cli/config.example.json) (generic template) and [`cli/config.example.jaeger.json`](cli/config.example.jaeger.json) (Jaeger org).
 
 For the available command-line flags, run:
 

@@ -1,12 +1,12 @@
 {
   "_comment": "Copy to ~/.config/maintainer-tools/config.json or pass via --config. All keys but `repos` are optional.",
-  "viewer": "yurishkuro",
-  "repos": ["jaegertracing/jaeger", "jaegertracing/jaeger-ui", "jaegertracing/jaeger-idl"],
-  "maintainers": ["yurishkuro", "albertteoh", "joe-elliott", "mahadzaryab1"],
-  "interns": [],
+  "viewer": "your-github-login",
+  "repos": ["owner/repo-a", "owner/repo-b"],
+  "maintainers": ["maintainer-one", "maintainer-two"],
+  "interns": ["intern-one"],
   "codeowners": {
-    "jaegertracing/jaeger": ["cmd/jaeger/**", "internal/**"],
-    "jaegertracing/jaeger-ui": ["packages/jaeger-ui/src/**"]
+    "owner/repo-a": ["src/subsystem-a/**", "docs/**"],
+    "owner/repo-b": ["lib/**"]
   },
   "priorityLabels": ["priority:high", "priority:medium", "priority:low"]
 }

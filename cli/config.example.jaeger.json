@@ -1,0 +1,8 @@
+{
+  "_comment": "Example config for the Jaeger org. Copy to ~/.config/maintainer-tools/config.json and adjust your viewer login.",
+  "viewer": "yurishkuro",
+  "repos": ["jaegertracing/jaeger", "jaegertracing/jaeger-ui", "jaegertracing/jaeger-idl"],
+  "maintainers": ["yurishkuro", "albertteoh", "jkowall", "joe-elliott", "mahadzaryab1"],
+  "interns": ["Nabil-Salah", "parship12", "parshipcy"],
+  "priorityLabels": ["priority:high", "priority:medium", "priority:low"]
+}
