@@ -17,7 +17,6 @@
     "outDir": "dist",
     "rootDir": ".",
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
       "@jaegertracing/maintainer-tools-checks": ["./packages/checks/src/index.ts"],
       "@jaegertracing/maintainer-tools-checks/cache": ["./packages/checks/src/cache.ts"],
