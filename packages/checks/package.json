@@ -27,7 +27,7 @@
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@octokit/graphql": "8.1.2",
+    "@octokit/graphql": "8.2.2",
     "@octokit/graphql-schema": "15.26.0"
   }
 }
