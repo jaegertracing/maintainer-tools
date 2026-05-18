@@ -227,6 +227,24 @@ The mapping from `CheckResult` to surface is fixed by the predicate, not
 the consumer. A predicate that wants to surface in the digest sets
 `inDigest: true`; it does not call into the digest writer.
 
+### Comment publisher decision table
+
+The publisher (`packages/checks/src/comments/publisher.ts`) looks up
+prior bot comments on the PR by `(kind, scope)` and decides what to do
+based on the body's SHA. For a `weekly_digest` comment with
+`scope=week=YYYY-Www`:
+
+| prior? | same week? | same sha? | action                                                 |
+| ------ | ---------- | --------- | ------------------------------------------------------ |
+| no     | —          | —         | **POST** (first time this PR)                          |
+| yes    | yes        | yes       | **SKIP** (re-run, body unchanged)                      |
+| yes    | yes        | no        | **PATCH** (edit in place; body changed)                |
+| yes    | no (older) | —         | **POST** new + optionally minimize older as `OUTDATED` |
+
+For one-shot kinds (`quota_blocked`, `slash_ack`) the caller passes a
+scope that doesn't roll over, so the bottom row doesn't occur — the
+publisher just does POST / PATCH / SKIP.
+
 ## Caching, retries, and rate limits (status)
 
 - Cache: **implemented**, CLI-only.

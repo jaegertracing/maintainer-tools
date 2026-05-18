@@ -19,6 +19,7 @@ interface IssuesApiSubset {
   }) => Promise<{
     data: Array<{
       id: number;
+      node_id: string;
       body?: string | null;
       created_at: string;
       user: { login: string } | null;
@@ -40,7 +41,22 @@ interface IssuesApiSubset {
 
 export interface OctokitLike {
   rest: { issues: IssuesApiSubset };
+  // GraphQL transport for the `minimizeComment` mutation. Octokit
+  // exposes it as a callable on the instance.
+  graphql: <T = unknown>(query: string, variables?: Record<string, unknown>) => Promise<T>;
 }
+
+// GitHub's `minimizeComment` mutation collapses a comment with a reason
+// chip ("marked as outdated", "marked as resolved", etc.). The classifier
+// enum supports ABUSE, DUPLICATE, OFF_TOPIC, OUTDATED, RESOLVED, SPAM.
+// `OUTDATED` is the right fit for "superseded by a newer weekly digest".
+const MINIMIZE_MUTATION = `
+  mutation Minimize($id: ID!) {
+    minimizeComment(input: { subjectId: $id, classifier: OUTDATED }) {
+      minimizedComment { isMinimized minimizedReason }
+    }
+  }
+`;
 
 export function octokitCommentClient(octokit: OctokitLike): CommentClient {
   return {
@@ -48,7 +64,13 @@ export function octokitCommentClient(octokit: OctokitLike): CommentClient {
       // Manual pagination — listComments can exceed 100 on busy PRs and
       // we cannot afford to miss a prior footer on page 2. 100 per page is
       // the API max.
-      const out: Array<{ id: number; body: string; createdAt: string; author: string | null }> = [];
+      const out: Array<{
+        id: number;
+        nodeId: string | null;
+        body: string;
+        createdAt: string;
+        author: string | null;
+      }> = [];
       let page = 1;
       // eslint-disable-next-line no-constant-condition -- exit via break
       while (true) {
@@ -62,6 +84,7 @@ export function octokitCommentClient(octokit: OctokitLike): CommentClient {
         for (const c of data) {
           out.push({
             id: c.id,
+            nodeId: c.node_id,
             body: c.body ?? '',
             createdAt: c.created_at,
             author: c.user?.login ?? null,
@@ -89,6 +112,9 @@ export function octokitCommentClient(octokit: OctokitLike): CommentClient {
         body,
       });
       return { id: data.id, url: data.html_url };
+    },
+    async minimizeComment(nodeId) {
+      await octokit.graphql(MINIMIZE_MUTATION, { id: nodeId });
     },
   };
 }

@@ -2,10 +2,25 @@
 //
 // Greenfield action (P4): nudge PRs whose `waiting-for-author` label has
 // been stale for ≥ `wait-days`. One comment per PR per ISO week.
-// Idempotency comes entirely from the P2 publisher's footer — a
-// re-run within the same week with the same body is a no-op SKIP, a
-// re-run with different content is a PATCH, a run after the week
-// rolls over POSTs fresh.
+// Idempotency comes entirely from the P2 publisher's footer.
+//
+// Decision table per invocation, given the publisher's view of prior
+// comments matching `kind=weekly_digest`:
+//
+//   prior?  same week?  same sha?    | action
+//   ─────────────────────────────────┼────────────────────────────────
+//   no      —           —            | POST (first time this PR)
+//   yes     yes         yes          | SKIP (re-run, body unchanged)
+//   yes     yes         no           | PATCH (edit in place; body diff)
+//   yes     no (older)  —            | POST a new comment for this week
+//                                    | AND minimize the older one(s) as
+//                                    | OUTDATED if `minimizeOlder` is set
+//
+// So a daily cron stays a no-op within a week, edits in place if the
+// situation changes (e.g. CI flipped green and one bullet dropped), and
+// rolls over to a fresh comment on Monday — with last week's collapsed
+// behind GitHub's "marked as outdated" affordance so the PR thread
+// doesn't accumulate visible noise.
 //
 // Triggered events: a daily cron schedule is the expected use, but
 // `workflow_dispatch` also works for manual runs.
@@ -32,6 +47,7 @@ interface RunStats {
   posted: number;
   patched: number;
   noop: number;
+  minimized: number;
   errored: number;
 }
 
@@ -70,6 +86,7 @@ async function run(): Promise<void> {
     posted: 0,
     patched: 0,
     noop: 0,
+    minimized: 0,
     errored: 0,
   };
 
@@ -98,16 +115,25 @@ async function run(): Promise<void> {
           kind: 'weekly_digest',
           scope: `week=${week}`,
           body,
+          // When a new week's digest posts, collapse the prior week's
+          // comment as OUTDATED so the PR thread doesn't accumulate
+          // visible noise. The previous comments stay on the PR
+          // (collapsed, expandable on click) — never deleted.
+          minimizeOlder: true,
           dryRun,
         },
         commentClient,
       );
 
       const prefix = dryRun ? '[dry-run] ' : '';
+      const minSuffix = result.minimized.length
+        ? ` + minimized ${result.minimized.length} older`
+        : '';
       switch (result.action) {
         case 'post':
           stats.posted++;
-          core.info(`  ${prefix}#${pr.number}: POST (${triggered.length} item(s))`);
+          stats.minimized += result.minimized.length;
+          core.info(`  ${prefix}#${pr.number}: POST (${triggered.length} item(s))${minSuffix}`);
           break;
         case 'patch':
           stats.patched++;
@@ -126,13 +152,14 @@ async function run(): Promise<void> {
 
   core.info('');
   core.info('=== Summary ===');
-  core.info(`considered:        ${stats.considered}`);
-  core.info(`skipped (fresh):   ${stats.skippedFresh}`);
-  core.info(`skipped (no-op):   ${stats.noop}`);
-  core.info(`skipped (no chk):  ${stats.skippedNoChecks}`);
-  core.info(`posted:            ${stats.posted}`);
-  core.info(`patched:           ${stats.patched}`);
-  core.info(`errored:           ${stats.errored}`);
+  core.info(`considered:         ${stats.considered}`);
+  core.info(`skipped (fresh):    ${stats.skippedFresh}`);
+  core.info(`skipped (no-op):    ${stats.noop}`);
+  core.info(`skipped (no chk):   ${stats.skippedNoChecks}`);
+  core.info(`posted:             ${stats.posted}`);
+  core.info(`patched:            ${stats.patched}`);
+  core.info(`minimized (older):  ${stats.minimized}`);
+  core.info(`errored:            ${stats.errored}`);
 
   // The digest output is also a job summary so it's findable in the
   // Actions UI without scrolling through logs. `GITHUB_STEP_SUMMARY` is
@@ -149,6 +176,7 @@ async function run(): Promise<void> {
         ['considered', String(stats.considered)],
         ['posted', String(stats.posted)],
         ['patched', String(stats.patched)],
+        ['minimized (older)', String(stats.minimized)],
         ['no-op (sha match)', String(stats.noop)],
         ['skipped (no checks)', String(stats.skippedNoChecks)],
         ['skipped (fresh)', String(stats.skippedFresh)],
