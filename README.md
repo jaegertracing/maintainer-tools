@@ -28,7 +28,7 @@ All three consume the same [predicate catalog](#predicate-catalog).
 ## Triage report (CLI)
 
 A maintainer-local command that scans the GitHub repos you configure,
-classifies every open PR into one of seven attention buckets, and writes a
+classifies every open PR into one of several attention buckets, and writes a
 self-contained HTML file you double-click open.
 
 Never writes anything back to GitHub.
@@ -84,14 +84,14 @@ The CLI looks for a JSON config in this order:
 
 Schema:
 
-| Field         | Type                  | Description                                                                                                                                         |
-| ------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repos`       | `string[]` (required) | Repos to scan, `"owner/name"` form.                                                                                                                 |
-| `viewer`      | `string`              | Your GitHub login. If omitted, the CLI fetches it via the `viewer` GraphQL query.                                                                   |
-| `maintainers` | `string[]`            | Logins treated as maintainer activity for the "awaiting first response" buckets and as exempt from the quota check.                                 |
-| `interns`     | `string[]`            | Same effect as `maintainers` but called out separately for the high-trust bucket.                                                                   |
-| `codeowners`  | `{[repo]: string[]}`  | Per-repo path globs you co-own; PRs touching matching files appear in the CODEOWNERS-hits bucket. Glob syntax: `*` (one segment), `**` (any depth). |
-| `cachePath`   | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                |
+| Field         | Type                  | Description                                                                                                                                                                                                                 |
+| ------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `repos`       | `string[]` (required) | Repos to scan, `"owner/name"` form.                                                                                                                                                                                         |
+| `viewer`      | `string`              | Your GitHub login. If omitted, the CLI fetches it via the `viewer` GraphQL query.                                                                                                                                           |
+| `maintainers` | `string[]`            | Logins whose review or comment activity counts as "a maintainer has engaged" for the "awaiting first response" buckets, AND whose PRs are quota-exempt.                                                                     |
+| `interns`     | `string[]`            | Logins whose PRs surface in the high-trust-author bucket and are quota-exempt. Unlike `maintainers`, intern activity on other PRs does NOT count as a maintainer response — put reviewer logins in `maintainers`, not here. |
+| `codeowners`  | `{[repo]: string[]}`  | Per-repo path globs you co-own; PRs touching matching files appear in the CODEOWNERS-hits bucket. Glob syntax: `*` (one segment), `**` (any depth).                                                                         |
+| `cachePath`   | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                                                                                        |
 
 A starter file is at [`cli/config.example.json`](cli/config.example.json).
 
@@ -109,16 +109,16 @@ Each repo gets its own block; within a repo, PRs are split into
 priority-ordered buckets. High-signal buckets are expanded by default,
 low-signal ones collapsed.
 
-| Bucket                                              | What it means                                                                                                                                                                                                                    | Default state |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| **Review requested on you**                         | Someone added you to the Reviewers field.                                                                                                                                                                                        | Expanded      |
-| **You're the bottleneck**                           | You've reviewed this PR before; the author has acted since (commit pushed or commented).                                                                                                                                         | Expanded      |
-| **High-trust authors awaiting first response**      | Author is a maintainer / intern; no maintainer has engaged yet.                                                                                                                                                                  | Expanded      |
-| **First-time contributors awaiting first response** | Author's `authorAssociation` is `FIRST_TIME_*`; no maintainer has engaged yet.                                                                                                                                                   | Expanded      |
-| **CODEOWNERS hits**                                 | PR touches files matching your configured codeowner globs.                                                                                                                                                                       | Collapsed     |
-| **FYI**                                             | Catch-all for everything else open.                                                                                                                                                                                              | Collapsed     |
-| **Dependency bots**                                 | Author is `dependabot[bot]` / `renovate[bot]` / `renovate-bot[bot]`.                                                                                                                                                             | Collapsed     |
-| **Hidden**                                          | Not actionable until the contributor moves. Drafts, non-dependency bots, and any PR a predicate marked as hide-from-triage (DCO missing, CI red, merge conflict, quota-exceeded, stale). Shown collapsed with a `reason` column. | Collapsed     |
+| Bucket                                              | What it means                                                                                                                                                                                                                                       | Default state |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **Review requested on you**                         | Someone added you to the Reviewers field.                                                                                                                                                                                                           | Expanded      |
+| **You're the bottleneck**                           | You've reviewed this PR before; the author has acted since (commit pushed or commented).                                                                                                                                                            | Expanded      |
+| **High-trust authors awaiting first response**      | Author is a maintainer / intern; no maintainer has engaged yet.                                                                                                                                                                                     | Expanded      |
+| **First-time contributors awaiting first response** | Author's `authorAssociation` is `FIRST_TIME_*`; no maintainer has engaged yet.                                                                                                                                                                      | Expanded      |
+| **CODEOWNERS hits**                                 | PR touches files matching your configured codeowner globs.                                                                                                                                                                                          | Collapsed     |
+| **FYI**                                             | Catch-all for everything else open.                                                                                                                                                                                                                 | Collapsed     |
+| **Dependency bots**                                 | Author is `dependabot[bot]` / `renovate[bot]` / `renovate-bot[bot]`.                                                                                                                                                                                | Collapsed     |
+| **Hidden**                                          | Not actionable until the contributor moves. Drafts, non-dependency bots, and any PR a predicate marked as hide-from-triage (DCO missing, CI red, merge conflict, quota-exceeded, stale, empty description). Shown collapsed with a `reason` column. | Collapsed     |
 
 An explicit review request on you **overrides** every hide rule — if a
 maintainer tagged you, you'll see the PR even if it has merge conflicts.
@@ -149,8 +149,11 @@ GitHub doesn't bump `updatedAt`. Use `--no-cache` to force a full refresh.
 
 ## `pr-nudge` GitHub Action
 
-Runs the predicate library on a single PR and publishes one **GitHub
-Checks panel** entry per predicate. Triggered per PR event.
+Runs the predicate library on a single PR and publishes a **GitHub
+Checks panel** entry for each predicate that opts into that surface (the
+mechanical pass/fail ones — see the [catalog](#predicate-catalog)).
+Predicates that don't publish a Check Run are still evaluated and
+logged. Triggered per PR event.
 
 The Checks panel is the right place for mechanical pass/fail signals
 because (a) the contributor already looks there for CI status,
@@ -163,8 +166,15 @@ conversation.
 # .github/workflows/pr-nudge.yml
 name: 'PR Nudge'
 
+# `pull_request_target` (not `pull_request`) so workflows triggered by
+# fork PRs receive a write-scoped GITHUB_TOKEN — the default
+# `pull_request` event gives forks a read-only token, which would
+# silently strip `checks: write` and the action would 403. pr-nudge
+# never checks out the PR's code, so the usual `pull_request_target`
+# caveat (don't execute untrusted code with elevated permissions)
+# doesn't apply.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
@@ -185,11 +195,11 @@ will surface upgrade PRs.
 
 ### Inputs
 
-| Input          | Default               | Description                                                                        |
-| -------------- | --------------------- | ---------------------------------------------------------------------------------- |
-| `github-token` | `${{ github.token }}` | Token for reads and Check Run writes.                                              |
-| `rules`        | full predicate set    | Comma-separated predicate IDs to run. See [Predicate catalog](#predicate-catalog). |
-| `dry-run`      | `false`               | If `true`, log every would-be Check Run but don't create them.                     |
+| Input          | Default                                                 | Description                                                                                                                                                                                                                                        |
+| -------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github-token` | `${{ github.token }}`                                   | Token for reads and Check Run writes.                                                                                                                                                                                                              |
+| `rules`        | `dco_missing,ci_failing,merge_conflict,stale_on_author` | Comma-separated predicate IDs to run. Defaults to the four most load-bearing predicates; pass the explicit list to opt into more (e.g. `description_empty,no_linked_issue,no_tests_for_code_change`). See [Predicate catalog](#predicate-catalog). |
+| `dry-run`      | `false`                                                 | If `true`, log every would-be Check Run but don't create them.                                                                                                                                                                                     |
 
 ### What it does
 
@@ -315,18 +325,18 @@ nothing needs to be said.
 The shared library of PR-state checks. Each predicate is a pure function
 of a PR's current GraphQL state.
 
-| ID                         | What it detects                                                                                   | Used by                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `dco_missing`              | A non-merge commit lacks `Signed-off-by:`.                                                        | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)            |
-| `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                      | Triage (hides), pr-weekly-digest (item)                              |
-| `merge_conflict`           | `mergeable === CONFLICTING`.                                                                      | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)            |
-| `stale_on_author`          | PR carries the `stale` label or hasn't been touched for `staleDays`.                              | Triage (hides)                                                       |
-| `quota_exceeded`           | Author has more than their tiered quota of open PRs OR carries the `pr-quota-reached` label.      | Triage (hides)                                                       |
-| `description_empty`        | PR body is empty or just template stubs.                                                          | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)            |
-| `no_linked_issue`          | No `Fixes/Closes/Resolves #N` in the body. Exempt for `docs`/`ci`/`trivial`/`chore` labelled PRs. | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag) |
-| `no_tests_for_code_change` | Source files changed but no test files touched. Same exemption labels.                            | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag) |
-| `unresolved_from_reviewer` | A review thread is unresolved and the author pushed commits since the last reviewer comment.      | pr-weekly-digest (item), triage (row flag)                           |
-| `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.               | Triage (row flag with count)                                         |
+| ID                         | What it detects                                                                                                           | Used by                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `dco_missing`              | A non-merge commit lacks `Signed-off-by:`.                                                                                | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)            |
+| `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                                              | Triage (hides), pr-weekly-digest (item)                              |
+| `merge_conflict`           | `mergeable === CONFLICTING`.                                                                                              | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)            |
+| `stale_on_author`          | PR carries the `stale` label or hasn't been touched for `staleDays`.                                                      | Triage (hides)                                                       |
+| `quota_exceeded`           | Author has more than their tiered quota of open PRs OR carries the `pr-quota-reached` label.                              | Triage (hides)                                                       |
+| `description_empty`        | PR body is empty or just template stubs.                                                                                  | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)            |
+| `no_linked_issue`          | No `Fixes/Closes/Resolves #N` in the body. Exempt for `docs` / `documentation` / `ci` / `trivial` / `chore` labelled PRs. | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag) |
+| `no_tests_for_code_change` | Source files changed but no test files touched. Same exemption labels.                                                    | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag) |
+| `unresolved_from_reviewer` | A review thread is unresolved and the author pushed commits since the last reviewer comment.                              | pr-weekly-digest (item), triage (row flag)                           |
+| `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                       | Triage (row flag with count)                                         |
 
 "Hides" means the predicate sends matching PRs to the triage report's
 **Hidden** bucket (still visible if you expand it; the reason chip shows
@@ -350,7 +360,7 @@ get their own **Dependency bots** bucket.
 | 0                                     | 1                           |
 | 1                                     | 2                           |
 | 2                                     | 3                           |
-| 3 or more                             | unlimited                   |
+| 3 or more                             | 10 (effectively unlimited)  |
 
 The triage CLI computes this itself (one GraphQL search query per
 multi-PR author per run); the `pr-quota-reached` label managed by the
@@ -360,16 +370,20 @@ upstream workflow is treated as a corroborating signal.
 
 ## Authentication
 
-All three components use the same token resolution scheme, in order of
-preference:
+**Triage CLI** — token resolved at startup in this order, first hit wins:
 
-1. **`$GH_TOKEN`** environment variable (CLI only).
-2. **`$GITHUB_TOKEN`** environment variable (CLI only; actions get
-   `${{ github.token }}` automatically from the workflow).
-3. **`gh auth token`** — shells out to the GitHub CLI's stored credential
-   (CLI only).
+1. **`$GH_TOKEN`** environment variable.
+2. **`$GITHUB_TOKEN`** environment variable.
+3. **`gh auth token`** — shells out to the GitHub CLI's stored credential.
 
-Required scopes:
+If `gh auth login` is configured, the CLI just works with no extra setup.
+
+**GitHub Actions** (`pr-nudge`, `pr-weekly-digest`) — each takes a
+`github-token` input that defaults to `${{ github.token }}` (the
+workflow-issued token). Override only if you need an alternative
+identity, e.g. a fine-grained PAT stored in `secrets.MY_PAT`.
+
+Required scopes / permissions:
 
 | Component                   | Required permissions                                      |
 | --------------------------- | --------------------------------------------------------- |
