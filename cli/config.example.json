@@ -7,5 +7,6 @@
   "codeowners": {
     "jaegertracing/jaeger": ["cmd/jaeger/**", "internal/**"],
     "jaegertracing/jaeger-ui": ["packages/jaeger-ui/src/**"]
-  }
+  },
+  "priorityLabels": ["priority:high", "priority:medium", "priority:low"]
 }

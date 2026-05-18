@@ -139,6 +139,25 @@ Renovate (`renovate.json`) opens PRs on Sundays for minor/major upgrades only;
 patch and digest upgrades are disabled to reduce noise. GitHub Actions
 upgrades are grouped. Patch/digest upgrades to workflows are also disabled.
 
+## Key Source Files
+
+| File                                      | Role                                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `packages/checks/src/types.ts`            | Core `PullRequest` and `CheckResult` types — the shared data contract for all tools. |
+| `packages/checks/src/predicates/index.ts` | Predicate registry and `runAll()` entry point.                                       |
+| `packages/checks/src/graphql.ts`          | All GitHub GraphQL queries (`LIST_QUERY`, `PR_QUERY`, `VIEWER_QUERY`, …).            |
+| `packages/checks/src/cache.ts`            | SQLite-backed PR cache (Node 22.5+ `node:sqlite`).                                   |
+| `cli/src/index.ts`                        | CLI entry point — arg parsing, orchestration, output.                                |
+| `cli/src/config.ts`                       | Config schema (`TriageConfig`), loader, validation, and defaults.                    |
+| `cli/src/buckets.ts`                      | `classify()` — assigns each PR to exactly one of 8 buckets; `computeFlags()`.        |
+| `cli/src/scan.ts`                         | Multi-repo scanner: list → cache-check → fetch loop.                                 |
+| `cli/src/quota.ts`                        | Cross-PR quota enrichment (`enrichQuotaState()`).                                    |
+| `cli/src/render/shared.ts`                | Renderer-agnostic grouping (`groupByRepo`, `buildPriorityGroups`).                   |
+| `cli/src/render/html.ts`                  | Self-contained HTML report generator.                                                |
+| `cli/config.example.json`                 | Annotated example config (source of truth for default field values).                 |
+| `pr-nudge/src/index.ts`                   | GitHub Action entry point — fetches one PR and publishes Check Runs.                 |
+| `pr-weekly-digest/src/index.ts`           | Cron action — posts/edits per-PR digest comments.                                    |
+
 ## Pointers
 
 - Design: [`docs/rfc/maintainer-pr-triage-tooling.md`](docs/rfc/maintainer-pr-triage-tooling.md)

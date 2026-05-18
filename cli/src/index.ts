@@ -149,7 +149,12 @@ async function runTriage(argv: string[]): Promise<void> {
   log(`bucket totals: ${formatBucketTotals(classified)}`);
 
   log('rendering HTML');
-  const report = renderHtml(classified, { viewer, now, authorOpenCounts: perRepoCounts });
+  const report = renderHtml(classified, {
+    viewer,
+    now,
+    authorOpenCounts: perRepoCounts,
+    priorityLabels: cfg.priorityLabels,
+  });
 
   if (output === '-') {
     log('writing report to stdout');

@@ -28,6 +28,13 @@ export interface TriageConfig {
   codeowners: Record<string, string[]>;
   // Filesystem path for the SQLite cache (see packages/checks/src/cache.ts).
   cachePath: string;
+  // Ordered priority labels, highest to lowest (e.g. ["priority:high",
+  // "priority:medium", "priority:low"]). When non-empty, the report adds a
+  // priority grouping level between repo and bucket: PRs are matched to the
+  // first label in the list they carry; unmatched PRs fall into an explicit
+  // "(no priority)" group rendered last. When empty, the report renders the
+  // flat bucket view used before priority labels were introduced.
+  priorityLabels: string[];
 }
 
 interface RawConfig {
@@ -37,6 +44,7 @@ interface RawConfig {
   interns?: string[];
   codeowners?: Record<string, string[]>;
   cachePath?: string;
+  priorityLabels?: string[];
 }
 
 const DEFAULT_CACHE_PATH = join(
@@ -80,6 +88,7 @@ export function loadConfig(explicitPath?: string): TriageConfig {
     interns: raw.interns ?? [],
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
+    priorityLabels: raw.priorityLabels ?? [],
   };
 }
 
