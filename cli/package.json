@@ -3,11 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "maintainer-tools": "./dist/index.js"
-  },
   "scripts": {
-    "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -23,7 +23,7 @@
     "fmt": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "prettier-check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "tsc-lint": "tsc -p tsconfig.json --noEmit",
-    "triage": "node cli/dist/index.js triage",
+    "triage": "tsx cli/src/index.ts triage",
     "test": "npm run --workspaces --if-present test"
   },
   "devDependencies": {
@@ -31,6 +31,7 @@
     "@vercel/ncc": "0.38.3",
     "npm-run-all2": "7.0.2",
     "prettier": "3.4.2",
+    "tsx": "4.19.2",
     "typescript": "5.7.2"
   }
 }
