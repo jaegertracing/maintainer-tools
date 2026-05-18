@@ -154,7 +154,8 @@ upgrades are grouped. Patch/digest upgrades to workflows are also disabled.
 | `cli/src/quota.ts`                        | Cross-PR quota enrichment (`enrichQuotaState()`).                                    |
 | `cli/src/render/shared.ts`                | Renderer-agnostic grouping (`groupByRepo`, `buildPriorityGroups`).                   |
 | `cli/src/render/html.ts`                  | Self-contained HTML report generator.                                                |
-| `cli/config.example.json`                 | Annotated example config (source of truth for default field values).                 |
+| `cli/config.example.json`                 | Generic starter config with placeholder values.                                      |
+| `cli/config.example.jaeger.json`          | Jaeger-org starter config. Field defaults live in `cli/src/config.ts`.               |
 | `pr-nudge/src/index.ts`                   | GitHub Action entry point — fetches one PR and publishes Check Runs.                 |
 | `pr-weekly-digest/src/index.ts`           | Cron action — posts/edits per-PR digest comments.                                    |
 
