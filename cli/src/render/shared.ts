@@ -22,8 +22,9 @@ export interface PriorityGroup {
   hiddenBreakdown: Map<string, number>;
 }
 
-// Sentinel used as the label for PRs that carry none of the configured
-// priority labels.
+// Display label for the catch-all group that holds PRs matching none of the
+// configured priority labels. The grouping logic uses null as the internal
+// map key to avoid any collision with a real GitHub label of the same name.
 export const NO_PRIORITY_LABEL = '(no priority)';
 
 export interface RepoBlock {
@@ -104,23 +105,24 @@ function buildSections(prs: ClassifiedPR[]): {
 }
 
 function buildPriorityGroups(prs: ClassifiedPR[], priorityLabels: string[]): PriorityGroup[] {
-  // Assign each PR to the first matching priority label, or NO_PRIORITY_LABEL.
-  const byLabel = new Map<string, ClassifiedPR[]>();
+  // null key = catch-all for PRs that match none of the configured labels.
+  // Using null rather than the display string avoids collision with a real
+  // GitHub label that happens to be named NO_PRIORITY_LABEL.
+  const byLabel = new Map<string | null, ClassifiedPR[]>();
   for (const label of priorityLabels) byLabel.set(label, []);
-  byLabel.set(NO_PRIORITY_LABEL, []);
+  byLabel.set(null, []);
 
   for (const c of prs) {
     const matched = priorityLabels.find((l) => c.pr.labels.includes(l));
-    const key = matched ?? NO_PRIORITY_LABEL;
-    byLabel.get(key)!.push(c);
+    byLabel.get(matched ?? null)!.push(c);
   }
 
   const groups: PriorityGroup[] = [];
-  for (const [label, groupPrs] of byLabel) {
+  for (const [key, groupPrs] of byLabel) {
     if (groupPrs.length === 0) continue;
     const { sections, hiddenBreakdown } = buildSections(groupPrs);
     groups.push({
-      label,
+      label: key ?? NO_PRIORITY_LABEL,
       sections,
       totalCount: groupPrs.length,
       visibleCount: groupPrs.filter((c) => c.bucket !== 'hidden').length,

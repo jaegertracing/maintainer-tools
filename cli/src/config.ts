@@ -89,8 +89,16 @@ export function loadConfig(explicitPath?: string): TriageConfig {
     interns: raw.interns ?? [],
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
-    priorityLabels: raw.priorityLabels ?? [],
+    priorityLabels: validatePriorityLabels(raw.priorityLabels, path),
   };
+}
+
+function validatePriorityLabels(value: unknown, configPath: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
+    throw new Error(`Config at ${configPath}: "priorityLabels" must be an array of strings.`);
+  }
+  return value as string[];
 }
 
 function findFirstExisting(): string | undefined {
