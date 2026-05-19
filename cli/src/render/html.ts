@@ -15,7 +15,6 @@ import {
   type BucketSection,
   formatAge,
   groupByRepo,
-  NO_PRIORITY_LABEL,
   type PriorityGroup,
   type RepoBlock,
 } from './shared.js';
@@ -81,9 +80,7 @@ function renderPriorityGroup(
   counts: Map<string, number>,
 ): string {
   const sections = group.sections.map((s) => renderSection(s, viewer, now, counts)).join('\n    ');
-  const isNoPriority = group.label === NO_PRIORITY_LABEL;
-  const cls = isNoPriority ? 'priority-group priority-group-none' : 'priority-group';
-  return `<details class="${cls}" open>
+  return `<details class="priority-group" open>
     <summary class="priority-label">${escape(group.label)} <span class="count">${group.visibleCount} / ${group.totalCount} visible</span></summary>
     ${sections}
   </details>`;
@@ -196,7 +193,6 @@ const CSS = `
   section.repo > h2 { border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
   section.repo .count { font-weight: normal; color: #57606a; font-size: 0.85em; }
   details.priority-group { margin: 1em 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 0 0.8em 0.5em 0.8em; }
-  details.priority-group-none { opacity: 0.7; }
   details.priority-group > summary.priority-label { cursor: pointer; padding: 0.4em 0; font-weight: 700; font-size: 1em; list-style: none; }
   details.priority-group > summary.priority-label .count { font-weight: normal; color: #57606a; font-size: 0.85em; }
   details.bucket { margin: 0.5em 0; border-left: 3px solid #d0d7de; padding-left: 0.8em; }
