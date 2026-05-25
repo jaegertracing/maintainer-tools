@@ -34,14 +34,18 @@ export function ciFailing(pr: PullRequest): CheckResult {
   // headCheckRuns is absent (legacy cache entry), we can't tell — treat it
   // as a real CI failure to avoid surfacing broken PRs.
   const runs = pr.headCheckRuns;
-  // A run is "failing" if its conclusion is failure or action_required.
-  // The overall failure is label-only if every failing run is a label gate.
+  // Conclusions that mean "this check is actively broken". null means
+  // in-progress/skipped/neutral — not a failure. 'success' is not failing.
+  const FAILING_CONCLUSIONS = new Set([
+    'failure', 'action_required', 'timed_out', 'cancelled', 'startup_failure',
+  ]);
+  const failingRuns = runs?.filter((r) => r.conclusion !== null && FAILING_CONCLUSIONS.has(r.conclusion));
+  // Require at least one failing run (guards against empty-array edge case)
+  // and every failing run must be a label gate.
   const labelOnlyFailure =
-    runs !== undefined &&
-    runs.every(
-      (r) =>
-        (r.conclusion !== 'failure' && r.conclusion !== 'action_required') || isLabelGate(r.name),
-    );
+    failingRuns !== undefined &&
+    failingRuns.length > 0 &&
+    failingRuns.every((r) => isLabelGate(r.name));
 
   return {
     id: 'ci_failing',

@@ -92,8 +92,17 @@ interface PullRequestNode {
         messageBody: string;
         committedDate: string;
         author: { email: string | null } | null;
+        statusCheckRollup: { state: PullRequest['statusCheckRollup'] } | null;
+        parents: { totalCount: number };
+      };
+    }>;
+  };
+  // Separate head-only selection so we can fetch check contexts without
+  // paying for them on all 100 commits (which are only needed for DCO).
+  headCommit: {
+    nodes: Array<{
+      commit: {
         statusCheckRollup: {
-          state: PullRequest['statusCheckRollup'];
           contexts: {
             nodes: Array<
               | { __typename: 'CheckRun'; name: string; conclusion: string | null }
@@ -101,7 +110,6 @@ interface PullRequestNode {
             >;
           };
         } | null;
-        parents: { totalCount: number };
       };
     }>;
   };
@@ -168,8 +176,15 @@ const PR_QUERY = `
               messageBody
               committedDate
               author { email }
+              statusCheckRollup { state }
+              parents { totalCount }
+            }
+          }
+        }
+        headCommit: commits(last: 1) {
+          nodes {
+            commit {
               statusCheckRollup {
-                state
                 contexts(first: 50) {
                   nodes {
                     __typename
@@ -178,7 +193,6 @@ const PR_QUERY = `
                   }
                 }
               }
-              parents { totalCount }
             }
           }
         }
@@ -331,6 +345,7 @@ export function createGraphqlClient(token: string): GraphqlClient {
       });
       const pr = data.repository.pullRequest;
       const head = pr.commits.nodes[pr.commits.nodes.length - 1];
+      const headCheckRollup = pr.headCommit.nodes[0]?.commit.statusCheckRollup;
       return {
         repo: { owner, name: repo },
         number: pr.number,
@@ -348,16 +363,18 @@ export function createGraphqlClient(token: string): GraphqlClient {
         changedFiles: pr.changedFiles,
         files: pr.files.nodes.map((f) => f.path),
         statusCheckRollup: head?.commit.statusCheckRollup?.state ?? null,
-        headCheckRuns: head?.commit.statusCheckRollup?.contexts.nodes.map((ctx) => {
+        headCheckRuns: headCheckRollup?.contexts.nodes.map((ctx) => {
           if (ctx.__typename === 'CheckRun') {
             return { name: ctx.name, conclusion: ctx.conclusion?.toLowerCase() ?? null };
           }
-          // StatusContext: map GitHub state string to conclusion-like values.
-          const state = ctx.state.toLowerCase();
-          return {
-            name: ctx.context,
-            conclusion: state === 'success' ? 'success' : state === 'pending' ? null : 'failure',
-          };
+          // StatusContext: map GitHub's PENDING/EXPECTED to null (not yet run),
+          // SUCCESS to 'success', and ERROR/FAILURE to 'failure'.
+          const state = ctx.state.toUpperCase();
+          const conclusion =
+            state === 'SUCCESS' ? 'success'
+            : state === 'PENDING' || state === 'EXPECTED' ? null
+            : 'failure';
+          return { name: ctx.context, conclusion };
         }),
         commits: pr.commits.nodes.map((n) => ({
           sha: n.commit.oid,
