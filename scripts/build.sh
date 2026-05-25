@@ -11,6 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Pinned to match the node-version in .github/workflows/lint-build.yml.
 # Update this tag when upgrading Node.
+set -x
 exec docker run --rm \
   -v "${ROOT}:/work" \
   -w /work \
