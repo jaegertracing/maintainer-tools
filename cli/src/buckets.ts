@@ -275,11 +275,14 @@ function computeFlags(pr: PullRequest, checks: CheckResult[]): RowFlag[] {
   if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
   if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');
   if (pr.labels.includes('awaiting-maintainer-input')) flags.push('QUESTION');
+  if (pr.labels.includes('waiting-for-author')) flags.push('WAITING-FOR-AUTHOR');
 
   // P3 predicates: each fires as a visible row flag when triggered. These
   // checks are advisory (no hide rule beyond `description_empty`, which
   // hides via its own `hidesFromTriage: true`), so they show up here so a
   // maintainer can spot them at a glance in the triage table.
+  if (checks.some((c) => c.id === 'ci_failing' && c.triggered && c.labelOnlyFailure))
+    flags.push('NEEDS-LABEL');
   if (checks.some((c) => c.id === 'no_linked_issue' && c.triggered)) flags.push('NO-ISSUE');
   if (checks.some((c) => c.id === 'no_tests_for_code_change' && c.triggered)) {
     flags.push('NO-TESTS');

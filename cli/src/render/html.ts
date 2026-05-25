@@ -234,6 +234,8 @@ const CSS = `
   .flag-DRAFT, .flag-BOT, .flag-HIDE { background: #eaeef2; color: #57606a; }
   /* P3 advisory flags — distinct muted tones so the column is scannable
      but the flags don't compete with BLOCKER/MERGE-CONFLICT for attention. */
+  .flag-NEEDS-LABEL { background: #ddf4ff; color: #0550ae; }
+  .flag-WAITING-FOR-AUTHOR { background: #fff8c5; color: #66533d; }
   .flag-NO-ISSUE { background: #fff1e5; color: #66533d; }
   .flag-NO-TESTS { background: #fff1e5; color: #66533d; }
   .flag-UNRESOLVED { background: #fff8c5; color: #66533d; }

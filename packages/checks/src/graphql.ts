@@ -97,6 +97,22 @@ interface PullRequestNode {
       };
     }>;
   };
+  // Separate head-only selection so we can fetch check contexts without
+  // paying for them on all 100 commits (which are only needed for DCO).
+  headCommit: {
+    nodes: Array<{
+      commit: {
+        statusCheckRollup: {
+          contexts: {
+            nodes: Array<
+              | { __typename: 'CheckRun'; name: string; conclusion: string | null }
+              | { __typename: 'StatusContext'; context: string; state: string }
+            >;
+          };
+        } | null;
+      };
+    }>;
+  };
 }
 
 const PR_QUERY = `
@@ -162,6 +178,21 @@ const PR_QUERY = `
               author { email }
               statusCheckRollup { state }
               parents { totalCount }
+            }
+          }
+        }
+        headCommit: commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 50) {
+                  nodes {
+                    __typename
+                    ... on CheckRun { name conclusion }
+                    ... on StatusContext { context state }
+                  }
+                }
+              }
             }
           }
         }
@@ -314,6 +345,7 @@ export function createGraphqlClient(token: string): GraphqlClient {
       });
       const pr = data.repository.pullRequest;
       const head = pr.commits.nodes[pr.commits.nodes.length - 1];
+      const headCheckRollup = pr.headCommit.nodes[0]?.commit.statusCheckRollup;
       return {
         repo: { owner, name: repo },
         number: pr.number,
@@ -331,6 +363,21 @@ export function createGraphqlClient(token: string): GraphqlClient {
         changedFiles: pr.changedFiles,
         files: pr.files.nodes.map((f) => f.path),
         statusCheckRollup: head?.commit.statusCheckRollup?.state ?? null,
+        headCheckRuns: headCheckRollup?.contexts.nodes.map((ctx) => {
+          if (ctx.__typename === 'CheckRun') {
+            return { name: ctx.name, conclusion: ctx.conclusion?.toLowerCase() ?? null };
+          }
+          // StatusContext: map GitHub's PENDING/EXPECTED to null (not yet run),
+          // SUCCESS to 'success', and ERROR/FAILURE to 'failure'.
+          const state = ctx.state.toUpperCase();
+          const conclusion =
+            state === 'SUCCESS'
+              ? 'success'
+              : state === 'PENDING' || state === 'EXPECTED'
+                ? null
+                : 'failure';
+          return { name: ctx.context, conclusion };
+        }),
         commits: pr.commits.nodes.map((n) => ({
           sha: n.commit.oid,
           messageHeadline: n.commit.messageHeadline,
