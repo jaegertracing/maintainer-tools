@@ -371,9 +371,11 @@ export function createGraphqlClient(token: string): GraphqlClient {
           // SUCCESS to 'success', and ERROR/FAILURE to 'failure'.
           const state = ctx.state.toUpperCase();
           const conclusion =
-            state === 'SUCCESS' ? 'success'
-            : state === 'PENDING' || state === 'EXPECTED' ? null
-            : 'failure';
+            state === 'SUCCESS'
+              ? 'success'
+              : state === 'PENDING' || state === 'EXPECTED'
+                ? null
+                : 'failure';
           return { name: ctx.context, conclusion };
         }),
         commits: pr.commits.nodes.map((n) => ({

@@ -5,11 +5,7 @@ import type { CheckResult, PullRequest } from '../types.js';
 // maintainer responsibility, not a contributor CI failure. PRs blocked solely
 // by these checks are surfaced in a dedicated "needs label" section rather
 // than being hidden as "CI failing".
-const LABEL_GATE_PATTERNS = [
-  /check.?label/i,
-  /verify.?pr.?label/i,
-  /label.?check/i,
-];
+const LABEL_GATE_PATTERNS = [/check.?label/i, /verify.?pr.?label/i, /label.?check/i];
 
 function isLabelGate(name: string): boolean {
   return LABEL_GATE_PATTERNS.some((re) => re.test(name));
@@ -37,9 +33,15 @@ export function ciFailing(pr: PullRequest): CheckResult {
   // Conclusions that mean "this check is actively broken". null means
   // in-progress/skipped/neutral — not a failure. 'success' is not failing.
   const FAILING_CONCLUSIONS = new Set([
-    'failure', 'action_required', 'timed_out', 'cancelled', 'startup_failure',
+    'failure',
+    'action_required',
+    'timed_out',
+    'cancelled',
+    'startup_failure',
   ]);
-  const failingRuns = runs?.filter((r) => r.conclusion !== null && FAILING_CONCLUSIONS.has(r.conclusion));
+  const failingRuns = runs?.filter(
+    (r) => r.conclusion !== null && FAILING_CONCLUSIONS.has(r.conclusion),
+  );
   // Require at least one failing run (guards against empty-array edge case)
   // and every failing run must be a label gate.
   const labelOnlyFailure =
