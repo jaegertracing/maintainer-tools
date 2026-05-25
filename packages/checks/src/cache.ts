@@ -43,7 +43,8 @@ interface CacheRow {
 // History:
 //   1 — initial shape (P0 + P1)
 //   2 — added commits[].parents for dco_missing merge exemption
-const SCHEMA_VERSION = 2;
+//   3 — added headCheckRuns for label-only CI failure detection
+const SCHEMA_VERSION = 3;
 
 interface CachePayload {
   v: number;

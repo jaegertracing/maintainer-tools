@@ -34,6 +34,10 @@ export interface CheckResult {
   checkConclusion?: CheckConclusion;
   inDigest: boolean;
   hidesFromTriage: boolean;
+  // Set by `ci_failing` when the only failing checks are label-gate checks
+  // (e.g. "check-label"). Such PRs are not hidden from triage — a maintainer
+  // needs to apply the label — but are shown in a dedicated group.
+  labelOnlyFailure?: boolean;
 }
 
 // GitHub's PR-author association enum.
@@ -113,6 +117,18 @@ export interface PullRequest {
     // `resolved_without_reply` to detect author-resolved-without-reply.
     resolvedBy: string | null;
     comments: Array<{ author: string | null; createdAt: string }>;
+  }>;
+
+  // Individual check runs on the head commit. Populated from the GitHub
+  // CheckRun / StatusContext contexts on the head commit's statusCheckRollup.
+  // Optional for backward compatibility with older cache entries — predicates
+  // and classifiers should degrade gracefully when absent.
+  headCheckRuns?: Array<{
+    name: string;
+    // GitHub CheckConclusionState (lowercase) for CheckRun nodes, or a
+    // normalized equivalent ('failure' | 'success' | null) for StatusContext
+    // nodes. null means in-progress / neutral / skipped.
+    conclusion: string | null;
   }>;
 
   // Optional computed annotations. Filled in by enrichment passes that have

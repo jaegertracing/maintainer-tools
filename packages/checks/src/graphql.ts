@@ -92,7 +92,15 @@ interface PullRequestNode {
         messageBody: string;
         committedDate: string;
         author: { email: string | null } | null;
-        statusCheckRollup: { state: PullRequest['statusCheckRollup'] } | null;
+        statusCheckRollup: {
+          state: PullRequest['statusCheckRollup'];
+          contexts: {
+            nodes: Array<
+              | { __typename: 'CheckRun'; name: string; conclusion: string | null }
+              | { __typename: 'StatusContext'; context: string; state: string }
+            >;
+          };
+        } | null;
         parents: { totalCount: number };
       };
     }>;
@@ -160,7 +168,16 @@ const PR_QUERY = `
               messageBody
               committedDate
               author { email }
-              statusCheckRollup { state }
+              statusCheckRollup {
+                state
+                contexts(first: 50) {
+                  nodes {
+                    __typename
+                    ... on CheckRun { name conclusion }
+                    ... on StatusContext { context state }
+                  }
+                }
+              }
               parents { totalCount }
             }
           }
@@ -331,6 +348,17 @@ export function createGraphqlClient(token: string): GraphqlClient {
         changedFiles: pr.changedFiles,
         files: pr.files.nodes.map((f) => f.path),
         statusCheckRollup: head?.commit.statusCheckRollup?.state ?? null,
+        headCheckRuns: head?.commit.statusCheckRollup?.contexts.nodes.map((ctx) => {
+          if (ctx.__typename === 'CheckRun') {
+            return { name: ctx.name, conclusion: ctx.conclusion?.toLowerCase() ?? null };
+          }
+          // StatusContext: map GitHub state string to conclusion-like values.
+          const state = ctx.state.toLowerCase();
+          return {
+            name: ctx.context,
+            conclusion: state === 'success' ? 'success' : state === 'pending' ? null : 'failure',
+          };
+        }),
         commits: pr.commits.nodes.map((n) => ({
           sha: n.commit.oid,
           messageHeadline: n.commit.messageHeadline,
