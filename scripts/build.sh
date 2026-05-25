@@ -19,4 +19,4 @@ exec docker run --rm \
   -v "maintainer-tools-node-modules:/work/node_modules" \
   -w /work \
   "node:24.16.0-slim" \
-  sh -c "npm ci --quiet && npm run --workspaces --if-present build"
+  sh -c "set -x; npm ci --fund=false --no-update-notifier && npm run --workspaces --if-present build"
