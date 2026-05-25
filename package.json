@@ -18,7 +18,7 @@
     "cli"
   ],
   "scripts": {
-    "build": "npm run --workspaces --if-present build",
+    "build": "bash scripts/build.sh",
     "lint": "npm-run-all -ln --parallel tsc-lint prettier-check",
     "fmt": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "prettier-check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
