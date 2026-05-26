@@ -43,9 +43,9 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
   'high-trust-awaiting-first-response': 'High-trust authors awaiting first response',
   'first-timer-awaiting': 'First-time contributors awaiting first response',
   'codeowners-hits': 'CODEOWNERS hits',
-  fyi: 'FYI',
+  fyi: 'Needs triage',
   'dependency-bots': 'Dependency bots',
-  hidden: 'Hidden',
+  hidden: 'Blocked on author',
 };
 
 // Logins treated as "dependency bots" — PRs they open are reviewable
@@ -108,6 +108,9 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   }
   if (hiddenByCheck && !explicitlyRequested) {
     return mk('hidden', [`hide:${hiddenByCheck.id}`], pr, checks, flags);
+  }
+  if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
+    return mk('hidden', ['waiting-for-author'], pr, checks, flags);
   }
   // Non-dependency bots (anything matching __typename=Bot or `*[bot]`
   // login that we don't know about) → Hidden. Dependency bots get their

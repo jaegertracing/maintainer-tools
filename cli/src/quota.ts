@@ -65,6 +65,16 @@ export async function enrichQuotaState(
 
   log(`quota: evaluating ${candidates.length} multi-PR author(s)`);
 
+  interface Row {
+    repo: string;
+    login: string;
+    merged: number;
+    quota: number;
+    open: number;
+    exceeded: number;
+  }
+  const rows: Row[] = [];
+
   for (const [key, authorPRs] of candidates) {
     const [slug, login] = key.split('|') as [string, string];
     const [owner, repo] = slug.split('/') as [string, string];
@@ -77,8 +87,28 @@ export async function enrichQuotaState(
       pr.computed ??= {};
       pr.computed.quotaExceeded = true;
     }
+    rows.push({
+      repo: slug,
+      login,
+      merged: mergedCount,
+      quota,
+      open: authorPRs.length,
+      exceeded: exceeded.length,
+    });
+  }
+
+  // Print as a fixed-width table. Each line is a separate log() call so the
+  // timestamp prefix is consistent across header and data rows. The author
+  // column is loginW+1 wide to account for the leading '@' in data rows.
+  const repoW = Math.max(4, ...rows.map((r) => r.repo.length));
+  const loginW = Math.max(7, ...rows.map((r) => r.login.length + 1)); // +1 for '@'
+  const header = `${'repo'.padEnd(repoW)}  ${'author'.padEnd(loginW)}  merged  quota  open  exceeded`;
+  log(`quota:   ${header}`);
+  log(`quota:   ${'-'.repeat(header.length)}`);
+  for (const r of rows) {
+    const author = `@${r.login}`;
     log(
-      `quota:   ${slug} @${login}: merged=${mergedCount} quota=${quota} open=${authorPRs.length} exceeded=${exceeded.length}`,
+      `quota:   ${r.repo.padEnd(repoW)}  ${author.padEnd(loginW)}  ${String(r.merged).padStart(6)}  ${String(r.quota).padStart(5)}  ${String(r.open).padStart(4)}  ${String(r.exceeded).padStart(8)}`,
     );
   }
 }
