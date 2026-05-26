@@ -87,13 +87,20 @@ export async function enrichQuotaState(
       pr.computed ??= {};
       pr.computed.quotaExceeded = true;
     }
-    rows.push({ repo: slug, login, merged: mergedCount, quota, open: authorPRs.length, exceeded: exceeded.length });
+    rows.push({
+      repo: slug,
+      login,
+      merged: mergedCount,
+      quota,
+      open: authorPRs.length,
+      exceeded: exceeded.length,
+    });
   }
 
   // Print as a fixed-width table. Each line is a separate log() call so the
   // timestamp prefix is consistent across header and data rows. The author
   // column is loginW+1 wide to account for the leading '@' in data rows.
-  const repoW  = Math.max(4, ...rows.map((r) => r.repo.length));
+  const repoW = Math.max(4, ...rows.map((r) => r.repo.length));
   const loginW = Math.max(7, ...rows.map((r) => r.login.length + 1)); // +1 for '@'
   const header = `${'repo'.padEnd(repoW)}  ${'author'.padEnd(loginW)}  merged  quota  open  exceeded`;
   log(`quota:   ${header}`);

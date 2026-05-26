@@ -210,13 +210,15 @@ function parseLimit(raw: string | undefined): number | undefined {
 function formatBucketTotals(classified: ClassifiedPR[]): string {
   const counts = new Map<string, number>();
   for (const c of classified) counts.set(c.bucket, (counts.get(c.bucket) ?? 0) + 1);
-  const rows = BUCKET_ORDER
-    .filter((b) => counts.has(b))
-    .map((b) => [BUCKET_LABELS[b], counts.get(b)!] as const);
+  const rows = BUCKET_ORDER.filter((b) => counts.has(b)).map(
+    (b) => [BUCKET_LABELS[b], counts.get(b)!] as const,
+  );
   if (rows.length === 0) return '(none)';
   const labelW = Math.max(...rows.map(([l]) => l.length));
   const countW = Math.max(...rows.map(([, n]) => String(n).length));
-  return '\n' + rows.map(([l, n]) => `  ${l.padEnd(labelW)}    ${String(n).padStart(countW)}`).join('\n');
+  return (
+    '\n' + rows.map(([l, n]) => `  ${l.padEnd(labelW)}    ${String(n).padStart(countW)}`).join('\n')
+  );
 }
 
 async function openCacheIfEnabled(
