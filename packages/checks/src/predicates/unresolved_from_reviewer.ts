@@ -40,6 +40,8 @@ function mk(triggered: boolean, summary: string): CheckResult {
     summary,
     publishesCheck: false,
     inDigest: triggered,
-    hidesFromTriage: false,
+    // Unresolved reviewer threads with author pushes since = ball is in the
+    // author's court. Not actionable by a maintainer until the author responds.
+    hidesFromTriage: triggered,
   };
 }
