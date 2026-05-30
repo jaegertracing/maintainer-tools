@@ -16,6 +16,7 @@ import { loadConfig } from './config.js';
 import { log } from './log.js';
 import { enrichQuotaState } from './quota.js';
 import { renderHtml } from './render/html.js';
+import { renderXlsx } from './render/xlsx.js';
 import { makeClient, scanRepos } from './scan.js';
 import { resolveToken } from './token.js';
 
@@ -27,14 +28,22 @@ Commands:
 Run \`maintainer-tools <command> --help\` for command-specific flags.
 `;
 
-const DEFAULT_OUTPUT = 'triage.html';
+type OutputFormat = 'html' | 'xlsx';
+
+const DEFAULT_OUTPUTS: Record<OutputFormat, string> = {
+  html: 'triage.html',
+  xlsx: 'triage.xlsx',
+};
 
 const TRIAGE_HELP = `Usage: maintainer-tools triage [options]
 
 Options:
   --config <path>     Path to JSON config (overrides discovery).
-  --output <path>     Where to write the HTML report. Pass \`-\` for stdout.
-                      Default: ./${DEFAULT_OUTPUT}
+  --format <fmt>      Output format: \`html\` (default) or \`xlsx\`.
+                      \`xlsx\` opens in Excel, Numbers, or Google Sheets —
+                      drop into a Google Drive Desktop folder for sync.
+  --output <path>     Where to write the report. Pass \`-\` for stdout.
+                      Default: ./triage.{html,xlsx} (based on --format).
   --no-cache          Bypass the SQLite cache for this run.
   --no-quota          Skip the per-author quota computation. Faster, but
                       relies solely on the \`pr-quota-reached\` label for
@@ -73,6 +82,7 @@ async function runTriage(argv: string[]): Promise<void> {
     args: argv,
     options: {
       config: { type: 'string' },
+      format: { type: 'string' },
       output: { type: 'string' },
       'no-cache': { type: 'boolean', default: false },
       'no-quota': { type: 'boolean', default: false },
@@ -90,7 +100,8 @@ async function runTriage(argv: string[]): Promise<void> {
   }
 
   const limit = parseLimit(values.limit);
-  const output = values.output ?? DEFAULT_OUTPUT;
+  const format = parseFormat(values.format);
+  const output = values.output ?? DEFAULT_OUTPUTS[format];
 
   log('loading config');
   const cfg = loadConfig(values.config);
@@ -148,24 +159,34 @@ async function runTriage(argv: string[]): Promise<void> {
   const perRepoCounts = computePerRepoOpenCounts(prs);
   log(`bucket totals: ${formatBucketTotals(classified)}`);
 
-  log('rendering HTML');
-  const report = renderHtml(classified, {
-    viewer,
-    now,
-    authorOpenCounts: perRepoCounts,
-    priorityLabels: cfg.priorityLabels,
-  });
+  log(`rendering ${format.toUpperCase()}`);
+  const payload: string | Uint8Array =
+    format === 'xlsx'
+      ? await renderXlsx(classified, { viewer, now })
+      : renderHtml(classified, {
+          viewer,
+          now,
+          authorOpenCounts: perRepoCounts,
+          priorityLabels: cfg.priorityLabels,
+        });
 
   if (output === '-') {
     log('writing report to stdout');
-    process.stdout.write(report);
+    process.stdout.write(payload);
     return;
   }
 
   const absPath = resolve(output);
   mkdirSync(dirname(absPath), { recursive: true });
-  writeFileSync(absPath, report);
-  log(`wrote ${absPath} (${report.length} bytes)`);
+  writeFileSync(absPath, payload);
+  const size = typeof payload === 'string' ? payload.length : payload.byteLength;
+  log(`wrote ${absPath} (${size} bytes)`);
+}
+
+function parseFormat(raw: string | undefined): OutputFormat {
+  if (raw === undefined) return 'html';
+  if (raw === 'html' || raw === 'xlsx') return raw;
+  throw new Error(`--format must be 'html' or 'xlsx' (got ${raw})`);
 }
 
 // Parse `--pr <spec>` into a fully-qualified PR reference. Accepted forms:

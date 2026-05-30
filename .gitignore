@@ -3,6 +3,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 triage.html
+triage.xlsx
 
 # Re-include ncc-bundled action entrypoints. GitHub JS actions ship as
 # `action.yml` + a committed `dist/index.js`; that bundle is the artifact users
