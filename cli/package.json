@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@octokit/graphql": "9.0.3",
-    "@jaegertracing/maintainer-tools-checks": "*"
+    "@jaegertracing/maintainer-tools-checks": "*",
+    "exceljs": "4.4.0"
   }
 }
