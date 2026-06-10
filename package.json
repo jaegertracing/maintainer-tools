@@ -27,7 +27,7 @@
     "test": "npm run --workspaces --if-present test"
   },
   "devDependencies": {
-    "@types/node": "24.12.4",
+    "@types/node": "24.13.2",
     "@vercel/ncc": "0.38.3",
     "npm-run-all2": "8.0.4",
     "prettier": "3.8.3",
