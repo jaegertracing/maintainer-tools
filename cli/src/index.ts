@@ -19,11 +19,13 @@ import { renderHtml } from './render/html.js';
 import { renderXlsx } from './render/xlsx.js';
 import { makeClient, scanRepos } from './scan.js';
 import { resolveToken } from './token.js';
+import { runNudge } from './nudge.js';
 
 const HELP = `Usage: maintainer-tools <command> [options]
 
 Commands:
   triage    Scan configured repos and emit a triage report.
+  nudge     Dry-run the weekly digest nudge (prints comments to stdout).
 
 Run \`maintainer-tools <command> --help\` for command-specific flags.
 `;
@@ -71,6 +73,10 @@ async function main(): Promise<void> {
   }
   if (cmd === 'triage') {
     await runTriage(process.argv.slice(3));
+    return;
+  }
+  if (cmd === 'nudge') {
+    await runNudge(process.argv.slice(3));
     return;
   }
   process.stderr.write(`unknown command: ${cmd}\n${HELP}`);
