@@ -38,9 +38,9 @@ async function run(): Promise<void> {
   core.info(`errored:            ${stats.errored}`);
 
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const week = new Date().toISOString().slice(0, 10);
+    const date = new Date().toISOString().slice(0, 10);
     await core.summary
-      .addHeading(`Weekly digest — ${owner}/${repo} — ${week}${dryRun ? ' (dry-run)' : ''}`)
+      .addHeading(`Weekly digest — ${owner}/${repo} — ${date}${dryRun ? ' (dry-run)' : ''}`)
       .addTable([
         [
           { data: 'metric', header: true },

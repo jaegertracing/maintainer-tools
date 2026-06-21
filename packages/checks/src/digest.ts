@@ -45,10 +45,14 @@ export interface DigestLogger {
   warning(msg: string): void;
 }
 
-export function renderDigestBody(author: string | null, triggered: CheckResult[]): string {
+export function renderDigestBody(
+  author: string | null,
+  triggered: CheckResult[],
+  waitDays: number,
+): string {
   const tag = author ? `@${author}` : 'there';
   const items = triggered.map((c) => `- ${c.summary}`).join('\n');
-  return `Hi ${tag}, this PR has been waiting on you for over a week. Please address:
+  return `Hi ${tag}, this PR has been waiting on you for over ${waitDays} days. Please address:
 
 ${items}
 
@@ -98,14 +102,7 @@ export async function runDigest(
         continue;
       }
 
-      const body = renderDigestBody(pr.author?.login ?? null, triggered);
-      params.onComment?.({
-        prNumber: pr.number,
-        prTitle: pr.title,
-        prUrl: pr.url,
-        author: pr.author?.login ?? null,
-        body,
-      });
+      const body = renderDigestBody(pr.author?.login ?? null, triggered, waitDays);
       const result = await publishComment(
         {
           owner,
@@ -128,10 +125,24 @@ export async function runDigest(
         case 'post':
           stats.posted++;
           stats.minimized += result.minimized.length;
+          params.onComment?.({
+            prNumber: pr.number,
+            prTitle: pr.title,
+            prUrl: pr.url,
+            author: pr.author?.login ?? null,
+            body,
+          });
           logger.info(`  ${prefix}#${pr.number}: POST (${triggered.length} item(s))${minSuffix}`);
           break;
         case 'patch':
           stats.patched++;
+          params.onComment?.({
+            prNumber: pr.number,
+            prTitle: pr.title,
+            prUrl: pr.url,
+            author: pr.author?.login ?? null,
+            body,
+          });
           logger.info(`  ${prefix}#${pr.number}: PATCH (${triggered.length} item(s))`);
           break;
         case 'skip':

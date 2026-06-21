@@ -46,7 +46,7 @@ function renderCard(entry: NudgeEntry): string {
   const bodyHtml = markdownToHtml(entry.body);
   return `<article class="nudge-card">
   <div class="card-header">
-    <a href="${entry.prUrl}" class="pr-link">${escape(entry.repo)}#${entry.prNumber}</a>
+    <a href="${escape(entry.prUrl)}" class="pr-link">${escape(entry.repo)}#${entry.prNumber}</a>
     <span class="pr-title">${escape(entry.prTitle)}</span>
     <span class="pr-author">${author}</span>
   </div>

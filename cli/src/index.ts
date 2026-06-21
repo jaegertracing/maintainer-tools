@@ -25,7 +25,7 @@ const HELP = `Usage: maintainer-tools <command> [options]
 
 Commands:
   triage    Scan configured repos and emit a triage report.
-  nudge     Dry-run the weekly digest nudge (prints comments to stdout).
+  nudge     Dry-run the weekly digest nudge (HTML report).
 
 Run \`maintainer-tools <command> --help\` for command-specific flags.
 `;

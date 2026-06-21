@@ -1,6 +1,6 @@
 // `maintainer-tools nudge` subcommand.
-// Runs the same weekly-digest logic as the GitHub Action, always in dry-run
-// mode, rendering the would-be comments into an HTML report.
+// Runs the same weekly-digest logic as the GitHub Action in dry-run mode,
+// rendering the would-be comments into an HTML report.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -26,7 +26,6 @@ Options:
   --wait-days <n>     Minimum idle days before nudging (default: 7).
   --repo <slug>       Run against a single repo (owner/repo) instead of
                       all configured repos.
-  --post              Actually post the comments (default is dry-run).
   --help              Show this help.
 
 Token lookup order: $GH_TOKEN, $GITHUB_TOKEN, \`gh auth token\`.
@@ -49,6 +48,14 @@ function noopCommentClient(): CommentClient {
   };
 }
 
+function parseRepoSlug(slug: string): { owner: string; repo: string } {
+  const parts = slug.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error(`--repo must be in owner/repo format (got "${slug}")`);
+  }
+  return { owner: parts[0], repo: parts[1] };
+}
+
 export async function runNudge(argv: string[]): Promise<void> {
   const { values } = parseArgs({
     args: argv,
@@ -58,7 +65,6 @@ export async function runNudge(argv: string[]): Promise<void> {
       label: { type: 'string' },
       'wait-days': { type: 'string' },
       repo: { type: 'string' },
-      post: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h' },
     },
     allowPositionals: false,
@@ -74,7 +80,6 @@ export async function runNudge(argv: string[]): Promise<void> {
   if (!Number.isFinite(waitDays) || waitDays < 0) {
     throw new Error(`--wait-days must be a non-negative number (got ${values['wait-days']})`);
   }
-  const dryRun = !values.post;
   const output = values.output ?? 'nudge.html';
 
   log('loading config');
@@ -86,19 +91,19 @@ export async function runNudge(argv: string[]): Promise<void> {
   const commentClient = noopCommentClient();
 
   const repos = values.repo ? [values.repo] : cfg.repos;
-  log(`repos: ${repos.join(', ')}  label=${label}  wait-days=${waitDays}  dry-run=${dryRun}`);
+  log(`repos: ${repos.join(', ')}  label=${label}  wait-days=${waitDays}  dry-run=true`);
 
   const entries: NudgeEntry[] = [];
 
   for (const slug of repos) {
-    const [owner, repo] = slug.split('/', 2) as [string, string];
+    const { owner, repo } = parseRepoSlug(slug);
     const stats = await runDigest(
       {
         owner,
         repo,
         label,
         waitDays,
-        dryRun,
+        dryRun: true,
         onComment: (info) => {
           entries.push({ repo: slug, ...info });
         },
