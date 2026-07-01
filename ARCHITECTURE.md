@@ -259,7 +259,10 @@ publisher just does POST / PATCH / SKIP.
 exactly one of seven priority-ordered buckets:
 
 1. **review-requested-on-you** — viewer in `reviewRequests`. Strongest
-   signal; overrides every hide rule.
+   signal; overrides every hide rule. Disabled entirely when
+   `TriageConfig.ignoreReviewRequestedOnYou` is `true` (GitHub review
+   requests carry no trust signal — anyone, including the PR author, can
+   send one).
 2. **youre-the-bottleneck** — viewer has reviewed previously, author has
    pushed or commented since.
 3. **high-trust-awaiting-first-response** — author is in the configured
@@ -273,8 +276,10 @@ exactly one of seven priority-ordered buckets:
    predicate marked `hidesFromTriage`. Counts only; not listed.
 
 Hide rules run before bucket assignment. The lone exception is
-`review-requested-on-you`: an explicit review request from a maintainer
-overrides hide rules because GitHub's request is a deliberate signal.
+`review-requested-on-you`: an explicit review request overrides hide rules
+because GitHub's request is treated as a deliberate signal — unless
+`ignoreReviewRequestedOnYou` is set, in which case the override (and the
+bucket itself) is switched off and hide rules apply unconditionally.
 
 The renderer (`cli/src/render/html.ts`) consumes the classified list
 as-is. The HTML output is self-contained (inline CSS, no external assets),

@@ -48,6 +48,22 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
   hidden: 'Blocked on author',
 };
 
+// One-sentence explanation shown under each bucket header in the report, so
+// a reader doesn't have to go dig through docs to know what a section means.
+export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
+  'review-requested-on-you': 'Someone added you to the Reviewers field on this PR.',
+  'youre-the-bottleneck':
+    "You've reviewed this PR before, and the author has pushed a commit or commented since — it's waiting on you again.",
+  'high-trust-awaiting-first-response':
+    'Author is a configured maintainer or intern, and no maintainer has engaged with the PR yet.',
+  'first-timer-awaiting':
+    "Author's first PR to the repo (GitHub-reported), and no maintainer has engaged with it yet.",
+  'codeowners-hits': 'PR touches file paths you are configured as a CODEOWNER for.',
+  fyi: "Open PR that didn't match a stronger signal above — needs a first look.",
+  'dependency-bots': 'Opened by a recognized dependency-update bot (Dependabot, Renovate).',
+  hidden: 'Not actionable right now — draft, blocked, or flagged as waiting on the author.',
+};
+
 // Logins treated as "dependency bots" — PRs they open are reviewable
 // merges, just authored by a service account. They follow the same hide
 // rules as humans (draft / merge-conflict / CI red still send them to
@@ -73,6 +89,8 @@ export interface ClassifyContext {
   interns: Set<string>;
   codeownerPaths: string[]; // for the current PR's repo
   now: Date;
+  // See TriageConfig.ignoreReviewRequestedOnYou.
+  ignoreReviewRequestedOnYou: boolean;
 }
 
 export interface ClassifiedPR {
@@ -100,7 +118,11 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // --- Hide rules first. Any predicate that declared hidesFromTriage wins
   // unless an explicit "you" signal overrides (review-requested overrides
   // because GitHub's request is the strongest signal a maintainer can send).
-  const explicitlyRequested = isReviewRequestedOnViewer(pr, ctx.viewer);
+  // ignoreReviewRequestedOnYou switches this signal off entirely — GitHub
+  // lets anyone request a review, not just maintainers, so it can't be
+  // trusted on its own.
+  const explicitlyRequested =
+    !ctx.ignoreReviewRequestedOnYou && isReviewRequestedOnViewer(pr, ctx.viewer);
   const hiddenByCheck = checks.find((c) => c.triggered && c.hidesFromTriage);
 
   if (pr.isDraft && !explicitlyRequested) {

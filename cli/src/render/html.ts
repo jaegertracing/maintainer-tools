@@ -7,6 +7,7 @@
 
 import {
   BUCKETS_EXPANDED_BY_DEFAULT,
+  BUCKET_DESCRIPTIONS,
   BUCKET_LABELS,
   type Bucket,
   type ClassifiedPR,
@@ -108,6 +109,7 @@ function renderSection(
 ): string {
   const expanded = BUCKETS_EXPANDED_BY_DEFAULT.has(section.bucket) ? ' open' : '';
   const label = BUCKET_LABELS[section.bucket];
+  const description = BUCKET_DESCRIPTIONS[section.bucket];
   const count = section.prs.length;
   const isHidden = section.bucket === 'hidden';
   // Last column is "flags" for actionable buckets, "reason" for hidden ones
@@ -116,6 +118,7 @@ function renderSection(
   const rows = section.prs.map((c) => renderRow(c, viewer, now, counts)).join('\n      ');
   return `<details class="bucket bucket-${section.bucket}"${expanded}>
     <summary>${escape(label)} <span class="count">(${count})</span></summary>
+    <p class="bucket-desc">${escape(description)}</p>
     <table class="pr-table">
       ${COLGROUP}
       <thead><tr><th>#</th><th>diff</th><th>title</th><th>author</th><th>${lastHeader}</th><th>age</th></tr></thead>
@@ -203,6 +206,7 @@ const CSS = `
   details.bucket-codeowners-hits, details.bucket-fyi, details.bucket-dependency-bots, details.bucket-hidden { border-left-color: #d0d7de; }
   summary { cursor: pointer; padding: 0.3em 0; font-weight: 600; }
   summary .count { font-weight: normal; color: #57606a; }
+  p.bucket-desc { margin: 0 0 0.6em 0; color: #57606a; font-size: 0.85em; }
   /* table-layout: fixed + <col> widths keep columns aligned across every
      per-bucket table in a repo. Without this, each table would size its
      own columns based on its content and rows wouldn't line up vertically. */

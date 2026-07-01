@@ -283,6 +283,7 @@ function classifyAll(
       interns,
       codeownerPaths: cfg.codeowners[`${pr.repo.owner}/${pr.repo.name}`] ?? [],
       now,
+      ignoreReviewRequestedOnYou: cfg.ignoreReviewRequestedOnYou,
     }),
   );
 }
