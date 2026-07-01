@@ -17,6 +17,10 @@
     "./comments": {
       "types": "./dist/comments/index.d.ts",
       "default": "./dist/comments/index.js"
+    },
+    "./digest": {
+      "types": "./dist/digest.d.ts",
+      "default": "./dist/digest.js"
     }
   },
   "files": [
