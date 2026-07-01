@@ -4,5 +4,5 @@
   "maintainers": ["yurishkuro", "albertteoh", "jkowall", "joe-elliott", "mahadzaryab1"],
   "interns": ["Nabil-Salah", "parship12", "parshipcy"],
   "priorityLabels": ["priority:high", "priority:medium", "priority:low"],
-  "ignoreReviewRequestedOnYou": true
+  "ignoreReviewRequestedOnYou": false
 }
