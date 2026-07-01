@@ -256,7 +256,7 @@ publisher just does POST / PATCH / SKIP.
 ## Triage CLI: bucket classifier
 
 `cli/src/buckets.ts` is a pure function that lands every open PR in
-exactly one of seven priority-ordered buckets:
+exactly one of eight priority-ordered buckets:
 
 1. **review-requested-on-you** — viewer in `reviewRequests`. Strongest
    signal; overrides every hide rule. Disabled entirely when
@@ -272,8 +272,11 @@ exactly one of seven priority-ordered buckets:
 5. **codeowners-hits** — PR files match the viewer's configured CODEOWNERS
    globs for the repo.
 6. **fyi** — catch-all for open PRs with no stronger signal.
-7. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
-   predicate marked `hidesFromTriage`. Counts only; not listed.
+7. **dependency-bots** — author is `dependabot[bot]` / `renovate[bot]` /
+   `renovate-bot[bot]`.
+8. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
+   predicate marked `hidesFromTriage`. Rendered as its own collapsed
+   section with a `reason` column, not merely counted.
 
 Hide rules run before bucket assignment. The lone exception is
 `review-requested-on-you`: an explicit review request overrides hide rules
