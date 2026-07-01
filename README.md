@@ -49,7 +49,6 @@ Make a config file at `~/.config/maintainer-tools/config.json`:
 
 ```json
 {
-  "viewer": "your-github-login",
   "repos": ["jaegertracing/jaeger", "jaegertracing/jaeger-ui"],
   "maintainers": ["yurishkuro", "albertteoh", "..."],
   "interns": [],
@@ -59,6 +58,8 @@ Make a config file at `~/.config/maintainer-tools/config.json`:
   "priorityLabels": ["priority:high", "priority:medium", "priority:low"]
 }
 ```
+
+(`viewer` is omitted above — see the schema table below; the CLI fetches it via GraphQL when unset.)
 
 Authenticate `gh` (or set `$GH_TOKEN` / `$GITHUB_TOKEN`):
 
@@ -85,15 +86,16 @@ The CLI looks for a JSON config in this order:
 
 Schema:
 
-| Field            | Type                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repos`          | `string[]` (required) | Repos to scan, `"owner/name"` form.                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `viewer`         | `string`              | Your GitHub login. If omitted, the CLI fetches it via the `viewer` GraphQL query.                                                                                                                                                                                                                                                                                                                                                              |
-| `maintainers`    | `string[]`            | Logins whose review or comment activity counts as "a maintainer has engaged" for the "awaiting first response" buckets, AND whose PRs are quota-exempt.                                                                                                                                                                                                                                                                                        |
-| `interns`        | `string[]`            | Logins whose PRs surface in the high-trust-author bucket and are quota-exempt. Unlike `maintainers`, intern activity on other PRs does NOT count as a maintainer response — put reviewer logins in `maintainers`, not here.                                                                                                                                                                                                                    |
-| `codeowners`     | `{[repo]: string[]}`  | Per-repo path globs you co-own; PRs touching matching files appear in the CODEOWNERS-hits bucket. Glob syntax: `*` (one segment), `**` (any depth).                                                                                                                                                                                                                                                                                            |
-| `cachePath`      | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                                                                                                                                                                                                                                                                                                           |
-| `priorityLabels` | `string[]`            | Ordered list of GitHub labels used as priority tiers, highest to lowest (e.g. `["priority:high", "priority:medium", "priority:low"]`). When non-empty, the report adds a **priority grouping level** between repo and bucket: each PR is placed in the first matching tier; PRs carrying none of the listed labels fall into a separate **(no priority)** group rendered last. When omitted or empty, the report renders the flat bucket view. |
+| Field                        | Type                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `repos`                      | `string[]` (required) | Repos to scan, `"owner/name"` form.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `viewer`                     | `string`              | Your GitHub login. If omitted, the CLI fetches it via the `viewer` GraphQL query.                                                                                                                                                                                                                                                                                                                                                              |
+| `maintainers`                | `string[]`            | Logins whose review or comment activity counts as "a maintainer has engaged" for the "awaiting first response" buckets, AND whose PRs are quota-exempt.                                                                                                                                                                                                                                                                                        |
+| `interns`                    | `string[]`            | Logins whose PRs surface in the high-trust-author bucket and are quota-exempt. Unlike `maintainers`, intern activity on other PRs does NOT count as a maintainer response — put reviewer logins in `maintainers`, not here.                                                                                                                                                                                                                    |
+| `codeowners`                 | `{[repo]: string[]}`  | Per-repo path globs you co-own; PRs touching matching files appear in the CODEOWNERS-hits bucket. Glob syntax: `*` (one segment), `**` (any depth).                                                                                                                                                                                                                                                                                            |
+| `cachePath`                  | `string`              | Override the on-disk SQLite cache path. Default: `$XDG_CACHE_HOME/maintainer-tools/pr-cache.sqlite`.                                                                                                                                                                                                                                                                                                                                           |
+| `priorityLabels`             | `string[]`            | Ordered list of GitHub labels used as priority tiers, highest to lowest (e.g. `["priority:high", "priority:medium", "priority:low"]`). When non-empty, the report adds a **priority grouping level** between repo and bucket: each PR is placed in the first matching tier; PRs carrying none of the listed labels fall into a separate **(no priority)** group rendered last. When omitted or empty, the report renders the flat bucket view. |
+| `ignoreReviewRequestedOnYou` | `boolean`             | Default `false`. Set `true` to disable the **Review requested on you** bucket — GitHub review requests can be sent by anyone (including the PR author), not just maintainers, so the signal is easy to game. When `true`, PRs with an outstanding request on you fall through to normal classification (and hide rules apply normally — no more override).                                                                                     |
 
 Starter files: [`cli/config.example.json`](cli/config.example.json) (generic template) and [`cli/config.example.jaeger.json`](cli/config.example.jaeger.json) (Jaeger org).
 
@@ -132,6 +134,13 @@ seeing the full picture in a single report.
 
 An explicit review request on you **overrides** every hide rule — if a
 maintainer tagged you, you'll see the PR even if it has merge conflicts.
+Set `ignoreReviewRequestedOnYou: true` to turn this bucket off entirely (see
+the schema table above); PRs with an outstanding request on you then get
+classified normally instead of jumping the queue.
+
+Each bucket's report section also carries a one-line description of what it
+means, rendered under the header — so the report is self-explanatory without
+needing this table.
 
 Each row also carries inline **flags** when relevant:
 
@@ -349,8 +358,10 @@ of a PR's current GraphQL state.
 | `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                       | Triage (row flag with count)                                         |
 
 "Hides" means the predicate sends matching PRs to the triage report's
-**Hidden** bucket (still visible if you expand it; the reason chip shows
-which predicate hid it). "Check" means it emits a Check Run via
+**Hidden** bucket (still visible if you expand it; the reason chip(s) show
+every predicate that hid it — a PR can be both stale and quota-exceeded at
+once, and both show up rather than one masking the other). "Check" means
+it emits a Check Run via
 `pr-nudge`. "Item" means it shows up as a bullet in the weekly digest
 comment.
 

@@ -106,7 +106,7 @@ export async function renderXlsx(
       age: Math.floor(ageInDays(pr, opts.now)),
       updated: new Date(pr.updatedAt),
       [RESOLVED_COL]: resolvedCount > 0 ? resolvedCount : '',
-      reason: c.reasons[0] ?? '',
+      reason: c.reasons.join(', '),
     };
     for (const flag of FLAG_COLUMNS) {
       rowData[flag] = flagHeads.has(flag) ? '✓' : '';

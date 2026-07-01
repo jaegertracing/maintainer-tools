@@ -35,6 +35,12 @@ export interface TriageConfig {
   // "(no priority)" group rendered last. When empty, the report renders the
   // flat bucket view used before priority labels were introduced.
   priorityLabels: string[];
+  // When true, an outstanding GitHub review request on the viewer no longer
+  // fast-tracks a PR into "review-requested-on-you" (which otherwise
+  // overrides every hide rule). Anyone who can open a PR can request review
+  // from you, so the bucket carries no trust signal on its own; PRs fall
+  // through to normal classification instead. Default false.
+  ignoreReviewRequestedOnYou: boolean;
 }
 
 interface RawConfig {
@@ -45,6 +51,7 @@ interface RawConfig {
   codeowners?: Record<string, string[]>;
   cachePath?: string;
   priorityLabels?: string[];
+  ignoreReviewRequestedOnYou?: boolean;
 }
 
 const DEFAULT_CACHE_PATH = join(
@@ -90,6 +97,11 @@ export function loadConfig(explicitPath?: string): TriageConfig {
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
     priorityLabels: validatePriorityLabels(raw.priorityLabels, path),
+    ignoreReviewRequestedOnYou: validateBoolean(
+      raw.ignoreReviewRequestedOnYou,
+      'ignoreReviewRequestedOnYou',
+      path,
+    ),
   };
 }
 
@@ -99,6 +111,14 @@ function validatePriorityLabels(value: unknown, configPath: string): string[] {
     throw new Error(`Config at ${configPath}: "priorityLabels" must be an array of strings.`);
   }
   return value as string[];
+}
+
+function validateBoolean(value: unknown, field: string, configPath: string): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value !== 'boolean') {
+    throw new Error(`Config at ${configPath}: "${field}" must be a boolean.`);
+  }
+  return value;
 }
 
 function findFirstExisting(): string | undefined {

@@ -256,10 +256,13 @@ publisher just does POST / PATCH / SKIP.
 ## Triage CLI: bucket classifier
 
 `cli/src/buckets.ts` is a pure function that lands every open PR in
-exactly one of seven priority-ordered buckets:
+exactly one of eight priority-ordered buckets:
 
 1. **review-requested-on-you** — viewer in `reviewRequests`. Strongest
-   signal; overrides every hide rule.
+   signal; overrides every hide rule. Disabled entirely when
+   `TriageConfig.ignoreReviewRequestedOnYou` is `true` (GitHub review
+   requests carry no trust signal — anyone, including the PR author, can
+   send one).
 2. **youre-the-bottleneck** — viewer has reviewed previously, author has
    pushed or commented since.
 3. **high-trust-awaiting-first-response** — author is in the configured
@@ -269,12 +272,17 @@ exactly one of seven priority-ordered buckets:
 5. **codeowners-hits** — PR files match the viewer's configured CODEOWNERS
    globs for the repo.
 6. **fyi** — catch-all for open PRs with no stronger signal.
-7. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
-   predicate marked `hidesFromTriage`. Counts only; not listed.
+7. **dependency-bots** — author is `dependabot[bot]` / `renovate[bot]` /
+   `renovate-bot[bot]`.
+8. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
+   predicate marked `hidesFromTriage`. Rendered as its own collapsed
+   section with a `reason` column, not merely counted.
 
 Hide rules run before bucket assignment. The lone exception is
-`review-requested-on-you`: an explicit review request from a maintainer
-overrides hide rules because GitHub's request is a deliberate signal.
+`review-requested-on-you`: an explicit review request overrides hide rules
+because GitHub's request is treated as a deliberate signal — unless
+`ignoreReviewRequestedOnYou` is set, in which case the override (and the
+bucket itself) is switched off and hide rules apply unconditionally.
 
 The renderer (`cli/src/render/html.ts`) consumes the classified list
 as-is. The HTML output is self-contained (inline CSS, no external assets),

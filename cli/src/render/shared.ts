@@ -96,10 +96,13 @@ function buildSections(prs: ClassifiedPR[]): {
       .sort((a, b) => Date.parse(a.pr.updatedAt) - Date.parse(b.pr.updatedAt));
     if (inBucket.length > 0) sections.push({ bucket, prs: inBucket });
   }
+  // A hidden PR can carry more than one reason (e.g. stale AND
+  // quota-exceeded); tally each so the breakdown doesn't undercount.
   const hiddenBreakdown = new Map<string, number>();
   for (const c of prs.filter((p) => p.bucket === 'hidden')) {
-    const reason = c.reasons[0] ?? 'other';
-    hiddenBreakdown.set(reason, (hiddenBreakdown.get(reason) ?? 0) + 1);
+    for (const reason of c.reasons.length > 0 ? c.reasons : ['other']) {
+      hiddenBreakdown.set(reason, (hiddenBreakdown.get(reason) ?? 0) + 1);
+    }
   }
   return { sections, hiddenBreakdown };
 }
