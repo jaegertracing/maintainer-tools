@@ -358,8 +358,10 @@ of a PR's current GraphQL state.
 | `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                       | Triage (row flag with count)                                         |
 
 "Hides" means the predicate sends matching PRs to the triage report's
-**Hidden** bucket (still visible if you expand it; the reason chip shows
-which predicate hid it). "Check" means it emits a Check Run via
+**Hidden** bucket (still visible if you expand it; the reason chip(s) show
+every predicate that hid it — a PR can be both stale and quota-exceeded at
+once, and both show up rather than one masking the other). "Check" means
+it emits a Check Run via
 `pr-nudge`. "Item" means it shows up as a bullet in the weekly digest
 comment.
 

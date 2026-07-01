@@ -146,7 +146,7 @@ function renderRow(
   const authorTag = author === viewer ? ' <span class="role-tag">you</span>' : '';
   const lastCell =
     c.bucket === 'hidden'
-      ? renderHideReason(c.reasons[0] ?? 'unknown')
+      ? (c.reasons.length > 0 ? c.reasons : ['unknown']).map(renderHideReason).join(' ')
       : c.flags.map(renderFlag).join(' ');
   const age = formatAge(pr, now);
   return `<tr>

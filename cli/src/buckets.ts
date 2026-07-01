@@ -123,13 +123,22 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // trusted on its own.
   const explicitlyRequested =
     !ctx.ignoreReviewRequestedOnYou && isReviewRequestedOnViewer(pr, ctx.viewer);
-  const hiddenByCheck = checks.find((c) => c.triggered && c.hidesFromTriage);
+  // A PR can trip more than one hide predicate at once (e.g. stale AND
+  // quota-exceeded); report all of them so the report doesn't silently
+  // mask one behind whichever predicate happens to run first.
+  const hiddenByChecks = checks.filter((c) => c.triggered && c.hidesFromTriage);
 
   if (pr.isDraft && !explicitlyRequested) {
     return mk('hidden', ['draft'], pr, checks, flags);
   }
-  if (hiddenByCheck && !explicitlyRequested) {
-    return mk('hidden', [`hide:${hiddenByCheck.id}`], pr, checks, flags);
+  if (hiddenByChecks.length > 0 && !explicitlyRequested) {
+    return mk(
+      'hidden',
+      hiddenByChecks.map((c) => `hide:${c.id}`),
+      pr,
+      checks,
+      flags,
+    );
   }
   if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
     return mk('hidden', ['waiting-for-author'], pr, checks, flags);
