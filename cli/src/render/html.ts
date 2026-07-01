@@ -20,6 +20,10 @@ import {
   type RepoBlock,
 } from './shared.js';
 
+// All outbound links (repo, PR, author) open in a new tab so following one
+// doesn't lose the maintainer's place in the report.
+const NEW_TAB = 'target="_blank" rel="noopener noreferrer"';
+
 export interface RenderOptions {
   viewer: string;
   now: Date;
@@ -86,10 +90,6 @@ function renderPriorityGroup(
     ${sections}
   </details>`;
 }
-
-// All outbound links (repo, PR, author) open in a new tab so following one
-// doesn't lose the maintainer's place in the report.
-const NEW_TAB = 'target="_blank" rel="noopener noreferrer"';
 
 // Shared `<colgroup>` so every bucket-section table within a repo renders
 // with identical column widths. Combined with `table-layout: fixed` in the
