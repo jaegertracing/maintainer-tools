@@ -160,14 +160,14 @@ async function runTriage(argv: string[]): Promise<void> {
     prs = result.prs;
   }
 
-  cache?.close();
-
   if (values['no-quota']) {
     log('quota: computation skipped (--no-quota); label-only mode');
   } else {
     const exemptLogins = new Set([...cfg.maintainers, ...cfg.interns]);
-    await enrichQuotaState(prs, client, { exemptLogins });
+    await enrichQuotaState(prs, client, { exemptLogins, cache });
   }
+
+  cache?.close();
 
   log('classifying PRs into buckets');
   const now = new Date();

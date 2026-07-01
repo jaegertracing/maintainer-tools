@@ -21,11 +21,26 @@ const SCHEMA = `
     fetched_at  TEXT NOT NULL,
     PRIMARY KEY (owner, repo, number)
   );
+  CREATE TABLE IF NOT EXISTS merged_count_cache (
+    owner       TEXT NOT NULL,
+    repo        TEXT NOT NULL,
+    author      TEXT NOT NULL,
+    count       INTEGER NOT NULL,
+    fetched_at  TEXT NOT NULL,
+    PRIMARY KEY (owner, repo, author)
+  );
 `;
 
 export interface PrCache {
   get(owner: string, repo: string, number: number): PullRequest | null;
   put(pr: PullRequest): void;
+  // Merged-PR-count cache for quota enrichment (cli/src/quota.ts). Unlike
+  // pr_cache, there's no cheap "has this changed" signal (it's a property
+  // of (repo, author), not of one PR), so freshness is TTL-based: the
+  // caller passes maxAgeMs and gets a miss (null) if the cached row is
+  // older than that.
+  getMergedCount(owner: string, repo: string, author: string, maxAgeMs: number): number | null;
+  putMergedCount(owner: string, repo: string, author: string, count: number): void;
   close(): void;
 }
 
@@ -67,6 +82,16 @@ export function openCache(path: string): PrCache {
        payload    = excluded.payload,
        fetched_at = excluded.fetched_at`,
   );
+  const getMergedStmt = db.prepare(
+    'SELECT count, fetched_at FROM merged_count_cache WHERE owner = ? AND repo = ? AND author = ?',
+  );
+  const putMergedStmt = db.prepare(
+    `INSERT INTO merged_count_cache (owner, repo, author, count, fetched_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(owner, repo, author) DO UPDATE SET
+       count      = excluded.count,
+       fetched_at = excluded.fetched_at`,
+  );
 
   return {
     get(owner, repo, number) {
@@ -92,6 +117,18 @@ export function openCache(path: string): PrCache {
         JSON.stringify(payload),
         new Date().toISOString(),
       );
+    },
+    getMergedCount(owner, repo, author, maxAgeMs) {
+      const row = getMergedStmt.get(owner, repo, author) as
+        | { count: number; fetched_at: string }
+        | undefined;
+      if (!row) return null;
+      const age = Date.now() - Date.parse(row.fetched_at);
+      if (age > maxAgeMs) return null;
+      return row.count;
+    },
+    putMergedCount(owner, repo, author, count) {
+      putMergedStmt.run(owner, repo, author, count, new Date().toISOString());
     },
     close() {
       db.close();
