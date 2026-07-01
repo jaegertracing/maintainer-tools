@@ -69,7 +69,7 @@ function renderRepoBlock(
           .join('\n  ')
       : block.sections.map((s) => renderSection(s, viewer, now, counts ?? new Map())).join('\n  ');
   return `<section class="repo">
-  <h2><a href="${repoUrl}">${escape(block.repo)}</a> <span class="count">${block.visibleCount} / ${block.totalCount} visible</span></h2>
+  <h2><a href="${repoUrl}" ${NEW_TAB}>${escape(block.repo)}</a> <span class="count">${block.visibleCount} / ${block.totalCount} visible</span></h2>
   ${inner}
 </section>`;
 }
@@ -86,6 +86,10 @@ function renderPriorityGroup(
     ${sections}
   </details>`;
 }
+
+// All outbound links (repo, PR, author) open in a new tab so following one
+// doesn't lose the maintainer's place in the report.
+const NEW_TAB = 'target="_blank" rel="noopener noreferrer"';
 
 // Shared `<colgroup>` so every bucket-section table within a repo renders
 // with identical column widths. Combined with `table-layout: fixed` in the
@@ -146,10 +150,10 @@ function renderRow(
       : c.flags.map(renderFlag).join(' ');
   const age = formatAge(pr, now);
   return `<tr>
-        <td><a href="${pr.url}">#${pr.number}</a></td>
+        <td><a href="${pr.url}" ${NEW_TAB}>#${pr.number}</a></td>
         <td>${diff}</td>
         <td>${escape(pr.title)}</td>
-        <td><a href="https://github.com/${escape(author)}">@${escape(author)}</a>${authorTag} <span class="open-count">[${openCount} open]</span></td>
+        <td><a href="https://github.com/${escape(author)}" ${NEW_TAB}>@${escape(author)}</a>${authorTag} <span class="open-count">[${openCount} open]</span></td>
         <td>${lastCell}</td>
         <td>${escape(age)}</td>
       </tr>`;
