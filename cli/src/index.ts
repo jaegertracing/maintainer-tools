@@ -15,6 +15,7 @@ import { classify, type ClassifiedPR, BUCKET_ORDER, BUCKET_LABELS } from './buck
 import { loadConfig } from './config.js';
 import { log } from './log.js';
 import { enrichQuotaState } from './quota.js';
+import { renderExplain } from './render/explain.js';
 import { renderHtml } from './render/html.js';
 import { renderXlsx } from './render/xlsx.js';
 import { makeClient, scanRepos } from './scan.js';
@@ -59,6 +60,11 @@ Options:
                         NNN  (uses the first configured repo)
                       Bypasses the per-repo list query — useful for
                       investigating a specific PR.
+  --explain           Requires --pr. Skips report rendering and prints a
+                      plain-text breakdown to stdout instead: bucket,
+                      every reason, every predicate check result, and row
+                      flags. Use this to see why a specific PR landed
+                      where it did.
   --viewer <login>    Override the viewer (default: GraphQL viewer).
   --help              Show this help.
 
@@ -94,6 +100,7 @@ async function runTriage(argv: string[]): Promise<void> {
       'no-quota': { type: 'boolean', default: false },
       limit: { type: 'string' },
       pr: { type: 'string' },
+      explain: { type: 'boolean', default: false },
       viewer: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -103,6 +110,9 @@ async function runTriage(argv: string[]): Promise<void> {
   if (values.help) {
     process.stdout.write(TRIAGE_HELP);
     return;
+  }
+  if (values.explain && !values.pr) {
+    throw new Error('--explain requires --pr <spec>.');
   }
 
   const limit = parseLimit(values.limit);
@@ -162,6 +172,12 @@ async function runTriage(argv: string[]): Promise<void> {
   log('classifying PRs into buckets');
   const now = new Date();
   const classified = classifyAll(prs, viewer, cfg, now);
+
+  if (values.explain) {
+    process.stdout.write(renderExplain(classified[0]!, now));
+    return;
+  }
+
   const perRepoCounts = computePerRepoOpenCounts(prs);
   log(`bucket totals: ${formatBucketTotals(classified)}`);
 
