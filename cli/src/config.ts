@@ -97,7 +97,11 @@ export function loadConfig(explicitPath?: string): TriageConfig {
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
     priorityLabels: validatePriorityLabels(raw.priorityLabels, path),
-    ignoreReviewRequestedOnYou: raw.ignoreReviewRequestedOnYou ?? false,
+    ignoreReviewRequestedOnYou: validateBoolean(
+      raw.ignoreReviewRequestedOnYou,
+      'ignoreReviewRequestedOnYou',
+      path,
+    ),
   };
 }
 
@@ -107,6 +111,14 @@ function validatePriorityLabels(value: unknown, configPath: string): string[] {
     throw new Error(`Config at ${configPath}: "priorityLabels" must be an array of strings.`);
   }
   return value as string[];
+}
+
+function validateBoolean(value: unknown, field: string, configPath: string): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value !== 'boolean') {
+    throw new Error(`Config at ${configPath}: "${field}" must be a boolean.`);
+  }
+  return value;
 }
 
 function findFirstExisting(): string | undefined {
