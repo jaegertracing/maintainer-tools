@@ -175,8 +175,11 @@ function renderRow(
 }
 
 // One-sentence explanation of what each flag/hide-reason chip means, shown
-// as a title-attribute tooltip so a reader doesn't have to know the
-// classifier internals to interpret a pill. Keyed by the chip's displayed
+// as a CSS hover tooltip (see `.flag[data-tip]` below) so a reader doesn't
+// have to know the classifier internals to interpret a pill. A plain
+// `title` attribute would work too, but browsers gate it behind a ~1-2s
+// hover delay we can't override; the CSS tooltip shows immediately. Keyed
+// by the chip's displayed
 // head text (see `renderFlag` and `renderHideReason` below) — both the
 // visible-row flags and the hidden-bucket reasons share this map since
 // several (e.g. `MERGE-CONFLICT`) name the same underlying predicate.
@@ -212,9 +215,9 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
     'Author has reached the new-contributor open-PR quota; this PR is on hold until an older one closes.',
 };
 
-function titleAttr(head: string): string {
+function tipAttr(head: string): string {
   const tooltip = FLAG_DESCRIPTIONS[head];
-  return tooltip ? ` title="${escape(tooltip)}"` : '';
+  return tooltip ? ` data-tip="${escape(tooltip)}"` : '';
 }
 
 // Render one row flag. CSS class is the alphanumeric+dash prefix of the
@@ -224,7 +227,7 @@ function titleAttr(head: string): string {
 function renderFlag(label: string): string {
   const head = (label.split(':')[0] ?? label).trim();
   const cls = head.replace(/[^A-Za-z0-9-]/g, '-');
-  return `<span class="flag flag-${cls}"${titleAttr(head)}>${escape(label)}</span>`;
+  return `<span class="flag flag-${cls}"${tipAttr(head)}>${escape(label)}</span>`;
 }
 
 // Renders the classifier's hide reason as a small neutral chip. Reasons
@@ -236,7 +239,7 @@ function renderFlag(label: string): string {
 function renderHideReason(raw: string): string {
   const stripped = raw.startsWith('hide:') ? raw.slice(5) : raw;
   const label = stripped.replace(/_/g, '-').toUpperCase();
-  return `<span class="flag flag-HIDE"${titleAttr(label)}>${escape(label)}</span>`;
+  return `<span class="flag flag-HIDE"${tipAttr(label)}>${escape(label)}</span>`;
 }
 
 // Inline favicon: a white funnel (the triage metaphor — many PRs in, a
@@ -295,7 +298,30 @@ const CSS = `
   .role-tag { font-size: 0.7em; background: #ddf4ff; color: #0969da; padding: 0.05em 0.4em; border-radius: 3px; vertical-align: middle; }
   .open-count { color: #57606a; font-size: 0.85em; }
   .flag { font-size: 0.7em; padding: 0.1em 0.4em; border-radius: 3px; background: #eaeef2; margin-right: 0.2em; }
-  .flag[title] { cursor: help; }
+  /* Custom hover tooltip instead of the native "title" attribute — the
+     browser's built-in tooltip only appears after a ~1-2s hover delay we
+     can't override; this one shows as soon as the mouse enters the pill. */
+  .flag[data-tip] { cursor: help; position: relative; }
+  .flag[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    width: max-content;
+    max-width: 260px;
+    padding: 0.4em 0.6em;
+    border-radius: 4px;
+    background: #1f2328;
+    color: white;
+    font-weight: normal;
+    font-size: 1em;
+    line-height: 1.3;
+    white-space: normal;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+  }
   .flag-BLOCKER { background: #cf222e; color: white; }
   .flag-MERGE-CONFLICT { background: #ffebe9; color: #82071e; }
   .flag-STALE { background: #fff8c5; color: #66533d; }
