@@ -120,12 +120,19 @@ export function openCache(path: string): PrCache {
     },
     getMergedCount(owner, repo, author, maxAgeMs) {
       const row = getMergedStmt.get(owner, repo, author) as
-        | { count: number; fetched_at: string }
+        | { count: number | bigint; fetched_at: string }
         | undefined;
       if (!row) return null;
       const age = Date.now() - Date.parse(row.fetched_at);
-      if (age > maxAgeMs) return null;
-      return row.count;
+      // A corrupted/manually-edited fetched_at parses to NaN, and `NaN >
+      // maxAgeMs` is always false -- without this check the row would
+      // never expire. Treat unparseable ages as stale instead.
+      if (!Number.isFinite(age) || age > maxAgeMs) return null;
+      // node:sqlite returns INTEGER columns as bigint once the value
+      // exceeds Number.MAX_SAFE_INTEGER; normalize since the interface
+      // promises a number (merged-PR counts never get remotely close to
+      // that range, so no precision is lost here).
+      return Number(row.count);
     },
     putMergedCount(owner, repo, author, count) {
       putMergedStmt.run(owner, repo, author, count, new Date().toISOString());
