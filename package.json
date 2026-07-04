@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "24.13.2",
-    "@vercel/ncc": "0.38.3",
+    "@vercel/ncc": "0.44.1",
     "npm-run-all2": "9.0.2",
     "prettier": "3.8.3",
     "tsx": "4.22.1",
