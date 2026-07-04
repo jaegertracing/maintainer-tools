@@ -57,9 +57,7 @@ interface PullRequestNode {
   reviewRequests: {
     nodes: Array<{
       requestedReviewer:
-        | { __typename: 'User'; login: string }
-        | { __typename: 'Team'; slug: string }
-        | null;
+        { __typename: 'User'; login: string } | { __typename: 'Team'; slug: string } | null;
     }>;
   };
   reviews: {

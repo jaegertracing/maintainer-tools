@@ -120,8 +120,7 @@ export function openCache(path: string): PrCache {
     },
     getMergedCount(owner, repo, author, maxAgeMs) {
       const row = getMergedStmt.get(owner, repo, author) as
-        | { count: number | bigint; fetched_at: string }
-        | undefined;
+        { count: number | bigint; fetched_at: string } | undefined;
       if (!row) return null;
       const age = Date.now() - Date.parse(row.fetched_at);
       // A corrupted/manually-edited fetched_at parses to NaN, and `NaN >
