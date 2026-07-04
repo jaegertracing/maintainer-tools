@@ -146,8 +146,4 @@ export interface PullRequest {
 
 // Subset of GraphQL Actor __typename we care about.
 export type AuthorTypename =
-  | 'User'
-  | 'Bot'
-  | 'EnterpriseUserAccount'
-  | 'Mannequin'
-  | 'Organization';
+  'User' | 'Bot' | 'EnterpriseUserAccount' | 'Mannequin' | 'Organization';
