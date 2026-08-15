@@ -149,6 +149,23 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
     return mk('hidden', ['waiting-for-author'], pr, checks, flags);
   }
+  // The mirror of `changes-requested-revised` below: the viewer asked for
+  // changes and the author has not answered yet. That is waiting on the author,
+  // the same as the `waiting-for-author` label above, but derived from review
+  // state instead of from a label the nudge workflow has to apply first.
+  // Without this the PR fell through to `fyi`, whose description is "needs a
+  // first look" — the one thing it demonstrably does not need.
+  if (
+    !explicitlyRequested &&
+    latestReviewState(pr.reviews.filter((r) => r.author === ctx.viewer)) === 'CHANGES_REQUESTED' &&
+    !authorActedSinceViewerReview(
+      pr,
+      pr.reviews.filter((r) => r.author === ctx.viewer),
+      ctx.viewer,
+    )
+  ) {
+    return mk('hidden', ['changes-requested'], pr, checks, flags);
+  }
   // Non-dependency bots (anything matching __typename=Bot or `*[bot]`
   // login that we don't know about) → Hidden. Dependency bots get their
   // own bucket below.
