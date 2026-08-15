@@ -1,8 +1,17 @@
 # RFC: Sharper triage signal
 
-**Status:** Proposed
+**Status:** Phase 1 implemented; phase 2 not started
 **Date:** 2026-08-14
 **Extends:** [`maintainer-pr-triage-tooling.md`](maintainer-pr-triage-tooling.md)
+
+Delivered by [#51](https://github.com/jaegertracing/maintainer-tools/pull/51)
+(diff composition, referenced issues, source-line ordering),
+[#52](https://github.com/jaegertracing/maintainer-tools/pull/52) and
+[#53](https://github.com/jaegertracing/maintainer-tools/pull/53) (the
+bucket-by-repo summary table and its links), and
+[#56](https://github.com/jaegertracing/maintainer-tools/pull/56) (a correctness
+fix this work uncovered: `ci_failing` was judging a truncated check-context
+list as if it were complete).
 
 ## Scope
 
@@ -339,6 +348,7 @@ Phase 1, item by item. All local, no model involved:
 | Per-class diff rows; issue column listing the colliding PRs         | `cli/src/render/html.ts`                     | ✅     |
 | Bucket sort by source lines, staleness as tiebreak                  | `cli/src/render/shared.ts`                   | ✅     |
 | `--no-issues`                                                       | `cli/src/index.ts`                           | ✅     |
+| Bucket-by-repo summary table, linked to its sections                | `cli/src/render/html.ts`                     | ✅     |
 | Readiness score                                                     | —                                            | Deferred |
 
 ## Calibration
