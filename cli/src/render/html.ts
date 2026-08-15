@@ -516,6 +516,7 @@ const CSS = `
   details.priority-group > summary.priority-label .count { font-weight: normal; color: #57606a; font-size: 0.85em; }
   details.bucket { margin: 0.5em 0; border-left: 3px solid #d0d7de; padding-left: 0.8em; }
   details.bucket-review-requested-on-you { border-left-color: #d29922; }
+  details.bucket-changes-requested-revised { border-left-color: #a40e26; }
   details.bucket-youre-the-bottleneck { border-left-color: #cf222e; }
   details.bucket-high-trust-awaiting-first-response { border-left-color: #1f883d; }
   details.bucket-first-timer-awaiting { border-left-color: #8250df; }
