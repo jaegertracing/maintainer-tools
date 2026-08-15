@@ -6,6 +6,15 @@
 // Hidden default collapsed. Empty buckets are omitted entirely.
 
 import {
+  computeComposition,
+  FILE_CLASSES,
+  issueUrl,
+  parseRefKey,
+  refKey,
+  type FileClass,
+  type PullRequest,
+} from '@jaegertracing/maintainer-tools-checks';
+import {
   BUCKETS_EXPANDED_BY_DEFAULT,
   BUCKET_DESCRIPTIONS,
   BUCKET_LABELS,
@@ -115,6 +124,7 @@ const COLGROUP = `<colgroup>
         <col class="col-num">
         <col class="col-diff">
         <col class="col-title">
+        <col class="col-issue">
         <col class="col-author">
         <col class="col-flags">
         <col class="col-age">
@@ -140,7 +150,7 @@ function renderSection(
     <p class="bucket-desc">${escape(description)}</p>
     <table class="pr-table">
       ${COLGROUP}
-      <thead><tr><th>#</th><th>diff</th><th>title</th><th>author</th><th>${lastHeader}</th><th>age</th></tr></thead>
+      <thead><tr><th>#</th><th>diff</th><th>title</th><th>issue</th><th>author</th><th>${lastHeader}</th><th>age</th></tr></thead>
       <tbody>
       ${rows}
       </tbody>
@@ -155,7 +165,7 @@ function renderRow(
   counts: Map<string, number>,
 ): string {
   const pr = c.pr;
-  const diff = `<span class="diff"><span class="add">+${pr.additions}</span>/<span class="del">-${pr.deletions}</span></span>`;
+  const diff = renderDiff(pr);
   const author = pr.author?.login ?? '(unknown)';
   const openCount = counts.get(author) ?? 1;
   const authorTag = author === viewer ? ' <span class="role-tag">you</span>' : '';
@@ -168,10 +178,97 @@ function renderRow(
         <td><a href="${escape(pr.url)}" ${NEW_TAB}>#${pr.number}</a></td>
         <td>${diff}</td>
         <td>${escape(pr.title)}</td>
+        <td>${renderIssueCell(pr)}</td>
         <td><a href="https://github.com/${escape(author)}" ${NEW_TAB}>@${escape(author)}</a>${authorTag} <span class="open-count">[${openCount} open]</span></td>
         <td>${lastCell}</td>
         <td>${escape(age)}</td>
       </tr>`;
+}
+
+// Per-class breakdown instead of one total. Only non-zero classes render, so a
+// pure source change stays as short as it was before, while a fixture drop is
+// visibly a fixture drop. Source leads because it is the sort key.
+const CLASS_ABBREV: Record<FileClass, string> = {
+  source: 'src',
+  tests: 'test',
+  fixtures: 'fix',
+  docs: 'doc',
+  config: 'cfg',
+  generated: 'gen',
+};
+
+function renderDiff(pr: PullRequest): string {
+  const comp = computeComposition(pr);
+  if (!comp.exact) {
+    // No per-file data (cached before fileStats existed). Show the whole-PR
+    // total rather than a breakdown we cannot stand behind.
+    return `<span class="diff">${addDel(pr.additions, pr.deletions)}</span>`;
+  }
+  const rows = FILE_CLASSES.filter((cls) => {
+    const t = comp.byClass[cls];
+    return t.additions + t.deletions > 0;
+  }).map((cls) => {
+    const t = comp.byClass[cls];
+    const tip = `${t.files} ${cls} file${t.files === 1 ? '' : 's'}: +${t.additions} / -${t.deletions}`;
+    return (
+      `<span class="dc-label dc-${cls}" data-tip="${escape(tip)}">${CLASS_ABBREV[cls]}</span>` +
+      `<span class="dc-nums">${addDel(t.additions, t.deletions)}</span>`
+    );
+  });
+  if (rows.length === 0) return '<span class="dim">—</span>';
+  if (comp.truncated) {
+    rows.push(
+      `<span class="dc-label dc-trunc" data-tip="More than 100 files changed; this split covers the first 100 only.">+…</span><span class="dc-nums"></span>`,
+    );
+  }
+  return `<div class="diff dcs">${rows.join('')}</div>`;
+}
+
+function addDel(additions: number, deletions: number): string {
+  return `<span class="add">+${additions}</span>/<span class="del">-${deletions}</span>`;
+}
+
+// The issues this PR claims to close, plus the other open PRs claiming the
+// same ones. Naming those PRs rather than only counting them is what makes the
+// row actionable: three separate contributors each fixed jaeger#8780, and
+// deciding which to keep means opening the other two.
+function renderIssueCell(pr: PullRequest): string {
+  const refs = pr.computed?.issueRefs ?? [];
+  if (refs.length === 0) return '<span class="dim">—</span>';
+  const meta = pr.computed?.issueMeta ?? {};
+  const links = refs
+    .map((ref) => {
+      const key = refKey(ref);
+      const m = meta[key];
+      const label = sameRepoLabel(ref, pr) ?? key;
+      const cls = m?.state && m.state !== 'OPEN' ? 'issue-link closed' : 'issue-link';
+      const tip = m
+        ? `${m.isPullRequest ? 'PR' : 'Issue'} ${key} (${m.state.toLowerCase()})${m.author ? `, opened by @${m.author}` : ''}: ${m.title}`
+        : `${key} — could not be resolved`;
+      return `<a class="${cls}" href="${escape(issueUrl(ref))}" ${NEW_TAB} data-tip="${escape(tip)}">${escape(label)}</a>`;
+    })
+    .join(' ');
+
+  const others = (pr.computed?.collidingPrs ?? [])
+    .map(parseRefKey)
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+    .sort((a, b) => a.number - b.number);
+  if (others.length === 0) return links;
+
+  const otherLinks = others
+    .map((r) => {
+      const label = sameRepoLabel(r, pr) ?? refKey(r);
+      const url = `https://github.com/${r.owner}/${r.repo}/pull/${r.number}`;
+      return `<a href="${escape(url)}" ${NEW_TAB}>${escape(label)}</a>`;
+    })
+    .join(', ');
+  return `${links}<span class="issue-others">other PRs: ${otherLinks}</span>`;
+}
+
+// Bare `#N` when the reference points into the PR's own repo, fully qualified
+// otherwise, so a cross-repo reference is never mistaken for a local one.
+function sameRepoLabel(ref: { owner: string; repo: string; number: number }, pr: PullRequest) {
+  return ref.owner === pr.repo.owner && ref.repo === pr.repo.name ? `#${ref.number}` : null;
 }
 
 // One-sentence explanation of what each flag/hide-reason chip means, shown
@@ -213,6 +310,12 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   'DESCRIPTION-EMPTY': 'PR description is empty or contains only unfilled template stubs.',
   'QUOTA-EXCEEDED':
     'Author has reached the new-contributor open-PR quota; this PR is on hold until an older one closes.',
+  'ISSUE-COLLISION':
+    'Another open PR claims to close the same issue. The count includes this PR, so `2` means one other PR is duplicating the work.',
+  'SELF-FILED':
+    'The author of this PR also opened the issue it closes — often a manufactured task rather than a problem the project had already identified. Not applied to maintainers or interns.',
+  'ISSUE-CLOSED':
+    'The issue this PR claims to close is already closed, so the PR is likely superseded or stale.',
 };
 
 function tipAttr(head: string): string {
@@ -280,9 +383,10 @@ const CSS = `
      own columns based on its content and rows wouldn't line up vertically. */
   table.pr-table { border-collapse: collapse; width: 100%; margin: 0.5em 0 1em 0; font-size: 0.9em; table-layout: fixed; }
   table.pr-table .col-num    { width: 5em; }
-  table.pr-table .col-diff   { width: 7em; }
+  table.pr-table .col-diff   { width: 9.5em; }
   table.pr-table .col-title  { width: auto; }
-  table.pr-table .col-author { width: 14em; }
+  table.pr-table .col-issue  { width: 9.5em; }
+  table.pr-table .col-author { width: 13em; }
   table.pr-table .col-flags  { width: 11em; }
   table.pr-table .col-age    { width: 4em; }
   /* word-break lets long titles wrap inside the fixed-width title column
@@ -295,14 +399,25 @@ const CSS = `
   td a:hover { text-decoration: underline; }
   .diff .add { color: #1f883d; }
   .diff .del { color: #cf222e; }
+  /* One row per file class, each keeping the familiar +added/-deleted pair.
+     Two-column grid so the labels and the counts line up down the cell.
+     Only the source label gets ink — it is the number the bucket sorts by. */
+  .dcs { display: grid; grid-template-columns: max-content max-content; column-gap: 0.45em; font-size: 0.9em; font-variant-numeric: tabular-nums; }
+  .dcs .dc-label { color: #8c959f; }
+  .dcs .dc-source { color: #1f2328; font-weight: 600; }
+  .dcs .dc-nums { white-space: nowrap; }
+  .dim { color: #8c959f; }
+  a.issue-link.closed { color: #8250df; text-decoration: line-through; }
+  .issue-others { display: block; font-size: 0.85em; color: #57606a; margin-top: 0.15em; }
+  .issue-others a { color: #57606a; }
   .role-tag { font-size: 0.7em; background: #ddf4ff; color: #0969da; padding: 0.05em 0.4em; border-radius: 3px; vertical-align: middle; }
   .open-count { color: #57606a; font-size: 0.85em; }
   .flag { font-size: 0.7em; padding: 0.1em 0.4em; border-radius: 3px; background: #eaeef2; margin-right: 0.2em; }
   /* Custom hover tooltip instead of the native "title" attribute — the
      browser's built-in tooltip only appears after a ~1-2s hover delay we
      can't override; this one shows as soon as the mouse enters the pill. */
-  .flag[data-tip] { cursor: help; position: relative; }
-  .flag[data-tip]:hover::after {
+  [data-tip] { cursor: help; position: relative; }
+  [data-tip]:hover::after {
     content: attr(data-tip);
     position: absolute;
     bottom: 125%;
@@ -322,6 +437,9 @@ const CSS = `
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     pointer-events: none;
   }
+  .flag-ISSUE-COLLISION { background: #cf222e; color: white; }
+  .flag-SELF-FILED { background: #fff1e5; color: #953800; }
+  .flag-ISSUE-CLOSED { background: #f5e8ff; color: #8250df; }
   .flag-BLOCKER { background: #cf222e; color: white; }
   .flag-MERGE-CONFLICT { background: #ffebe9; color: #82071e; }
   .flag-STALE { background: #fff8c5; color: #66533d; }

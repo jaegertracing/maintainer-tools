@@ -75,6 +75,11 @@ export interface PullRequest {
   deletions: number;
   changedFiles: number;
   files: string[]; // first 100 paths
+  // Per-file line counts for the same first-100 files. Optional because
+  // entries cached before the field existed don't have it; consumers fall
+  // back to the whole-PR `additions`/`deletions` totals. Path-only consumers
+  // keep using `files` so they don't have to project this down.
+  fileStats?: FileChange[];
   // Status check rollup state from the head commit; STATUS_ROLLUP can be
   // EXPECTED | ERROR | FAILURE | PENDING | SUCCESS, or null if no checks.
   statusCheckRollup: 'EXPECTED' | 'ERROR' | 'FAILURE' | 'PENDING' | 'SUCCESS' | null;
@@ -141,7 +146,44 @@ export interface PullRequest {
     // beyond the author's allowed concurrent-open-PR cap for this repo.
     // Independent of (but congruent with) the `pr-quota-reached` label.
     quotaExceeded?: boolean;
+    // Issues this PR claims to close, parsed from the body. Closing keywords
+    // only — a bare `#N` mention is not a claim, and in practice most bare
+    // mentions point at other PRs ("follow-up to #123") rather than issues.
+    issueRefs?: IssueRef[];
+    // Metadata for each entry in `issueRefs`, keyed by `refKey()`. Absent
+    // keys mean the lookup failed or was skipped; consumers degrade to
+    // showing the bare reference.
+    issueMeta?: Record<string, IssueMeta>;
+    // Other open PRs in the same scan that claim to close one of the same
+    // issues, as `owner/repo#number`. Empty or absent means no collision.
+    collidingPrs?: string[];
   };
+}
+
+// One changed file's line counts. `changeType` is GitHub's PatchStatus enum,
+// lowercased.
+export interface FileChange {
+  path: string;
+  additions: number;
+  deletions: number;
+  changeType: string;
+}
+
+// A reference to an issue in some repo. Owner/repo are resolved against the
+// referring PR's repo when the body used the bare `#N` form.
+export interface IssueRef {
+  owner: string;
+  repo: string;
+  number: number;
+}
+
+export interface IssueMeta {
+  author: string | null;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  title: string;
+  // True when the referenced number turned out to be a PR. GitHub's closing
+  // keywords accept any number, and contributors do write `Fixes #<pr>`.
+  isPullRequest: boolean;
 }
 
 // Subset of GraphQL Actor __typename we care about.

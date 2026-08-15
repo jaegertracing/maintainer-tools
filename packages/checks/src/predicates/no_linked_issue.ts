@@ -1,15 +1,5 @@
+import { hasIssueRef } from '../issue-refs.js';
 import type { CheckResult, PullRequest } from '../types.js';
-
-// Matches GitHub's auto-close keywords. Case-insensitive, accepts either
-// the bare `#NNN` form or a full GitHub issue URL. Pluralized variants
-// (`fixes`, `fixed`) and the singular all count.
-//
-// Examples that count:
-//   "Fixes #123"
-//   "closes  jaegertracing/jaeger#456"
-//   "Resolves: https://github.com/jaegertracing/jaeger/issues/789"
-const LINKED_RE =
-  /\b(fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\b[:\s]+(?:[\w-]+\/[\w-]+)?#\d+|\b(fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\b[:\s]+https?:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+/i;
 
 // Labels that exempt a PR from needing an issue link. Doc-only PRs,
 // CI/tooling changes, and explicitly-trivial work don't always have a
@@ -27,7 +17,7 @@ export function noLinkedIssue(pr: PullRequest): CheckResult {
       hidesFromTriage: false,
     };
   }
-  const triggered = !LINKED_RE.test(pr.body ?? '');
+  const triggered = !hasIssueRef(pr.body ?? '');
   return {
     id: 'no_linked_issue',
     triggered,

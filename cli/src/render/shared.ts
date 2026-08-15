@@ -2,7 +2,7 @@
 // bucket sections, sort by staleness (oldest first), and pre-compute the
 // "visible / total" header counts each renderer displays.
 
-import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { type Bucket, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 
 export interface BucketSection {
@@ -85,15 +85,27 @@ export function groupByRepo(
   return blocks;
 }
 
+// Smallest real change first, oldest first among equals.
+//
+// Sorting by source lines rather than by staleness is what makes a long bucket
+// workable: the 54-PR first-timer section held thirteen PRs under ten lines
+// scattered through it by date, next to a 2,324-line rewrite. Ordering by the
+// lines that actually need reading collects the one-minute reviews at the top.
+// Staleness stays as the tiebreak so equally-sized PRs still surface oldest
+// first.
+function bySourceLinesThenAge(a: ClassifiedPR, b: ClassifiedPR): number {
+  const d = computeComposition(a.pr).sourceLines - computeComposition(b.pr).sourceLines;
+  if (d !== 0) return d;
+  return Date.parse(a.pr.updatedAt) - Date.parse(b.pr.updatedAt);
+}
+
 function buildSections(prs: ClassifiedPR[]): {
   sections: BucketSection[];
   hiddenBreakdown: Map<string, number>;
 } {
   const sections: BucketSection[] = [];
   for (const bucket of BUCKET_ORDER) {
-    const inBucket = prs
-      .filter((c) => c.bucket === bucket)
-      .sort((a, b) => Date.parse(a.pr.updatedAt) - Date.parse(b.pr.updatedAt));
+    const inBucket = prs.filter((c) => c.bucket === bucket).sort(bySourceLinesThenAge);
     if (inBucket.length > 0) sections.push({ bucket, prs: inBucket });
   }
   // A hidden PR can carry more than one reason (e.g. stale AND

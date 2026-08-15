@@ -14,6 +14,7 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { classify, type ClassifiedPR, BUCKET_ORDER, BUCKET_LABELS } from './buckets.js';
 import { loadConfig } from './config.js';
 import { log } from './log.js';
+import { enrichIssueState } from './issues.js';
 import { enrichQuotaState } from './quota.js';
 import { renderExplain } from './render/explain.js';
 import { renderHtml } from './render/html.js';
@@ -51,6 +52,9 @@ Options:
   --no-quota          Skip the per-author quota computation. Faster, but
                       relies solely on the \`pr-quota-reached\` label for
                       identifying quota-blocked PRs.
+  --no-issues         Skip referenced-issue enrichment. Drops the issue
+                      column and the SELF-FILED / ISSUE-COLLISION /
+                      ISSUE-CLOSED flags; saves one batched query per run.
   --limit <n>         Cap PRs scanned per repo (for testing). PRs are
                       list-ordered by updated-desc, so this samples the
                       most recently active.
@@ -98,6 +102,7 @@ async function runTriage(argv: string[]): Promise<void> {
       output: { type: 'string' },
       'no-cache': { type: 'boolean', default: false },
       'no-quota': { type: 'boolean', default: false },
+      'no-issues': { type: 'boolean', default: false },
       limit: { type: 'string' },
       pr: { type: 'string' },
       explain: { type: 'boolean', default: false },
@@ -165,6 +170,12 @@ async function runTriage(argv: string[]): Promise<void> {
   } else {
     const exemptLogins = new Set([...cfg.maintainers, ...cfg.interns]);
     await enrichQuotaState(prs, client, { exemptLogins, cache });
+  }
+
+  if (values['no-issues']) {
+    log('issues: enrichment skipped (--no-issues)');
+  } else {
+    await enrichIssueState(prs, client, { cache });
   }
 
   cache?.close();
