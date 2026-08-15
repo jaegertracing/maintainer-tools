@@ -18,6 +18,7 @@ import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maint
 
 export type Bucket =
   | 'review-requested-on-you'
+  | 'changes-requested-revised'
   | 'youre-the-bottleneck'
   | 'high-trust-awaiting-first-response'
   | 'first-timer-awaiting'
@@ -28,6 +29,7 @@ export type Bucket =
 
 export const BUCKET_ORDER: Bucket[] = [
   'review-requested-on-you',
+  'changes-requested-revised',
   'youre-the-bottleneck',
   'high-trust-awaiting-first-response',
   'first-timer-awaiting',
@@ -39,6 +41,7 @@ export const BUCKET_ORDER: Bucket[] = [
 
 export const BUCKET_LABELS: Record<Bucket, string> = {
   'review-requested-on-you': 'Review requested on you',
+  'changes-requested-revised': 'You requested changes; author has revised',
   'youre-the-bottleneck': "You're the bottleneck",
   'high-trust-awaiting-first-response': 'High-trust authors awaiting first response',
   'first-timer-awaiting': 'First-time contributors awaiting first response',
@@ -52,6 +55,8 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 // a reader doesn't have to go dig through docs to know what a section means.
 export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
   'review-requested-on-you': 'Someone added you to the Reviewers field on this PR.',
+  'changes-requested-revised':
+    'You submitted a Request changes review and the author has pushed or commented since, so the ball is back with you. Your review is also still blocking the merge until you clear it.',
   'youre-the-bottleneck':
     "You've reviewed this PR before, and the author has pushed a commit or commented since — it's waiting on you again.",
   'high-trust-awaiting-first-response':
@@ -78,6 +83,7 @@ const DEPENDENCY_BOT_LOGINS = new Set<string>([
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
   'review-requested-on-you',
+  'changes-requested-revised',
   'youre-the-bottleneck',
   'high-trust-awaiting-first-response',
   'first-timer-awaiting',
@@ -165,8 +171,19 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   }
 
   // --- Priority 2: viewer previously reviewed, author has acted since.
+  //
+  // Split by what kind of review it was. "Request changes" is a commitment: it
+  // names things the author had to fix and it blocks the merge until dismissed,
+  // so a revision against it needs re-reading against that specific list. A
+  // plain comment that the author replied to is a weaker signal, and lumping
+  // the two together buried the explicit ones — 7 of the 9 PRs in this branch
+  // were requested-changes revisions on the 2026-08-15 queue.
   const viewerReviews = pr.reviews.filter((r) => r.author === ctx.viewer);
   if (viewerReviews.length > 0 && authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer)) {
+    if (latestReviewState(viewerReviews) === 'CHANGES_REQUESTED') {
+      reasons.push('you requested changes; author has revised since');
+      return mk('changes-requested-revised', reasons, pr, checks, flags);
+    }
     reasons.push('viewer reviewed; author has acted since');
     return mk('youre-the-bottleneck', reasons, pr, checks, flags);
   }
@@ -245,6 +262,19 @@ function hasMaintainerActivity(pr: PullRequest, maintainers: Set<string>): boole
     if (c.author && maintainers.has(c.author)) return true;
   }
   return false;
+}
+
+// State of the viewer's most recent submitted review. GitHub keeps the whole
+// history, and a later APPROVED or COMMENTED supersedes an earlier
+// CHANGES_REQUESTED, so only the newest one says where the PR stands.
+function latestReviewState(
+  reviews: PullRequest['reviews'],
+): PullRequest['reviews'][number]['state'] | null {
+  let latest: PullRequest['reviews'][number] | undefined;
+  for (const r of reviews) {
+    if (!latest || Date.parse(r.submittedAt) > Date.parse(latest.submittedAt)) latest = r;
+  }
+  return latest?.state ?? null;
 }
 
 function authorActedSinceViewerReview(

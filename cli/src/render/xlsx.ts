@@ -35,6 +35,9 @@ const RESOLVED_COL = 'RESOLVED-W/O-REPLY';
 // (cli/src/render/html.ts). Lower-signal buckets share the neutral gray.
 const BUCKET_COLORS: Record<Bucket, string> = {
   'review-requested-on-you': 'FFD29922',
+  // Deeper red than "you're the bottleneck": same class of signal, but this one
+  // also blocks the merge until the review is cleared.
+  'changes-requested-revised': 'FFA40E26',
   'youre-the-bottleneck': 'FFCF222E',
   'high-trust-awaiting-first-response': 'FF1F883D',
   'first-timer-awaiting': 'FF8250DF',
@@ -47,6 +50,7 @@ const BUCKET_COLORS: Record<Bucket, string> = {
 // Buckets dark enough that white text reads better than black.
 const DARK_BUCKETS = new Set<Bucket>([
   'review-requested-on-you',
+  'changes-requested-revised',
   'youre-the-bottleneck',
   'high-trust-awaiting-first-response',
   'first-timer-awaiting',
