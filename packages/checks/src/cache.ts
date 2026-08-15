@@ -79,7 +79,9 @@ interface CacheRow {
 //   4 — added fileStats (per-file additions/deletions) for diff composition
 //   5 — added headCheckRunsTruncated; widened the check-context page to 100,
 //       so entries cached at the old page size hold a shorter prefix
-const SCHEMA_VERSION = 5;
+//   6 — reviewThreads is now paginated in full, so entries cached before it
+//       hold at most the first 100 threads
+const SCHEMA_VERSION = 6;
 
 interface CachePayload {
   v: number;
