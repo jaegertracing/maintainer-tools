@@ -439,6 +439,8 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
     'Carries the `awaiting-maintainer-input` label — the author is waiting on a maintainer to answer something.',
   'WAITING-FOR-AUTHOR':
     'Carries the `waiting-for-author` label — the ball is in the author’s court.',
+  'CHANGES-REQUESTED':
+    'You submitted a Request changes review and the author has not pushed or commented since, so it is waiting on them.',
   'NEEDS-LABEL':
     'CI is failing only on a label-gate check (e.g. a missing changelog/kind label) — otherwise mergeable.',
   'NO-ISSUE':
