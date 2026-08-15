@@ -84,6 +84,8 @@ interface PullRequestNode {
     }>;
   };
   reviewThreads: {
+    totalCount: number;
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
     nodes: Array<{
       isResolved: boolean;
       resolvedBy: { login: string } | null;
@@ -166,6 +168,8 @@ const PR_QUERY = `
           }
         }
         reviewThreads(first: 100) {
+          totalCount
+          pageInfo { hasNextPage endCursor }
           nodes {
             isResolved
             resolvedBy { login }
@@ -208,6 +212,30 @@ const PR_QUERY = `
                     ... on StatusContext { context state }
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// Review threads beyond the first page. Only fired for the rare PR that has
+// more than 100 of them, so the ordinary PR costs no extra request.
+const REVIEW_THREADS_QUERY = `
+  query ReviewThreads($owner: String!, $repo: String!, $number: Int!, $cursor: String!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            isResolved
+            resolvedBy { login }
+            comments(first: 50) {
+              nodes {
+                author { login }
+                createdAt
               }
             }
           }
@@ -359,6 +387,54 @@ type IssueOrPrNode = {
   author: { login: string } | null;
 } | null;
 
+type RawReviewThread = {
+  isResolved: boolean;
+  resolvedBy: { login: string } | null;
+  comments: { nodes: Array<{ author: { login: string } | null; createdAt: string }> };
+};
+
+function mapReviewThread(t: RawReviewThread): NonNullable<PullRequest['reviewThreads']>[number] {
+  return {
+    isResolved: t.isResolved,
+    resolvedBy: t.resolvedBy?.login ?? null,
+    comments: t.comments.nodes.map((c) => ({
+      author: c.author?.login ?? null,
+      createdAt: c.createdAt,
+    })),
+  };
+}
+
+// Walk the remaining review-thread pages. `reviewThreads` caps at 100 per page
+// and jaeger has a PR with 181 threads, so without this the counts derived from
+// them are a prefix: that PR reports 47 unresolved threads out of 118, and
+// `resolved_without_reply` undercounts 57 as 53.
+async function fetchRemainingReviewThreads(
+  gql: typeof graphql,
+  owner: string,
+  repo: string,
+  number: number,
+  startCursor: string,
+): Promise<Array<NonNullable<PullRequest['reviewThreads']>[number]>> {
+  const out: Array<NonNullable<PullRequest['reviewThreads']>[number]> = [];
+  let cursor: string | null = startCursor;
+  while (cursor) {
+    const data: {
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            nodes: RawReviewThread[];
+          };
+        };
+      };
+    } = await gql(REVIEW_THREADS_QUERY, { owner, repo, number, cursor });
+    const rt = data.repository.pullRequest.reviewThreads;
+    out.push(...rt.nodes.map(mapReviewThread));
+    cursor = rt.pageInfo.hasNextPage ? rt.pageInfo.endCursor : null;
+  }
+  return out;
+}
+
 export function createGraphqlClient(token: string): GraphqlClient {
   const gql = graphql.defaults({
     headers: { authorization: `token ${token}` },
@@ -429,6 +505,13 @@ export function createGraphqlClient(token: string): GraphqlClient {
       const pr = data.repository.pullRequest;
       const head = pr.commits.nodes[pr.commits.nodes.length - 1];
       const headCheckRollup = pr.headCommit.nodes[0]?.commit.statusCheckRollup;
+      const threads = pr.reviewThreads.nodes.map(mapReviewThread);
+      const nextThreadCursor = pr.reviewThreads.pageInfo.endCursor;
+      if (pr.reviewThreads.pageInfo.hasNextPage && nextThreadCursor) {
+        threads.push(
+          ...(await fetchRemainingReviewThreads(gql, owner, repo, number, nextThreadCursor)),
+        );
+      }
       return {
         repo: { owner, name: repo },
         number: pr.number,
@@ -501,14 +584,7 @@ export function createGraphqlClient(token: string): GraphqlClient {
           createdAt: c.createdAt,
         })),
         body: pr.body ?? '',
-        reviewThreads: pr.reviewThreads.nodes.map((t) => ({
-          isResolved: t.isResolved,
-          resolvedBy: t.resolvedBy?.login ?? null,
-          comments: t.comments.nodes.map((c) => ({
-            author: c.author?.login ?? null,
-            createdAt: c.createdAt,
-          })),
-        })),
+        reviewThreads: threads,
       };
     },
   };
