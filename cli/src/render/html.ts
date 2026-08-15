@@ -556,10 +556,15 @@ const CSS = `
   /* Top-of-report bucket-by-repo matrix. */
   section.summary { margin: 0 0 1.6em 0; }
   section.summary h2 { font-size: 1.05em; margin: 0 0 0.5em 0; border: none; padding: 0; }
-  table.summary-table { border-collapse: collapse; font-size: 0.9em; font-variant-numeric: tabular-nums; }
-  table.summary-table th, table.summary-table td { padding: 0.3em 0.9em 0.3em 0; text-align: right; }
+  table.summary-table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.summary-table th, table.summary-table td { padding: 0.35em 0.9em 0.35em 0; text-align: right; }
   table.summary-table th[scope="row"] { text-align: left; font-weight: normal; padding-right: 1.6em; }
-  table.summary-table thead th { color: #57606a; font-size: 0.85em; font-weight: normal; border-bottom: 1px solid #d0d7de; }
+  /* Column headers carry the same size as the rows they label; the hierarchy
+     comes from colour, not from shrinking the text. The first header names the
+     row labels below it, so it is left-aligned with them rather than following
+     the numeric columns to the right. */
+  table.summary-table thead th { color: #57606a; font-weight: normal; border-bottom: 1px solid #d0d7de; }
+  table.summary-table thead th:first-child { text-align: left; }
   table.summary-table tbody tr:hover { background: #f6f8fa; }
   table.summary-table .row-total { font-weight: 600; }
   table.summary-table tfoot .grand th, table.summary-table tfoot .grand td { border-top: 1px solid #d0d7de; font-weight: 600; }
