@@ -112,7 +112,7 @@ export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const checks = runAll(pr);
-  const flags = computeFlags(pr, checks);
+  const flags = computeFlags(pr, checks, ctx);
   const reasons: string[] = [];
 
   // --- Hide rules first. Any predicate that declared hidesFromTriage wins
@@ -301,8 +301,9 @@ function anyFileMatches(files: string[], patterns: string[]): boolean {
   return files.some((f) => patterns.some((p) => matchesGlob(f, p)));
 }
 
-function computeFlags(pr: PullRequest, checks: CheckResult[]): RowFlag[] {
+function computeFlags(pr: PullRequest, checks: CheckResult[], ctx: ClassifyContext): RowFlag[] {
   const flags: RowFlag[] = [];
+  flags.push(...issueFlags(pr, ctx));
   if (pr.isDraft) flags.push('DRAFT');
   if (isBotAuthor(pr)) flags.push('BOT');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
@@ -330,6 +331,44 @@ function computeFlags(pr: PullRequest, checks: CheckResult[]): RowFlag[] {
     // than threaded through CheckResult — same data, no extra plumbing.
     const count = countResolvedWithoutReply(pr);
     flags.push(`RESOLVED-W/O-REPLY: ${count}`);
+  }
+  return flags;
+}
+
+// Flags derived from the referenced-issue enrichment (cli/src/issues.ts).
+// Absent enrichment yields no flags rather than misleading ones.
+function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
+  const refs = pr.computed?.issueRefs;
+  if (!refs || refs.length === 0) return [];
+  const flags: RowFlag[] = [];
+  const meta = pr.computed?.issueMeta ?? {};
+  const author = pr.author?.login;
+
+  const colliding = pr.computed?.collidingPrs ?? [];
+  if (colliding.length > 0) flags.push(`ISSUE-COLLISION: ${colliding.length + 1}`);
+
+  // Self-filed only counts for outside contributors. A maintainer or intern
+  // filing an issue and then fixing it is ordinary planned work, so flagging
+  // it would fire on most of the team's own PRs and mean nothing.
+  const isHighTrust = !!author && (ctx.maintainers.has(author) || ctx.interns.has(author));
+  if (author && !isHighTrust) {
+    for (const ref of refs) {
+      const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];
+      if (m && !m.isPullRequest && m.author === author) {
+        flags.push('SELF-FILED');
+        break;
+      }
+    }
+  }
+
+  // An open PR against an already-closed issue is either superseded by
+  // whoever closed it or stale enough that the problem went away.
+  for (const ref of refs) {
+    const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];
+    if (m && m.state !== 'OPEN') {
+      flags.push('ISSUE-CLOSED');
+      break;
+    }
   }
   return flags;
 }
