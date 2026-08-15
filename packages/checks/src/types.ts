@@ -128,6 +128,12 @@ export interface PullRequest {
   // CheckRun / StatusContext contexts on the head commit's statusCheckRollup.
   // Optional for backward compatibility with older cache entries — predicates
   // and classifiers should degrade gracefully when absent.
+  // True when the head commit has more check contexts than the query asked
+  // for, so `headCheckRuns` is a prefix rather than the whole set. Any
+  // consumer reasoning about *which* checks are failing has to treat a
+  // truncated list as unknown rather than complete — jaeger PRs reach 145
+  // contexts against a page size of 100.
+  headCheckRunsTruncated?: boolean;
   headCheckRuns?: Array<{
     name: string;
     // GitHub CheckConclusionState (lowercase) for CheckRun nodes, or a

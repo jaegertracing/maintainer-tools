@@ -44,9 +44,17 @@ export function ciFailing(pr: PullRequest): CheckResult {
   );
   // Require at least one failing run (guards against empty-array edge case)
   // and every failing run must be a label gate.
+  //
+  // A truncated list cannot support "every failing run is a label gate": the
+  // checks we were not shown may include a real failure, and concluding
+  // label-only would surface a broken PR as merely needing a label. Treat it
+  // the same as absent data — assume a real CI failure. jaeger PRs reach 145
+  // check contexts against a page size of 100, so this is reachable, not
+  // hypothetical.
   const labelOnlyFailure =
     failingRuns !== undefined &&
     failingRuns.length > 0 &&
+    pr.headCheckRunsTruncated !== true &&
     failingRuns.every((r) => isLabelGate(r.name));
 
   return {
