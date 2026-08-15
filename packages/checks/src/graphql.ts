@@ -118,6 +118,7 @@ interface PullRequestNode {
       commit: {
         statusCheckRollup: {
           contexts: {
+            totalCount: number;
             nodes: Array<
               | { __typename: 'CheckRun'; name: string; conclusion: string | null }
               | { __typename: 'StatusContext'; context: string; state: string }
@@ -199,7 +200,8 @@ const PR_QUERY = `
           nodes {
             commit {
               statusCheckRollup {
-                contexts(first: 50) {
+                contexts(first: 100) {
+                  totalCount
                   nodes {
                     __typename
                     ... on CheckRun { name conclusion }
@@ -450,6 +452,10 @@ export function createGraphqlClient(token: string): GraphqlClient {
           changeType: f.changeType.toLowerCase(),
         })),
         statusCheckRollup: head?.commit.statusCheckRollup?.state ?? null,
+        headCheckRunsTruncated:
+          headCheckRollup !== undefined && headCheckRollup !== null
+            ? headCheckRollup.contexts.totalCount > headCheckRollup.contexts.nodes.length
+            : undefined,
         headCheckRuns: headCheckRollup?.contexts.nodes.map((ctx) => {
           if (ctx.__typename === 'CheckRun') {
             return { name: ctx.name, conclusion: ctx.conclusion?.toLowerCase() ?? null };

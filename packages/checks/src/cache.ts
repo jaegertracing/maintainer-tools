@@ -77,7 +77,9 @@ interface CacheRow {
 //   2 — added commits[].parents for dco_missing merge exemption
 //   3 — added headCheckRuns for label-only CI failure detection
 //   4 — added fileStats (per-file additions/deletions) for diff composition
-const SCHEMA_VERSION = 4;
+//   5 — added headCheckRunsTruncated; widened the check-context page to 100,
+//       so entries cached at the old page size hold a shorter prefix
+const SCHEMA_VERSION = 5;
 
 interface CachePayload {
   v: number;
