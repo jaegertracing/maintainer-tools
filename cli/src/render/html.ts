@@ -80,74 +80,141 @@ ${body}
   document.getElementById('collapse-all').addEventListener('click', () => {
     document.querySelectorAll('details').forEach((d) => { d.open = false; });
   });
+
+  // Summary-table links point at sections that are often inside a collapsed
+  // <details>. Browsers vary on whether a fragment navigation opens the
+  // ancestors, and a link into a closed section otherwise scrolls nowhere, so
+  // open the whole chain first and then scroll.
+  document.querySelectorAll('.summary-table a[href^="#"]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      const target = document.getElementById(a.getAttribute('href').slice(1));
+      if (!target) return;
+      e.preventDefault();
+      for (let n = target; n; n = n.parentElement) {
+        if (n.tagName === 'DETAILS') n.open = true;
+      }
+      target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      history.replaceState(null, '', a.getAttribute('href'));
+    });
+  });
 </script>
 </body>
 </html>
 `;
 }
 
-function bucketCount(block: RepoBlock, bucket: Bucket): number {
+function slug(s: string): string {
+  return s.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function repoAnchor(repo: string): string {
+  return `repo-${slug(repo)}`;
+}
+
+// Anchor for one rendered bucket table. Derived from the same three values the
+// renderer uses to place it, so a summary link and its section cannot drift.
+// `group` is the priority-group label, or '' in the flat (no priorityLabels)
+// view.
+function sectionAnchor(repo: string, group: string, bucket: Bucket): string {
+  return `s-${slug(repo)}-${group ? `${slug(group)}-` : ''}${bucket}`;
+}
+
+// Where a single summary cell's PRs actually live. With priorityLabels
+// configured, one (repo, bucket) count is spread across a bucket table inside
+// each priority group, so a cell has several targets rather than one.
+interface CellTargets {
+  count: number;
+  parts: Array<{ group: string; count: number; anchor: string }>;
+}
+
+function cellTargets(block: RepoBlock, bucket: Bucket): CellTargets {
+  const parts: CellTargets['parts'] = [];
   if (block.priorityGroups.length > 0) {
-    return block.priorityGroups.reduce(
-      (a, g) => a + (g.sections.find((s) => s.bucket === bucket)?.prs.length ?? 0),
-      0,
-    );
+    for (const g of block.priorityGroups) {
+      const s = g.sections.find((x) => x.bucket === bucket);
+      if (s && s.prs.length > 0) {
+        parts.push({
+          group: g.label,
+          count: s.prs.length,
+          anchor: sectionAnchor(block.repo, g.label, bucket),
+        });
+      }
+    }
+  } else {
+    const s = block.sections.find((x) => x.bucket === bucket);
+    if (s && s.prs.length > 0) {
+      parts.push({ group: '', count: s.prs.length, anchor: sectionAnchor(block.repo, '', bucket) });
+    }
   }
-  return block.sections.find((s) => s.bucket === bucket)?.prs.length ?? 0;
+  return { count: parts.reduce((a, p) => a + p.count, 0), parts };
 }
 
 // Bucket-by-repo matrix at the top of the report: how much is waiting, and
-// where. Each repo heading below already says "N / M visible", but nothing
-// showed the shape of the queue across repos in one place, so the only way to
-// judge the size of the day's work was to scroll the whole report.
+// where. The per-repo headings below already say "N / M visible", but nothing
+// showed the shape of the queue across repos in one place.
 //
-// The total counts visible buckets only. Blocked-on-author is listed under it,
-// outside the total, because it is the bucket the report exists to exclude —
-// folding it in would make the headline number the size of the whole queue
-// rather than the size of the work. Showing it anyway keeps the arithmetic
-// checkable against the scan totals.
+// The total row counts visible buckets only. Blocked-on-author is listed under
+// it, outside the total, because it is the bucket the report exists to exclude
+// — folding it in would make the headline number the size of the whole queue
+// rather than the size of the work.
 function renderSummary(blocks: RepoBlock[]): string {
   if (blocks.length === 0) return '';
   const visibleBuckets = BUCKET_ORDER.filter((b) => b !== 'hidden');
-  const num = (n: number): string => (n === 0 ? '<td class="zero">0</td>' : `<td>${n}</td>`);
+
+  // A cell links to the first section holding its PRs. When the count spans
+  // several priority groups the tooltip names the split, so the number a
+  // reader jumps into is never silently smaller than the one they clicked.
+  const cell = (block: RepoBlock, bucket: Bucket): string => {
+    const { count, parts } = cellTargets(block, bucket);
+    if (count === 0) return '<td class="zero">0</td>';
+    const first = parts[0]!;
+    const tip =
+      parts.length > 1
+        ? ` data-tip="${escape(parts.map((p) => `${p.group}: ${p.count}`).join(' · '))}"`
+        : '';
+    return `<td><a href="#${first.anchor}"${tip}>${count}</a></td>`;
+  };
+
+  const rowTotal = (bucket: Bucket): number =>
+    blocks.reduce((a, b) => a + cellTargets(b, bucket).count, 0);
 
   const rows = visibleBuckets
-    .map((bucket) => ({ bucket, per: blocks.map((b) => bucketCount(b, bucket)) }))
-    .map((r) => ({ ...r, total: r.per.reduce((a, b) => a + b, 0) }))
-    // A bucket nobody is in is noise; it reappears when it fills up.
-    .filter((r) => r.total > 0)
+    .filter((bucket) => rowTotal(bucket) > 0)
     .map(
-      (r) =>
-        `<tr><th scope="row">${escape(BUCKET_LABELS[r.bucket])}</th>${r.per
-          .map(num)
-          .join('')}<td class="row-total">${r.total}</td></tr>`,
+      (bucket) =>
+        `<tr><th scope="row">${escape(BUCKET_LABELS[bucket])}</th>${blocks
+          .map((b) => cell(b, bucket))
+          .join('')}<td class="row-total">${rowTotal(bucket)}</td></tr>`,
     )
     .join('\n        ');
 
-  const perRepo = blocks.map((b) =>
-    visibleBuckets.reduce((a, bucket) => a + bucketCount(b, bucket), 0),
+  const perRepoVisible = blocks.map((b) =>
+    visibleBuckets.reduce((a, bucket) => a + cellTargets(b, bucket).count, 0),
   );
-  const grandTotal = perRepo.reduce((a, b) => a + b, 0);
-  const hiddenPer = blocks.map((b) => bucketCount(b, 'hidden'));
-  const hiddenTotal = hiddenPer.reduce((a, b) => a + b, 0);
+  const grandTotal = perRepoVisible.reduce((a, b) => a + b, 0);
+  const hiddenPer = blocks.map((b) => cellTargets(b, 'hidden'));
+  const hiddenTotal = hiddenPer.reduce((a, h) => a + h.count, 0);
 
   return `<section class="summary">
   <h2>Waiting on you <span class="count">${grandTotal} across ${blocks.length} repo${blocks.length === 1 ? '' : 's'}</span></h2>
   <table class="summary-table">
     <thead>
       <tr><th scope="col">bucket</th>${blocks
-        .map((b) => `<th scope="col">${escape(b.repo.split('/')[1] ?? b.repo)}</th>`)
+        .map(
+          (b) =>
+            `<th scope="col"><a href="#${repoAnchor(b.repo)}">${escape(b.repo.split('/')[1] ?? b.repo)}</a></th>`,
+        )
         .join('')}<th scope="col">total</th></tr>
     </thead>
     <tbody>
         ${rows}
     </tbody>
     <tfoot>
-      <tr class="grand"><th scope="row">total</th>${perRepo
+      <tr class="grand"><th scope="row">total</th>${perRepoVisible
         .map((n) => `<td>${n}</td>`)
         .join('')}<td class="row-total">${grandTotal}</td></tr>
-      <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS.hidden)}<span class="note"> (excluded)</span></th>${hiddenPer
-        .map(num)
+      <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS.hidden)}<span class="note"> (excluded)</span></th>${blocks
+        .map((b) => cell(b, 'hidden'))
         .join('')}<td class="row-total">${hiddenTotal}</td></tr>
     </tfoot>
   </table>
@@ -164,10 +231,12 @@ function renderRepoBlock(
   const inner =
     block.priorityGroups.length > 0
       ? block.priorityGroups
-          .map((g) => renderPriorityGroup(g, viewer, now, counts ?? new Map()))
+          .map((g) => renderPriorityGroup(g, block.repo, viewer, now, counts ?? new Map()))
           .join('\n  ')
-      : block.sections.map((s) => renderSection(s, viewer, now, counts ?? new Map())).join('\n  ');
-  return `<section class="repo">
+      : block.sections
+          .map((s) => renderSection(s, block.repo, '', viewer, now, counts ?? new Map()))
+          .join('\n  ');
+  return `<section class="repo" id="${repoAnchor(block.repo)}">
   <h2><a href="${escape(repoUrl)}" ${NEW_TAB}>${escape(block.repo)}</a> <span class="count">${block.visibleCount} / ${block.totalCount} visible</span></h2>
   ${inner}
 </section>`;
@@ -175,11 +244,14 @@ function renderRepoBlock(
 
 function renderPriorityGroup(
   group: PriorityGroup,
+  repo: string,
   viewer: string,
   now: Date,
   counts: Map<string, number>,
 ): string {
-  const sections = group.sections.map((s) => renderSection(s, viewer, now, counts)).join('\n    ');
+  const sections = group.sections
+    .map((s) => renderSection(s, repo, group.label, viewer, now, counts))
+    .join('\n    ');
   return `<details class="priority-group" open>
     <summary class="priority-label">${escape(group.label)} <span class="count">${group.visibleCount} / ${group.totalCount} visible</span></summary>
     ${sections}
@@ -203,6 +275,8 @@ const COLGROUP = `<colgroup>
 
 function renderSection(
   section: BucketSection,
+  repo: string,
+  group: string,
   viewer: string,
   now: Date,
   counts: Map<string, number>,
@@ -216,7 +290,7 @@ function renderSection(
   // (why the row isn't surfaced). Same column position so widths align.
   const lastHeader = isHidden ? 'reason' : 'flags';
   const rows = section.prs.map((c) => renderRow(c, viewer, now, counts)).join('\n      ');
-  return `<details class="bucket bucket-${section.bucket}"${expanded}>
+  return `<details class="bucket bucket-${section.bucket}" id="${sectionAnchor(repo, group, section.bucket)}"${expanded}>
     <summary>${escape(label)} <span class="count">(${count})</span></summary>
     <p class="bucket-desc">${escape(description)}</p>
     <table class="pr-table">
@@ -490,6 +564,13 @@ const CSS = `
   table.summary-table tfoot .grand th, table.summary-table tfoot .grand td { border-top: 1px solid #d0d7de; font-weight: 600; }
   table.summary-table tfoot .excluded th, table.summary-table tfoot .excluded td { color: #8c959f; font-weight: normal; }
   table.summary-table .note { font-size: 0.85em; }
+  table.summary-table td a { color: #0969da; text-decoration: none; }
+  table.summary-table td a:hover { text-decoration: underline; }
+  table.summary-table thead th a { color: inherit; text-decoration: none; }
+  table.summary-table thead th a:hover { text-decoration: underline; }
+  /* Briefly tint a section jumped to from the summary, so it is obvious which
+     table the click landed on. */
+  .bucket:target > summary, section.repo:target > h2 { background: #fff8c5; }
   a.issue-link.closed { color: #8250df; text-decoration: line-through; }
   .issue-others { display: block; font-size: 0.85em; color: #57606a; margin-top: 0.15em; }
   .issue-others a { color: #57606a; }
