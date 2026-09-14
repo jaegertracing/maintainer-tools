@@ -530,16 +530,21 @@ const CSS = `
      per-bucket table in a repo. Without this, each table would size its
      own columns based on its content and rows wouldn't line up vertically. */
   table.pr-table { border-collapse: collapse; width: 100%; margin: 0.5em 0 1em 0; font-size: 0.9em; table-layout: fixed; }
-  table.pr-table .col-num    { width: 5em; }
-  table.pr-table .col-diff   { width: 9.5em; }
-  table.pr-table .col-title  { width: auto; }
-  table.pr-table .col-issue  { width: 9.5em; }
-  table.pr-table .col-author { width: 13em; }
-  table.pr-table .col-flags  { width: 11em; }
-  table.pr-table .col-age    { width: 4em; }
-  /* word-break lets long titles wrap inside the fixed-width title column
-     instead of overflowing. */
+  /* Percentages rather than em widths: fixed em columns add up to ~750px,
+     which leaves the title column nothing once the window or browser zoom
+     brings the table below that, and the title then wraps one syllable per
+     line. */
+  table.pr-table .col-num    { width: 7%; }
+  table.pr-table .col-diff   { width: 12%; }
+  table.pr-table .col-title  { width: 35%; }
+  table.pr-table .col-issue  { width: 10%; }
+  table.pr-table .col-author { width: 16%; }
+  table.pr-table .col-flags  { width: 15%; }
+  table.pr-table .col-age    { width: 5%; }
+  /* word-break lets long words wrap inside a fixed-width column instead of
+     overflowing. */
   th, td { padding: 0.3em 0.5em; text-align: left; vertical-align: top; word-wrap: break-word; word-break: break-word; }
+  table.pr-table td:first-child, table.pr-table td:last-child { white-space: nowrap; }
   thead { color: #57606a; font-size: 0.85em; }
   tbody tr { border-top: 1px solid #eaeef2; }
   tbody tr:hover { background: #f6f8fa; }
