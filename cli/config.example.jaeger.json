@@ -7,7 +7,16 @@
     "jaegertracing/documentation"
   ],
   "maintainers": ["yurishkuro", "albertteoh", "jkowall", "joe-elliott", "mahadzaryab1"],
-  "interns": ["Nabil-Salah", "parship12", "parshipcy"],
+  "interns": [
+    "Nabil-Salah",
+    "parship12",
+    "parshipcy",
+    "SoumyaRaikwar",
+    "swetalin-10",
+    "Manik2708",
+    "lopster568",
+    "sksingh2005"
+  ],
   "priorityLabels": ["priority:high", "priority:medium", "priority:low"],
   "ignoreReviewRequestedOnYou": false
 }
