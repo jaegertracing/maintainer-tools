@@ -5,7 +5,6 @@ export {
   parseFooter,
   bodyHash,
 } from './footer.js';
-export { isoWeek } from './iso-week.js';
 export {
   type CommentClient,
   type PublishIntent,

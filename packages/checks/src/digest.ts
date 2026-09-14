@@ -3,7 +3,6 @@
 // same code path.
 
 import type { CommentClient } from './comments/publisher.js';
-import { isoWeek } from './comments/iso-week.js';
 import { publishComment } from './comments/publisher.js';
 import type { GraphqlClient } from './graphql.js';
 import type { CheckResult } from './types.js';
@@ -67,11 +66,10 @@ export async function runDigest(
 ): Promise<DigestStats> {
   const { owner, repo, label, waitDays, dryRun } = params;
   const now = params.now ?? new Date();
-  const week = isoWeek(now);
   const cutoff = now.getTime() - waitDays * DAY_MS;
 
   logger.info(
-    `pr-weekly-digest: ${owner}/${repo}  label=${label}  wait-days=${waitDays}  week=${week}  dry-run=${dryRun}`,
+    `pr-weekly-digest: ${owner}/${repo}  label=${label}  wait-days=${waitDays}  dry-run=${dryRun}`,
   );
 
   const candidates = await gql.listOpenPRsByLabel(owner, repo, label);
@@ -103,15 +101,17 @@ export async function runDigest(
       }
 
       const body = renderDigestBody(pr.author?.login ?? null, triggered, waitDays);
+      // No `scope`: one digest comment per PR, edited in place. An
+      // unchanged set of triggered reasons then hits `publishComment`'s
+      // sha-match/skip path, so a genuinely idle PR gets no write — and no
+      // activity for `actions/stale`'s countdown to reset against.
       const result = await publishComment(
         {
           owner,
           repo,
           issueNumber: pr.number,
           kind: 'weekly_digest',
-          scope: `week=${week}`,
           body,
-          minimizeOlder: true,
           dryRun,
         },
         commentClient,

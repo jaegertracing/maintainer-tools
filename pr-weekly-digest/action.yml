@@ -1,10 +1,11 @@
 name: 'Jaeger maintainer-tools PR Weekly Digest'
 description: >
   Scans open PRs carrying the `waiting-for-author` label, identifies those
-  that have been idle for at least `wait-days`, and posts (or edits)
-  one digest comment per PR per ISO week summarising what the author
-  needs to address. Idempotent across same-week reruns via the
-  comment-publisher's footer.
+  that have been idle for at least `wait-days`, and maintains one digest
+  comment per PR summarising what the author needs to address. The comment
+  is edited in place when the reasons change and left untouched otherwise —
+  a PR with nothing new to report gets no write, so it stays visible to
+  `actions/stale`.
 author: 'Jaeger maintainers'
 inputs:
   github-token:
