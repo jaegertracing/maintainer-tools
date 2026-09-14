@@ -265,9 +265,9 @@ function renderPriorityGroup(
 // columns independently based on its own content.
 const COLGROUP = `<colgroup>
         <col class="col-num">
+        <col class="col-issue">
         <col class="col-diff">
         <col class="col-title">
-        <col class="col-issue">
         <col class="col-author">
         <col class="col-flags">
         <col class="col-age">
@@ -295,7 +295,7 @@ function renderSection(
     <p class="bucket-desc">${escape(description)}</p>
     <table class="pr-table">
       ${COLGROUP}
-      <thead><tr><th>#</th><th>diff</th><th>title</th><th>issue</th><th>author</th><th>${lastHeader}</th><th>age</th></tr></thead>
+      <thead><tr><th>PR #</th><th>issue</th><th>diff</th><th>title</th><th>author</th><th>${lastHeader}</th><th>age</th></tr></thead>
       <tbody>
       ${rows}
       </tbody>
@@ -321,9 +321,9 @@ function renderRow(
   const age = formatAge(pr, now);
   return `<tr>
         <td><a href="${escape(pr.url)}" ${NEW_TAB}>#${pr.number}</a></td>
+        <td>${renderIssueCell(pr)}</td>
         <td>${diff}</td>
         <td>${escape(pr.title)}</td>
-        <td>${renderIssueCell(pr)}</td>
         <td><a href="https://github.com/${escape(author)}" ${NEW_TAB}>@${escape(author)}</a>${authorTag} <span class="open-count">[${openCount} open]</span></td>
         <td>${lastCell}</td>
         <td>${escape(age)}</td>
