@@ -7,6 +7,8 @@
 //
 import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
 
+import { hasLogin, sameLogin } from './logins.js';
+
 export type Bucket =
   | 'trusted-authors'
   | 'review-requested-on-you'
@@ -119,6 +121,9 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // trusted on its own.
   const explicitlyRequested =
     !ctx.ignoreReviewRequestedOnYou && isReviewRequestedOnViewer(pr, ctx.viewer);
+  const viewerReviews = pr.reviews.filter(
+    (review) => review.author !== null && sameLogin(review.author, ctx.viewer),
+  );
   // A PR can trip more than one hide predicate at once (e.g. stale AND
   // quota-exceeded); report all of them so the report doesn't silently
   // mask one behind whichever predicate happens to run first.
@@ -147,12 +152,8 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // first look" — the one thing it demonstrably does not need.
   if (
     !explicitlyRequested &&
-    latestReviewState(pr.reviews.filter((r) => r.author === ctx.viewer)) === 'CHANGES_REQUESTED' &&
-    !authorActedSinceViewerReview(
-      pr,
-      pr.reviews.filter((r) => r.author === ctx.viewer),
-      ctx.viewer,
-    )
+    latestReviewState(viewerReviews) === 'CHANGES_REQUESTED' &&
+    !authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer)
   ) {
     return mk('hidden', ['changes-requested'], pr, checks, flags);
   }
@@ -167,7 +168,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const authorLogin = pr.author?.login;
   if (
     authorLogin &&
-    authorLogin.toLowerCase() !== ctx.viewer.toLowerCase() &&
+    !sameLogin(authorLogin, ctx.viewer) &&
     (hasLogin(ctx.maintainers, authorLogin) || hasLogin(ctx.interns, authorLogin))
   ) {
     reasons.push('trusted author');
@@ -196,7 +197,6 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // plain comment that the author replied to is a weaker signal, and lumping
   // the two together buried the explicit ones — 7 of the 9 PRs in this branch
   // were requested-changes revisions on the 2026-08-15 queue.
-  const viewerReviews = pr.reviews.filter((r) => r.author === ctx.viewer);
   if (viewerReviews.length > 0 && authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer)) {
     if (latestReviewState(viewerReviews) === 'CHANGES_REQUESTED') {
       reasons.push('you requested changes; author has revised since');
@@ -236,7 +236,7 @@ function mk(
 }
 
 function isReviewRequestedOnViewer(pr: PullRequest, viewer: string): boolean {
-  return pr.reviewRequests.some((r) => r.kind === 'user' && r.login === viewer);
+  return pr.reviewRequests.some((r) => r.kind === 'user' && sameLogin(r.login, viewer));
 }
 
 function isBotAuthor(pr: PullRequest): boolean {
@@ -275,14 +275,6 @@ function hasMaintainerActivity(pr: PullRequest, maintainers: Set<string>): boole
   return false;
 }
 
-function hasLogin(logins: Set<string>, login: string): boolean {
-  const normalized = login.toLowerCase();
-  for (const configured of logins) {
-    if (configured.toLowerCase() === normalized) return true;
-  }
-  return false;
-}
-
 // State of the viewer's most recent submitted review. GitHub keeps the whole
 // history, and a later APPROVED or COMMENTED supersedes an earlier
 // CHANGES_REQUESTED, so only the newest one says where the PR stands.
@@ -314,7 +306,12 @@ function authorActedSinceViewerReview(
   if (headCommittedAt > latest) return true;
   // Or commented since?
   for (const c of pr.comments) {
-    if (c.author === authorLogin && Date.parse(c.createdAt) > latest && c.author !== viewer) {
+    if (
+      c.author &&
+      sameLogin(c.author, authorLogin) &&
+      Date.parse(c.createdAt) > latest &&
+      !sameLogin(c.author, viewer)
+    ) {
       return true;
     }
   }

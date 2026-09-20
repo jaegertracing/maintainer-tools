@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifyContext } from './buckets.js';
+import { enrichQuotaState } from './quota.js';
 
-const now = new Date('2026-09-20T12:00:00Z');
+const now = new Date();
+
+function hoursAgo(hours: number): string {
+  return new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
+}
 
 const context: ClassifyContext = {
   viewer: 'maintainer-a',
@@ -26,8 +31,8 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
     authorAssociation: 'CONTRIBUTOR',
     isDraft: false,
     mergeable: 'MERGEABLE',
-    createdAt: '2026-09-19T12:00:00Z',
-    updatedAt: '2026-09-20T11:00:00Z',
+    createdAt: hoursAgo(24),
+    updatedAt: hoursAgo(1),
     labels: [],
     additions: 1,
     deletions: 0,
@@ -40,7 +45,7 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
         messageHeadline: 'Test trusted-author priority',
         messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
         authorEmail: 'contributor@example.com',
-        committedDate: '2026-09-20T11:00:00Z',
+        committedDate: hoursAgo(1),
         parents: 1,
       },
     ],
@@ -63,10 +68,10 @@ for (const [role, login] of [
         {
           author: 'maintainer-a',
           state: 'COMMENTED',
-          submittedAt: '2026-09-20T09:00:00Z',
+          submittedAt: hoursAgo(3),
         },
       ],
-      comments: [{ author: 'maintainer-a', createdAt: '2026-09-20T10:00:00Z' }],
+      comments: [{ author: 'maintainer-a', createdAt: hoursAgo(2) }],
       files: ['src/example.ts', 'src/example.test.ts'],
     });
 
@@ -80,7 +85,7 @@ for (const [role, login] of [
 test('trusted authors outrank explicit review requests', () => {
   const pr = pullRequest({
     author: { login: 'trusted-author', typename: 'User' },
-    reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
+    reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
   });
 
   const result = classify(pr, context);
@@ -103,7 +108,7 @@ test('a review request makes a blocked trusted-author PR actionable', () => {
   const pr = pullRequest({
     author: { login: 'trusted-author', typename: 'User' },
     isDraft: true,
-    reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
+    reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
   });
 
   assert.equal(classify(pr, context).bucket, 'trusted-authors');
@@ -119,9 +124,9 @@ const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
     {
       reviews: [
         {
-          author: 'maintainer-a',
+          author: 'MAINTAINER-A',
           state: 'CHANGES_REQUESTED',
-          submittedAt: '2026-09-20T12:00:00Z',
+          submittedAt: hoursAgo(0.5),
         },
       ],
     },
@@ -142,3 +147,25 @@ for (const [state, overrides, reason] of hiddenCases) {
     assert.deepEqual(result.reasons, [reason]);
   });
 }
+
+test('trusted-author quota exemptions are case-insensitive', async () => {
+  const prs = [
+    pullRequest({ number: 1, author: { login: 'trusted-author', typename: 'User' } }),
+    pullRequest({ number: 2, author: { login: 'trusted-author', typename: 'User' } }),
+  ];
+  let mergedCountCalls = 0;
+  const client = {
+    countMergedPRs: async () => {
+      mergedCountCalls++;
+      return 0;
+    },
+  } as unknown as GraphqlClient;
+
+  await enrichQuotaState(prs, client, { exemptLogins: new Set(['Trusted-Author']) });
+
+  assert.equal(mergedCountCalls, 0);
+  assert.deepEqual(
+    prs.map((pr) => classify(pr, context).bucket),
+    ['trusted-authors', 'trusted-authors'],
+  );
+});
