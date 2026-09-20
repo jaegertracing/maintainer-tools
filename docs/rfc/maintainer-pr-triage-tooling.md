@@ -24,7 +24,7 @@ A maintainer's actual questions about open PRs aren't first-class queries on Git
 - *Which first-time contributors are still awaiting a first response?*
 - *Which PRs are technically ready for review but have a mechanical issue (DCO, red CI, conflict, missing label) that I shouldn't have to flag by hand?*
 - *Which review conversations did the author silently mark resolved without addressing them?*
-- *Which PRs from a high-trust author should jump the queue?*
+- *Which PRs from a priority author should jump the queue?*
 
 All five are derivable from the GraphQL API, but every maintainer reinvents the derivation in their head every time. The result is the org defaulting to GitHub email — a non-discriminate firehose — for triage, and to a scatter of one-off workflows (each with its own JS file curl-fetched from a central repo) for nudging.
 
@@ -51,7 +51,7 @@ The two migrated scripts share a distribution pattern today: each repo's workflo
 
 - Centralize PR-check definitions in one TypeScript module that both triage and nudge consume — no drift.
 - Subsume the two bespoke nudge scripts without changing contributor-facing behavior.
-- Surface high-priority signals explicitly (review-requested-on-you, blocking-on-you, from-high-trust-author).
+- Surface high-priority signals explicitly (review-requested-on-you, blocking-on-you, from-priority-author).
 - Move mechanical pass/fail off PR comments and into the **GitHub Checks panel**, where the contributor already looks.
 - Idempotent: re-running produces the same output for the same state.
 
@@ -196,7 +196,7 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
 [Header: "PR Triage — 2026-05-16 09:00 — @yurishkuro"]
 
 [Repo: jaegertracing/jaeger]                        12 / 47 visible
-  ▸ Trusted authors (2)                              [expanded by default]
+  ▸ Priority authors (2)                             [expanded by default]
       - #412   [src +8/-0]                         Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
       - #6543  [src +20/-10] [test +392/-77]       Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
   ▸ Review requested on you (1)                     [expanded]
@@ -223,7 +223,7 @@ Top of each repo block shows "visible / total" so a glance tells the maintainer 
 
 ### Attention categories (within each repo)
 
-1. **Trusted authors.** PR author is another user in `maintainers` or `interns`. Actionable PRs from trusted authors remain at the front of the queue after a maintainer responds.
+1. **Priority authors.** PR author is another user in `maintainers`, `interns`, or `priorityAuthors`. Actionable PRs from priority authors remain at the front of the queue throughout review.
 2. **Review requested on you.** Someone clicked your name in Reviewers.
 3. **You requested changes; author has revised.** Your request-changes review still blocks the merge, and the author has pushed or commented since.
 4. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
@@ -294,7 +294,7 @@ After P6, `stale.yml` is untouched. The two migrated workflow files (`waiting-fo
 
 - **Governance of bot comments.** A bot comment is the project speaking. The RFC process for adding a new check should require sign-off from at least two maintainers on the comment text.
 
-- **MAINTAINERS.md drift.** If the high-trust user list isn't kept current, the "high-trust authors" bucket misclassifies. Mitigation: a `pr-tool sync-maintainers` subcommand and a triage-report warning when last sync > 14 days ago.
+- **Priority-author drift.** If the configured author lists are not kept current, the priority-authors bucket misclassifies. Mitigation: a `pr-tool sync-maintainers` subcommand and a triage-report warning when last sync > 14 days ago.
 
 - **Heuristic edge cases.** "Last substantive activity is unanswered author comment" misclassifies an author musing aloud. "Conversation resolved without reply" misclassifies a typo-fix the author resolved via commit. Both default to non-nudge surfacing (flag in triage, no Checks-panel failure) until per-repo data shows otherwise.
 

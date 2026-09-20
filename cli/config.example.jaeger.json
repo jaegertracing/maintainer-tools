@@ -17,6 +17,7 @@
     "lopster568",
     "sksingh2005"
   ],
+  "priorityAuthors": ["ysh-bot"],
   "priorityLabels": ["priority:high", "priority:medium", "priority:low"],
   "ignoreReviewRequestedOnYou": false
 }

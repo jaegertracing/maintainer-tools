@@ -3,6 +3,7 @@
   "repos": ["owner/repo-a", "owner/repo-b"],
   "maintainers": ["maintainer-one", "maintainer-two"],
   "interns": ["intern-one"],
+  "priorityAuthors": ["priority-author-one"],
   "codeowners": {
     "owner/repo-a": ["src/subsystem-a/**", "docs/**"],
     "owner/repo-b": ["lib/**"]

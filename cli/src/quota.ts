@@ -15,7 +15,7 @@
 // `computed.quotaExceeded = true`. Authors with a single open PR are
 // trivially in-quota regardless of tier and skipped.
 //
-// Single-open-PR authors and exempt logins (maintainers + interns) get
+// Single-open-PR authors and exempt logins get
 // no enrichment, which keeps the query budget proportional to the small
 // subset that could actually be quota-blocked.
 
@@ -46,7 +46,7 @@ const FETCH_CONCURRENCY = 6;
 
 export interface QuotaEnrichOptions {
   // Logins whose PRs are always in-quota and shouldn't even cost a query
-  // (maintainers, interns, configured high-trust authors).
+  // (maintainers, interns, and configured priority authors).
   exemptLogins: Set<string>;
   // Optional cache for merged-PR counts, keyed by (repo, author). Omit (or
   // pass null) to always query fresh, e.g. for --no-cache.

@@ -127,7 +127,7 @@ async function runTriage(argv: string[]): Promise<void> {
   log('loading config');
   const cfg = loadConfig(values.config);
   log(
-    `config: ${cfg.repos.length} repo(s), ${cfg.maintainers.length} maintainer(s), ${cfg.interns.length} intern(s)`,
+    `config: ${cfg.repos.length} repo(s), ${cfg.maintainers.length} maintainer(s), ${cfg.interns.length} intern(s), ${cfg.priorityAuthors.length} priority author(s)`,
   );
 
   const { token, source } = resolveToken();
@@ -168,7 +168,7 @@ async function runTriage(argv: string[]): Promise<void> {
   if (values['no-quota']) {
     log('quota: computation skipped (--no-quota); label-only mode');
   } else {
-    const exemptLogins = new Set([...cfg.maintainers, ...cfg.interns]);
+    const exemptLogins = new Set([...cfg.maintainers, ...cfg.interns, ...cfg.priorityAuthors]);
     await enrichQuotaState(prs, client, { exemptLogins, cache });
   }
 
@@ -303,11 +303,13 @@ function classifyAll(
 ): ClassifiedPR[] {
   const maintainers = new Set(cfg.maintainers);
   const interns = new Set(cfg.interns);
+  const priorityAuthors = new Set(cfg.priorityAuthors);
   return prs.map((pr) =>
     classify(pr, {
       viewer,
       maintainers,
       interns,
+      priorityAuthors,
       codeownerPaths: cfg.codeowners[`${pr.repo.owner}/${pr.repo.name}`] ?? [],
       now,
       ignoreReviewRequestedOnYou: cfg.ignoreReviewRequestedOnYou,
