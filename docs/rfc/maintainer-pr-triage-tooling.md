@@ -235,11 +235,11 @@ Top of each repo block shows "visible / total" so a glance tells the maintainer 
 
 Within each bucket, PRs sort by reported source-line count (smallest first), then by
 staleness (oldest first). The per-file query covers the first 100 changed files;
-truncated rows display `+…` and sort on that subset. When per-file data is unavailable,
-the renderer displays and sorts by the whole-PR `[+X/-Y]` total. Per-row fields:
-per-file-class line counts (`src`, `test`, `fix`, `doc`, `cfg`, and `gen`); `[N open]`
-author's open-PR count in this repo; inline flags `[BLOCKER]` (release-blocker label or
-current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]`
+rows sort on that subset, and non-empty truncated breakdowns display `+…`. When per-file
+data is unavailable, the renderer displays and sorts by the whole-PR `[+X/-Y]` total.
+Per-row fields: per-file-class line counts (`src`, `test`, `fix`, `doc`, `cfg`, and
+`gen`); `[N open]` author's open-PR count in this repo; inline flags `[BLOCKER]`
+(release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]`
 (`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
 
 ---
