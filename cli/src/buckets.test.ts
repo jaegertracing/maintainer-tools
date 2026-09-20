@@ -95,6 +95,21 @@ test('trusted authors outrank explicit review requests', () => {
   assert.deepEqual(result.reasons, ['trusted author']);
 });
 
+test('trusted authors remain prioritized after revising requested changes', () => {
+  const pr = pullRequest({
+    author: { login: 'trusted-author', typename: 'User' },
+    reviews: [
+      {
+        author: 'MAINTAINER-A',
+        state: 'CHANGES_REQUESTED',
+        submittedAt: hoursAgo(3),
+      },
+    ],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'trusted-authors');
+});
+
 test("the viewer's own PRs do not enter the trusted-author bucket", () => {
   const pr = pullRequest({
     author: { login: 'maintainer-a', typename: 'User' },
