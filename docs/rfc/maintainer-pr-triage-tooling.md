@@ -233,7 +233,11 @@ Top of each repo block shows "visible / total" so a glance tells the maintainer 
 8. **Dependency bots.** PR author is a recognized dependency-update bot.
 9. **Hidden.** `waiting-for-author`, drafts, and bot-authored PRs. These PRs remain collapsed until the contributor moves.
 
-Within each bucket, PRs sort by staleness (oldest first). Per-row fields: `[+X/-Y]` line counts; `[N open]` author's open-PR count in this repo; inline flags `[BLOCKER]` (release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]` (`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
+Within each bucket, PRs sort by source-line count (smallest first), then by staleness
+(oldest first). Per-row fields: `[+X/-Y]` line counts; `[N open]` author's open-PR count
+in this repo; inline flags `[BLOCKER]` (release-blocker label or current milestone),
+`[RESOLVED-W/O-REPLY: N]`, `[QUESTION]` (`awaiting-maintainer-input`),
+`[POSSIBLE-QUESTION]` (heuristic).
 
 ---
 
