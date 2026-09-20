@@ -53,6 +53,14 @@ test('parseOverview tolerates a body with no findings line', () => {
   assert.equal(copilotLabel(r), '🔴');
 });
 
+test('parseOverview keeps a review with an unrecognised heading visible', () => {
+  const r = parseOverview('<!-- ccr-overview-v2 -->\n### Something new\n', 'u', 'x');
+  assert.equal(r.light, null);
+  assert.equal(r.headline, 'Something new');
+  assert.equal(copilotLabel(r), '⚪');
+  assert.equal(copilotTooltip(r), 'Copilot: Something new · Findings: none');
+});
+
 test('copilotReview picks the latest Copilot overview and ignores other reviews', () => {
   const pr = {
     reviews: [

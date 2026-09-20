@@ -261,8 +261,9 @@ lists every PR (Hidden included) as one row of a flat table rendered with
 weighed as independent facets on each PR (priority author, review requested,
 first-timer, CODEOWNERS hit, dependency bot, maintainer engaged, and the full
 list of hide reasons), and each facet is a column. Sorting is multi-column:
-shift-click adds a header to the sort, and a Sort panel shows the active keys as
-chips that can be dragged into priority order or clicked to flip direction.
+shift-click makes a header the primary key with the earlier keys as tiebreakers,
+and a Sort panel shows the active keys as chips that can be dragged into priority
+order or clicked to flip direction.
 Every column has a header filter; list-valued and enumerated columns autocomplete
 from the values in the currently visible rows, and a Filters panel shows the
 active filters as removable chips. Tabulator's script and stylesheet are inlined

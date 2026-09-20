@@ -16,7 +16,7 @@ import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
-import { ageInDays, NO_PRIORITY_LABEL } from './shared.js';
+import { ageInDays, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
 
 export interface TableOptions {
   viewer: string;
@@ -112,11 +112,6 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
   });
 }
 
-function hideReasonLabel(raw: string): string {
-  const stripped = raw.startsWith('hide:') ? raw.slice(5) : raw;
-  return stripped.replace(/_/g, '-').toUpperCase();
-}
-
 function issueLabel(ref: { owner: string; repo: string; number: number }, pr: PullRequest): string {
   const same = ref.owner === pr.repo.owner && ref.repo === pr.repo.name;
   return same ? `#${ref.number}` : `${ref.owner}/${ref.repo}#${ref.number}`;
@@ -129,7 +124,7 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
     <div class="panel" id="sort-panel">
       <span class="panel-label">Sort</span>
       <span class="chips" id="sort-chips"></span>
-      <span class="panel-hint">click a header to sort, shift-click to add a column; drag chips to reorder, click a chip to flip direction</span>
+      <span class="panel-hint">click a header to sort, shift-click to make another column the primary key; drag chips to reorder, click a chip to flip direction</span>
     </div>
     <div class="panel" id="filter-panel">
       <span class="panel-label">Filters</span>
@@ -264,7 +259,7 @@ const TABLE_SCRIPT = `
   };
 
   const text = (title, field, extra) => Object.assign({ title, field, headerFilter: 'input' }, extra);
-  const en = (title, field, extra) => Object.assign({ title, field, headerFilter: 'list', headerFilterParams: enumParams }, extra);
+  const en = (title, field, extra) => Object.assign({ title, field, headerFilter: 'list', headerFilterParams: enumParams, headerFilterFunc: 'like' }, extra);
   const bool = (title, field, extra) => Object.assign({
     title, field, hozAlign: 'center', formatter: 'tickCross', formatterParams: { crossElement: false },
     // Live filtering would re-apply the typed label ("yes") in place of the

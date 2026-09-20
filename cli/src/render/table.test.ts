@@ -75,6 +75,8 @@ test('buildTableRows keeps the overridden signals next to the bucket', () => {
   assert.ok(row);
   assert.equal(row.repo, 'example/repo');
   assert.equal(row.bucket, 'Blocked on author');
+  assert.equal(row.bucketOrder, 8);
+  assert.equal(row.isViewer, false);
   assert.equal(row.priorityAuthor, true);
   assert.deepEqual(row.hideReasons, ['DCO-MISSING', 'CI-FAILING']);
   assert.equal(row.dco, 'missing');
@@ -87,6 +89,34 @@ test('buildTableRows keeps the overridden signals next to the bucket', () => {
   assert.equal(row.updatedAt, '2026-09-18');
   assert.deepEqual(row.issues, ['#3', 'other/repo#9']);
   assert.equal(row.copilot, '');
+});
+
+test('buildTableRows carries the Copilot verdict and marks the viewer as author', () => {
+  const body =
+    '<!-- ccr-overview-v2 -->\n### 🟡 Review recommended\n**Findings:** 2 <picture><img alt="High severity"></picture>\n';
+  const classified = classify(
+    pullRequest({
+      author: { login: 'maintainer-a', typename: 'User' },
+      reviews: [
+        {
+          author: 'copilot-pull-request-reviewer',
+          state: 'COMMENTED',
+          submittedAt: '2026-09-18T09:00:00Z',
+          url: 'https://example/review',
+          body,
+        },
+      ],
+    }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.equal(row.isViewer, true);
+  assert.equal(row.copilot, '🟡 2H');
+  assert.equal(row.copilotLight, 'yellow');
+  assert.equal(row.copilotUrl, 'https://example/review');
+  assert.equal(row.copilotTip, 'Copilot: Review recommended · Findings: 2 high');
 });
 
 test('buildTableRows falls back to the no-priority label only when tiers are configured', () => {

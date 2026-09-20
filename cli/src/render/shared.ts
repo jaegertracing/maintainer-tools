@@ -160,6 +160,13 @@ export function formatAge(pr: PullRequest, now: Date): string {
   return `${Math.floor(days)}d`;
 }
 
+// Classifier hide reasons come as `draft`, `bot-authored`, a label name, or
+// `hide:<predicate_id>`; every renderer shows them as SHORT-DASH-CASE.
+export function hideReasonLabel(raw: string): string {
+  const stripped = raw.startsWith('hide:') ? raw.slice(5) : raw;
+  return stripped.replace(/_/g, '-').toUpperCase();
+}
+
 export function summarizeAuthor(pr: PullRequest): string {
   return pr.author?.login ?? '(unknown)';
 }

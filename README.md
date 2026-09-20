@@ -173,8 +173,9 @@ author, review requested on you, first-timer, CODEOWNERS hit, dependency bot,
 maintainer engaged) plus every reason that would hide it, so a PR from a
 priority author that is hidden for a missing DCO sign-off is one filter away.
 
-- **Sort**: click a header to sort, shift-click to add a second key. The Sort
-  panel lists the active keys as chips; drag them to change priority, click
+- **Sort**: click a header to sort, shift-click another to make it the
+  primary key with the previous keys as tiebreakers. The Sort panel lists the
+  active keys as chips, primary first; drag them to change priority, click
   one to flip its direction, or remove it with `×`.
 - **Filter**: type in the box under a header. Enumerated and list-valued
   columns (author, bucket, flags, labels, ...) autocomplete from the values in

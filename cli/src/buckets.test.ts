@@ -222,6 +222,18 @@ for (const [state, overrides, reason] of hiddenCases) {
   });
 }
 
+test('facets flag non-dependency bots as a hide reason', () => {
+  const result = classify(
+    pullRequest({ author: { login: 'some-helper[bot]', typename: 'Bot' } }),
+    context,
+  );
+
+  assert.equal(result.bucket, 'hidden');
+  assert.deepEqual(result.facets.hideReasons, ['bot-authored']);
+  assert.equal(result.facets.bot, true);
+  assert.equal(result.facets.dependencyBot, false);
+});
+
 test('facets record every hide reason even though the bucket stops at the first', () => {
   const pr = pullRequest({
     author: { login: 'priority-author', typename: 'User' },

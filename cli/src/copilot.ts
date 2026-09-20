@@ -88,11 +88,12 @@ export function parseOverview(
 
 // Compact label used in both report views: the traffic light plus the
 // non-zero severity counts, e.g. "🟢 1M 2L". An overview with no findings
-// renders just the light.
+// renders just the light; an unrecognised heading gets a neutral light so the
+// review stays visible and linked.
 export function copilotLabel(review: CopilotReview): string {
   const parts: string[] = [];
-  const emoji = LIGHTS.find(([, v]) => v === review.light)?.[0];
-  if (emoji) parts.push(emoji);
+  const emoji = LIGHTS.find(([, v]) => v === review.light)?.[0] ?? '⚪';
+  parts.push(emoji);
   if (review.findings.high > 0) parts.push(`${review.findings.high}H`);
   if (review.findings.medium > 0) parts.push(`${review.findings.medium}M`);
   if (review.findings.low > 0) parts.push(`${review.findings.low}L`);

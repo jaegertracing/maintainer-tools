@@ -30,6 +30,7 @@ import {
   groupByRepo,
   type PriorityGroup,
   type RepoBlock,
+  hideReasonLabel,
 } from './shared.js';
 import { renderTableView, TABLE_CSS, tabulatorAssets } from './table.js';
 
@@ -500,7 +501,6 @@ function renderCopilot(c: ClassifiedPR): string {
   const review = c.copilot;
   if (!review) return '';
   const label = copilotLabel(review);
-  if (!label) return '';
   const inner = `<span class="flag flag-COPILOT copilot-${escape(review.light ?? 'none')}" data-tip="${escape(copilotTooltip(review))}">${escape(label)}</span>`;
   return review.url ? ` <a href="${escape(review.url)}" ${NEW_TAB}>${inner}</a>` : ` ${inner}`;
 }
@@ -512,8 +512,7 @@ function renderCopilot(c: ClassifiedPR): string {
 //   - `hide:<predicate_id>` -> a predicate with hidesFromTriage=true fired
 // Normalize to a SHORT-DASH-CASE label.
 function renderHideReason(raw: string): string {
-  const stripped = raw.startsWith('hide:') ? raw.slice(5) : raw;
-  const label = stripped.replace(/_/g, '-').toUpperCase();
+  const label = hideReasonLabel(raw);
   return `<span class="flag flag-HIDE"${tipAttr(label)}>${escape(label)}</span>`;
 }
 
