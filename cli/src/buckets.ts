@@ -168,7 +168,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (
     authorLogin &&
     authorLogin.toLowerCase() !== ctx.viewer.toLowerCase() &&
-    (ctx.maintainers.has(authorLogin) || ctx.interns.has(authorLogin))
+    (hasLogin(ctx.maintainers, authorLogin) || hasLogin(ctx.interns, authorLogin))
   ) {
     reasons.push('trusted author');
     return mk('trusted-authors', reasons, pr, checks, flags);
@@ -267,10 +267,18 @@ function isFirstTimeContributor(pr: PullRequest): boolean {
 // not this bucket.
 function hasMaintainerActivity(pr: PullRequest, maintainers: Set<string>): boolean {
   for (const r of pr.reviews) {
-    if (r.author && maintainers.has(r.author)) return true;
+    if (r.author && hasLogin(maintainers, r.author)) return true;
   }
   for (const c of pr.comments) {
-    if (c.author && maintainers.has(c.author)) return true;
+    if (c.author && hasLogin(maintainers, c.author)) return true;
+  }
+  return false;
+}
+
+function hasLogin(logins: Set<string>, login: string): boolean {
+  const normalized = login.toLowerCase();
+  for (const configured of logins) {
+    if (configured.toLowerCase() === normalized) return true;
   }
   return false;
 }
@@ -391,7 +399,8 @@ function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
   // Self-filed only counts for outside contributors. A maintainer or intern
   // filing an issue and then fixing it is ordinary planned work, so flagging
   // it would fire on most of the team's own PRs and mean nothing.
-  const isHighTrust = !!author && (ctx.maintainers.has(author) || ctx.interns.has(author));
+  const isHighTrust =
+    !!author && (hasLogin(ctx.maintainers, author) || hasLogin(ctx.interns, author));
   if (author && !isHighTrust) {
     for (const ref of refs) {
       const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];

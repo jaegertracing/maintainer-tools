@@ -9,8 +9,8 @@ const now = new Date('2026-09-20T12:00:00Z');
 
 const context: ClassifyContext = {
   viewer: 'maintainer-a',
-  maintainers: new Set(['maintainer-a', 'trusted-maintainer']),
-  interns: new Set(['trusted-author']),
+  maintainers: new Set(['Maintainer-A', 'Trusted-Maintainer']),
+  interns: new Set(['Trusted-Author']),
   codeownerPaths: ['src/**'],
   now,
   ignoreReviewRequestedOnYou: false,
