@@ -5,15 +5,6 @@
 // signal). The Hidden bucket absorbs PRs that aren't actionable until the
 // contributor moves.
 //
-// Buckets follow the RFC, "Attention categories":
-//   1. trusted-authors
-//   2. review-requested-on-you
-//   3. youre-the-bottleneck
-//   4. first-timer-awaiting
-//   5. codeowners-hits
-//   6. fyi
-//   7. hidden
-
 import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
 
 export type Bucket =

@@ -56,10 +56,9 @@ for (const [role, login] of [
   ['maintainer', 'trusted-maintainer'],
   ['intern', 'trusted-author'],
 ] as const) {
-  test(`${role} PRs outrank other actionable categories after a maintainer responds`, () => {
+  test(`${role} PRs remain prioritized after a maintainer responds`, () => {
     const pr = pullRequest({
       author: { login, typename: 'User' },
-      reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
       reviews: [
         {
           author: 'maintainer-a',
@@ -77,6 +76,18 @@ for (const [role, login] of [
     assert.deepEqual(result.reasons, ['trusted author']);
   });
 }
+
+test('trusted authors outrank explicit review requests', () => {
+  const pr = pullRequest({
+    author: { login: 'trusted-author', typename: 'User' },
+    reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'trusted-authors');
+  assert.deepEqual(result.reasons, ['trusted author']);
+});
 
 test('trusted-author drafts remain hidden', () => {
   const pr = pullRequest({
