@@ -197,8 +197,8 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
 
 [Repo: jaegertracing/jaeger]                        12 / 47 visible
   ▸ Trusted authors (2)                              [expanded by default]
-      - #6543  [+412/-87]  Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
       - #412   [+8/-0]     Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
+      - #6543  [+412/-87]  Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
   ▸ Review requested on you (1)                     [expanded]
       - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
   ▸ You requested changes; author has revised (1)    [expanded]
