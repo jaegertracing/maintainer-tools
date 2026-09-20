@@ -5,6 +5,7 @@ import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools
 
 import { classify, type ClassifyContext } from './buckets.js';
 import { enrichQuotaState } from './quota.js';
+import { renderHtml } from './render/html.js';
 
 const now = new Date();
 
@@ -102,6 +103,14 @@ test("the viewer's own PRs do not enter the trusted-author bucket", () => {
   const result = classify(pr, { ...context, viewer: 'Maintainer-A' });
 
   assert.equal(result.bucket, 'codeowners-hits');
+  assert.match(
+    renderHtml([result], {
+      viewer: 'Maintainer-A',
+      now,
+      authorOpenCounts: new Map(),
+    }),
+    /@maintainer-a<\/a> <span class="role-tag">you<\/span>/,
+  );
 });
 
 test('a review request makes a blocked trusted-author PR actionable', () => {

@@ -22,6 +22,7 @@ import {
   type Bucket,
   type ClassifiedPR,
 } from '../buckets.js';
+import { sameLogin } from '../logins.js';
 import {
   type BucketSection,
   formatAge,
@@ -313,7 +314,7 @@ function renderRow(
   const diff = renderDiff(pr);
   const author = pr.author?.login ?? '(unknown)';
   const openCount = counts.get(author) ?? 1;
-  const authorTag = author === viewer ? ' <span class="role-tag">you</span>' : '';
+  const authorTag = sameLogin(author, viewer) ? ' <span class="role-tag">you</span>' : '';
   const lastCell =
     c.bucket === 'hidden'
       ? (c.reasons.length > 0 ? c.reasons : ['unknown']).map(renderHideReason).join(' ')
