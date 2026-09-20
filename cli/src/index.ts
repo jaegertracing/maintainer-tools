@@ -21,7 +21,7 @@ import { renderHtml } from './render/html.js';
 import { renderXlsx } from './render/xlsx.js';
 import { makeClient, scanRepos } from './scan.js';
 import { resolveToken } from './token.js';
-import { classifyAll, quotaExemptLogins } from './triage-policy.js';
+import { classifyAll, priorityAuthorLogins } from './triage-policy.js';
 import { runNudge } from './nudge.js';
 
 const HELP = `Usage: maintainer-tools <command> [options]
@@ -169,7 +169,7 @@ async function runTriage(argv: string[]): Promise<void> {
   if (values['no-quota']) {
     log('quota: computation skipped (--no-quota); label-only mode');
   } else {
-    const exemptLogins = quotaExemptLogins(cfg);
+    const exemptLogins = priorityAuthorLogins(cfg);
     await enrichQuotaState(prs, client, { exemptLogins, cache });
   }
 

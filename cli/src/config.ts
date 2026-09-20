@@ -99,7 +99,7 @@ export function loadConfig(explicitPath?: string): TriageConfig {
     priorityAuthors: validateStringArray(raw.priorityAuthors, 'priorityAuthors', path),
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
-    priorityLabels: validateStringArray(raw.priorityLabels, 'priorityLabels', path),
+    priorityLabels: validateStringArray(raw.priorityLabels, 'priorityLabels', path, true),
     ignoreReviewRequestedOnYou: validateBoolean(
       raw.ignoreReviewRequestedOnYou,
       'ignoreReviewRequestedOnYou',
@@ -108,18 +108,17 @@ export function loadConfig(explicitPath?: string): TriageConfig {
   };
 }
 
-function validateStringArray(value: unknown, field: string, configPath: string): string[] {
-  if (value === undefined) return [];
+function validateStringArray(
+  value: unknown,
+  field: string,
+  configPath: string,
+  nullAsEmpty = false,
+): string[] {
+  if (value === undefined || (nullAsEmpty && value === null)) return [];
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
     throw new Error(`Config at ${configPath}: "${field}" must be an array of strings.`);
   }
   return value as string[];
-}
-
-export function priorityAuthorLogins(
-  config: Pick<TriageConfig, 'maintainers' | 'interns' | 'priorityAuthors'>,
-): Set<string> {
-  return new Set([...config.maintainers, ...config.interns, ...config.priorityAuthors]);
 }
 
 function validateBoolean(value: unknown, field: string, configPath: string): boolean {

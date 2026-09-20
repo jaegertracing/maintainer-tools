@@ -1,10 +1,12 @@
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifiedPR } from './buckets.js';
-import { priorityAuthorLogins, type TriageConfig } from './config.js';
+import type { TriageConfig } from './config.js';
 
-export function quotaExemptLogins(config: TriageConfig): Set<string> {
-  return priorityAuthorLogins(config);
+export function priorityAuthorLogins(
+  config: Pick<TriageConfig, 'maintainers' | 'interns' | 'priorityAuthors'>,
+): Set<string> {
+  return new Set([...config.maintainers, ...config.interns, ...config.priorityAuthors]);
 }
 
 export function classifyAll(

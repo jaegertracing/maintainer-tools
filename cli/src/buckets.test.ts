@@ -7,7 +7,7 @@ import { classify, type ClassifyContext } from './buckets.js';
 import type { TriageConfig } from './config.js';
 import { enrichQuotaState } from './quota.js';
 import { renderHtml } from './render/html.js';
-import { classifyAll, quotaExemptLogins } from './triage-policy.js';
+import { classifyAll, priorityAuthorLogins } from './triage-policy.js';
 
 const now = new Date();
 
@@ -62,7 +62,7 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
 
 const triageConfig: TriageConfig = {
   repos: ['example/repo'],
-  maintainers: ['Maintainer-A'],
+  maintainers: ['Maintainer-B'],
   interns: ['Priority-Intern'],
   priorityAuthors: ['Priority-Author'],
   codeowners: {},
@@ -71,10 +71,12 @@ const triageConfig: TriageConfig = {
   ignoreReviewRequestedOnYou: false,
 };
 
-test('triage policy wires configured priority authors into classification and quota', async () => {
+test('triage policy wires every priority source into classification and quota', async () => {
   const prs = [
     pullRequest({ number: 1, author: { login: 'priority-author', typename: 'User' } }),
     pullRequest({ number: 2, author: { login: 'priority-author', typename: 'User' } }),
+    pullRequest({ number: 3, author: { login: 'maintainer-b', typename: 'User' } }),
+    pullRequest({ number: 4, author: { login: 'priority-intern', typename: 'User' } }),
   ];
   let mergedCountCalls = 0;
   const client = {
@@ -84,12 +86,12 @@ test('triage policy wires configured priority authors into classification and qu
     },
   } as unknown as GraphqlClient;
 
-  await enrichQuotaState(prs, client, { exemptLogins: quotaExemptLogins(triageConfig) });
+  await enrichQuotaState(prs, client, { exemptLogins: priorityAuthorLogins(triageConfig) });
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
     classifyAll(prs, 'maintainer-a', triageConfig, now).map((result) => result.bucket),
-    ['priority-authors', 'priority-authors'],
+    ['priority-authors', 'priority-authors', 'priority-authors', 'priority-authors'],
   );
 });
 

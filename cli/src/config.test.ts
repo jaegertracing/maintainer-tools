@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
-import { loadConfig, priorityAuthorLogins } from './config.js';
+import { loadConfig } from './config.js';
 
 function configFile(t: TestContext, value: unknown): string {
   const dir = mkdtempSync(join(tmpdir(), 'maintainer-tools-config-'));
@@ -20,17 +20,10 @@ test('priorityAuthors defaults to an empty list', (t) => {
   assert.deepEqual(config.priorityAuthors, []);
 });
 
-test('priorityAuthorLogins combines every configured priority source', (t) => {
-  const config = loadConfig(
-    configFile(t, {
-      repos: ['example/repo'],
-      maintainers: ['maintainer'],
-      interns: ['intern'],
-      priorityAuthors: ['priority-author'],
-    }),
-  );
+test('priorityLabels preserves null as an empty list', (t) => {
+  const config = loadConfig(configFile(t, { repos: ['example/repo'], priorityLabels: null }));
 
-  assert.deepEqual([...priorityAuthorLogins(config)], ['maintainer', 'intern', 'priority-author']);
+  assert.deepEqual(config.priorityLabels, []);
 });
 
 for (const field of ['maintainers', 'interns', 'priorityAuthors'] as const) {
