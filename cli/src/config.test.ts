@@ -33,8 +33,15 @@ test('priorityAuthorLogins combines every configured priority source', (t) => {
   assert.deepEqual([...priorityAuthorLogins(config)], ['maintainer', 'intern', 'priority-author']);
 });
 
-test('priorityAuthors rejects malformed values', (t) => {
-  const path = configFile(t, { repos: ['example/repo'], priorityAuthors: 'priority-author' });
+for (const field of ['maintainers', 'interns', 'priorityAuthors'] as const) {
+  for (const [shape, value] of [
+    ['scalar', 'author'],
+    ['non-string element', ['author', 42]],
+  ] as const) {
+    test(`${field} rejects a ${shape}`, (t) => {
+      const path = configFile(t, { repos: ['example/repo'], [field]: value });
 
-  assert.throws(() => loadConfig(path), /"priorityAuthors" must be an array of strings/);
-});
+      assert.throws(() => loadConfig(path), new RegExp(`"${field}" must be an array of strings`));
+    });
+  }
+}
