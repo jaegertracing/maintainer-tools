@@ -12,7 +12,7 @@ import { parseArgs } from 'node:util';
 
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { classify, type ClassifiedPR, BUCKET_ORDER, BUCKET_LABELS } from './buckets.js';
-import { loadConfig } from './config.js';
+import { loadConfig, priorityAuthorLogins } from './config.js';
 import { log } from './log.js';
 import { enrichIssueState } from './issues.js';
 import { enrichQuotaState } from './quota.js';
@@ -168,7 +168,7 @@ async function runTriage(argv: string[]): Promise<void> {
   if (values['no-quota']) {
     log('quota: computation skipped (--no-quota); label-only mode');
   } else {
-    const exemptLogins = new Set([...cfg.maintainers, ...cfg.interns, ...cfg.priorityAuthors]);
+    const exemptLogins = priorityAuthorLogins(cfg);
     await enrichQuotaState(prs, client, { exemptLogins, cache });
   }
 
@@ -302,13 +302,11 @@ function classifyAll(
   now: Date,
 ): ClassifiedPR[] {
   const maintainers = new Set(cfg.maintainers);
-  const interns = new Set(cfg.interns);
-  const priorityAuthors = new Set(cfg.priorityAuthors);
+  const priorityAuthors = priorityAuthorLogins(cfg);
   return prs.map((pr) =>
     classify(pr, {
       viewer,
       maintainers,
-      interns,
       priorityAuthors,
       codeownerPaths: cfg.codeowners[`${pr.repo.owner}/${pr.repo.name}`] ?? [],
       now,

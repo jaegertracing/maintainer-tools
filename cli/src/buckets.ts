@@ -84,7 +84,6 @@ export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
 export interface ClassifyContext {
   viewer: string;
   maintainers: Set<string>;
-  interns: Set<string>;
   priorityAuthors: Set<string>;
   codeownerPaths: string[]; // for the current PR's repo
   now: Date;
@@ -416,11 +415,7 @@ function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
 }
 
 function isPriorityAuthor(ctx: ClassifyContext, login: string): boolean {
-  return (
-    hasLogin(ctx.maintainers, login) ||
-    hasLogin(ctx.interns, login) ||
-    hasLogin(ctx.priorityAuthors, login)
-  );
+  return hasLogin(ctx.priorityAuthors, login);
 }
 
 function countResolvedWithoutReply(pr: PullRequest): number {

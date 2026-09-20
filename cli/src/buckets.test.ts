@@ -16,8 +16,7 @@ function hoursAgo(hours: number): string {
 const context: ClassifyContext = {
   viewer: 'maintainer-a',
   maintainers: new Set(['Maintainer-A', 'Priority-Maintainer']),
-  interns: new Set(['Priority-Intern']),
-  priorityAuthors: new Set(['Priority-Author']),
+  priorityAuthors: new Set(['Priority-Maintainer', 'Priority-Intern', 'Priority-Author']),
   codeownerPaths: ['src/**'],
   now,
   ignoreReviewRequestedOnYou: false,
@@ -203,6 +202,16 @@ test('maintainer activity is case-insensitive for first-response buckets', () =>
   });
 
   assert.equal(classify(pr, context).bucket, 'codeowners-hits');
+});
+
+test('priority-author activity does not count as a maintainer response', () => {
+  const pr = pullRequest({
+    authorAssociation: 'FIRST_TIMER',
+    comments: [{ author: 'priority-author', createdAt: hoursAgo(2) }],
+    files: ['docs/example.md'],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'first-timer-awaiting');
 });
 
 test('author replies are case-insensitive for bottleneck detection', () => {
