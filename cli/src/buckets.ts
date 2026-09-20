@@ -100,6 +100,25 @@ export interface ClassifiedPR {
   checks: CheckResult[];
   // Inline row flags derived from PR state, not from a single predicate.
   flags: RowFlag[];
+  facets: Facets;
+}
+
+// The signals the classifier weighs, recorded independently of which one won.
+// The bucket keeps exactly one answer per PR; the facets let the table view
+// filter on a signal the bucket decision overrode, such as a priority author
+// whose PR is hidden for a missing DCO sign-off.
+export interface Facets {
+  priorityAuthor: boolean;
+  reviewRequested: boolean;
+  viewerReviewed: boolean;
+  firstTimer: boolean;
+  dependencyBot: boolean;
+  bot: boolean;
+  codeownersHit: boolean;
+  maintainerEngaged: boolean;
+  // Every reason that would send the PR to Hidden, in the same `draft` /
+  // `hide:<predicate_id>` / label vocabulary as `reasons`.
+  hideReasons: string[];
 }
 
 // Row-flag labels rendered in the `flags` column of each PR row. The
@@ -128,21 +147,51 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // quota-exceeded); report all of them so the report doesn't silently
   // mask one behind whichever predicate happens to run first.
   const hiddenByChecks = checks.filter((c) => c.triggered && c.hidesFromTriage);
+  const changesRequestedPending =
+    latestReviewState(viewerReviews) === 'CHANGES_REQUESTED' &&
+    !authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer);
+  const authorLogin = pr.author?.login;
+
+  const hideReasons: string[] = [];
+  if (pr.isDraft) hideReasons.push('draft');
+  hideReasons.push(...hiddenByChecks.map((c) => `hide:${c.id}`));
+  if (pr.labels.includes('waiting-for-author')) hideReasons.push('waiting-for-author');
+  if (changesRequestedPending) hideReasons.push('changes-requested');
+  if (isBotAuthor(pr) && !isDependencyBot(pr)) hideReasons.push('bot-authored');
+  const facets: Facets = {
+    priorityAuthor:
+      authorLogin !== undefined &&
+      !sameLogin(authorLogin, ctx.viewer) &&
+      isPriorityAuthor(ctx, authorLogin),
+    reviewRequested: isReviewRequestedOnViewer(pr, ctx.viewer),
+    viewerReviewed: viewerReviews.length > 0,
+    firstTimer: isFirstTimeContributor(pr),
+    dependencyBot: isDependencyBot(pr),
+    bot: isBotAuthor(pr),
+    codeownersHit: anyFileMatches(pr.files, ctx.codeownerPaths),
+    maintainerEngaged: hasMaintainerActivity(pr, ctx.maintainers),
+    hideReasons,
+  };
+  const mk = (bucket: Bucket, reasons: string[]): ClassifiedPR => ({
+    pr,
+    bucket,
+    reasons,
+    checks,
+    flags,
+    facets,
+  });
 
   if (pr.isDraft && !explicitlyRequested) {
-    return mk('hidden', ['draft'], pr, checks, flags);
+    return mk('hidden', ['draft']);
   }
   if (hiddenByChecks.length > 0 && !explicitlyRequested) {
     return mk(
       'hidden',
       hiddenByChecks.map((c) => `hide:${c.id}`),
-      pr,
-      checks,
-      flags,
     );
   }
   if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
-    return mk('hidden', ['waiting-for-author'], pr, checks, flags);
+    return mk('hidden', ['waiting-for-author']);
   }
   // The mirror of `changes-requested-revised` below: the viewer asked for
   // changes and the author has not answered yet. That is waiting on the author,
@@ -150,31 +199,26 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // state instead of from a label the nudge workflow has to apply first.
   // Without this the PR fell through to `fyi`, whose description is "needs a
   // first look" — the one thing it demonstrably does not need.
-  if (
-    !explicitlyRequested &&
-    latestReviewState(viewerReviews) === 'CHANGES_REQUESTED' &&
-    !authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer)
-  ) {
-    return mk('hidden', ['changes-requested'], pr, checks, flags);
+  if (!explicitlyRequested && changesRequestedPending) {
+    return mk('hidden', ['changes-requested']);
   }
   // Non-dependency bots (anything matching __typename=Bot or `*[bot]`
   // login that we don't know about) → Hidden. Dependency bots get their
   // own bucket below.
   if (isBotAuthor(pr) && !isDependencyBot(pr) && !explicitlyRequested) {
-    return mk('hidden', ['bot-authored'], pr, checks, flags);
+    return mk('hidden', ['bot-authored']);
   }
 
   // --- Priority 1: actionable PRs from configured priority authors.
-  const authorLogin = pr.author?.login;
-  if (authorLogin && !sameLogin(authorLogin, ctx.viewer) && isPriorityAuthor(ctx, authorLogin)) {
+  if (facets.priorityAuthor) {
     reasons.push('priority author');
-    return mk('priority-authors', reasons, pr, checks, flags);
+    return mk('priority-authors', reasons);
   }
 
   // --- Priority 2: someone clicked the viewer in Reviewers.
   if (explicitlyRequested) {
     reasons.push('viewer in reviewRequests');
-    return mk('review-requested-on-you', reasons, pr, checks, flags);
+    return mk('review-requested-on-you', reasons);
   }
 
   // --- Dependency bots that survived the hide rules go to their own
@@ -182,7 +226,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // touching a viewer-owned path is still a dependabot PR.
   if (isDependencyBot(pr)) {
     reasons.push('dependency bot');
-    return mk('dependency-bots', reasons, pr, checks, flags);
+    return mk('dependency-bots', reasons);
   }
 
   // --- Priority 3: viewer previously reviewed, author has acted since.
@@ -196,10 +240,10 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (viewerReviews.length > 0 && authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer)) {
     if (latestReviewState(viewerReviews) === 'CHANGES_REQUESTED') {
       reasons.push('you requested changes; author has revised since');
-      return mk('changes-requested-revised', reasons, pr, checks, flags);
+      return mk('changes-requested-revised', reasons);
     }
     reasons.push('viewer reviewed; author has acted since');
-    return mk('youre-the-bottleneck', reasons, pr, checks, flags);
+    return mk('youre-the-bottleneck', reasons);
   }
 
   // --- Priority 4: first-time contributors awaiting a first response.
@@ -207,28 +251,18 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (noMaintainerActivity && authorLogin) {
     if (isFirstTimeContributor(pr)) {
       reasons.push('first-time contributor; no maintainer response yet');
-      return mk('first-timer-awaiting', reasons, pr, checks, flags);
+      return mk('first-timer-awaiting', reasons);
     }
   }
 
   // --- Priority 5: PR touches files the viewer co-owns.
   if (anyFileMatches(pr.files, ctx.codeownerPaths)) {
     reasons.push('PR touches viewer CODEOWNERS paths');
-    return mk('codeowners-hits', reasons, pr, checks, flags);
+    return mk('codeowners-hits', reasons);
   }
 
   // --- Priority 6: catch-all for open PRs that don't trip a stronger signal.
-  return mk('fyi', ['no stronger signal'], pr, checks, flags);
-}
-
-function mk(
-  bucket: Bucket,
-  reasons: string[],
-  pr: PullRequest,
-  checks: CheckResult[],
-  flags: RowFlag[],
-): ClassifiedPR {
-  return { pr, bucket, reasons, checks, flags };
+  return mk('fyi', ['no stronger signal']);
 }
 
 function isReviewRequestedOnViewer(pr: PullRequest, viewer: string): boolean {

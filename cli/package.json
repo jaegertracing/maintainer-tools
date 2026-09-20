@@ -8,8 +8,9 @@
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@octokit/graphql": "9.0.3",
     "@jaegertracing/maintainer-tools-checks": "*",
-    "exceljs": "4.4.0"
+    "@octokit/graphql": "9.0.3",
+    "exceljs": "4.4.0",
+    "tabulator-tables": "^6.5.3"
   }
 }

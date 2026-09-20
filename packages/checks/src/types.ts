@@ -102,6 +102,11 @@ export interface PullRequest {
     author: string | null;
     state: ReviewState;
     submittedAt: string;
+    // Review URL and body. Optional because cache entries written before the
+    // fields existed lack them; the triage CLI reads the body of bot reviews
+    // (GitHub Copilot's review overview) and degrades to no verdict without it.
+    url?: string;
+    body?: string;
   }>;
   // Issue-style PR comments (last 50). Used by triage to decide whether a
   // maintainer has responded yet; not used by predicates.

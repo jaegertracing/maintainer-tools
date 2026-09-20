@@ -159,6 +159,31 @@ Each row also carries inline **flags** when relevant:
 | `DRAFT`                 | PR is a draft.                                                             |
 | `BOT`                   | Bot author.                                                                |
 
+When GitHub Copilot has reviewed the PR, the row also shows its verdict as a
+chip linking to the review: a traffic light and the finding counts by
+severity, e.g. `🟢 1M 2L` for "approval recommended, one medium and two low
+findings". Hover the chip for the full wording.
+
+### Table view
+
+The **Table** button in the report header switches to a flat table of every
+PR, hidden ones included, one row per PR. Alongside the bucket, each row
+carries the signals the classifier weighed as separate columns (priority
+author, review requested on you, first-timer, CODEOWNERS hit, dependency bot,
+maintainer engaged) plus every reason that would hide it, so a PR from a
+priority author that is hidden for a missing DCO sign-off is one filter away.
+
+- **Sort**: click a header to sort, shift-click to add a second key. The Sort
+  panel lists the active keys as chips; drag them to change priority, click
+  one to flip its direction, or remove it with `×`.
+- **Filter**: type in the box under a header. Enumerated and list-valued
+  columns (author, bucket, flags, labels, ...) autocomplete from the values in
+  the visible rows; numeric columns accept `>= 5`-style expressions. Active
+  filters appear as chips in the Filters panel with a **Clear all** button.
+
+The table is rendered with [Tabulator](https://tabulator.info), inlined into
+the file, so the report remains a single self-contained HTML file.
+
 ### How fresh the data is
 
 The CLI keeps an on-disk SQLite cache keyed on `(owner, repo, number,
