@@ -36,6 +36,10 @@ export interface TableRow {
   isViewer: boolean;
   bucket: string;
   bucketOrder: number;
+  // Position of the repo in the scan and of the priority tier in the config,
+  // so the default sort can follow the bucket view instead of the alphabet.
+  repoOrder: number;
+  priorityOrder: number;
   priorityLabel: string;
   hideReasons: string[];
   flags: string[];
@@ -66,13 +70,23 @@ export interface TableRow {
 }
 
 export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): TableRow[] {
+  const repoOrder = new Map<string, number>();
+  for (const c of classified) {
+    const slug = `${c.pr.repo.owner}/${c.pr.repo.name}`;
+    if (!repoOrder.has(slug)) repoOrder.set(slug, repoOrder.size);
+  }
+  const tiers = opts.priorityLabels ?? [];
   return classified.map((c) => {
     const pr = c.pr;
     const author = pr.author?.login ?? '(unknown)';
     const review = c.copilot;
-    const priorityLabel = (opts.priorityLabels ?? []).find((l) => pr.labels.includes(l));
+    const slug = `${pr.repo.owner}/${pr.repo.name}`;
+    const priorityIndex = tiers.findIndex((l) => pr.labels.includes(l));
+    const priorityLabel = priorityIndex >= 0 ? tiers[priorityIndex] : undefined;
     return {
-      repo: `${pr.repo.owner}/${pr.repo.name}`,
+      repo: slug,
+      repoOrder: repoOrder.get(slug) ?? 0,
+      priorityOrder: priorityIndex >= 0 ? priorityIndex : tiers.length,
       number: pr.number,
       url: pr.url,
       title: pr.title,
@@ -81,7 +95,7 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       isViewer: sameLogin(author, opts.viewer),
       bucket: BUCKET_LABELS[c.bucket],
       bucketOrder: BUCKET_ORDER.indexOf(c.bucket),
-      priorityLabel: priorityLabel ?? (opts.priorityLabels?.length ? NO_PRIORITY_LABEL : ''),
+      priorityLabel: priorityLabel ?? (tiers.length > 0 ? NO_PRIORITY_LABEL : ''),
       hideReasons: c.facets.hideReasons.map(hideReasonLabel),
       flags: c.flags,
       priorityAuthor: c.facets.priorityAuthor,
@@ -277,8 +291,12 @@ const TABLE_SCRIPT = `
     headerFilter: 'input', headerFilterPlaceholder: '>= n', headerFilterFunc: numFilter, width: 90,
   }, extra);
 
+  const HAS_TIERS = ROWS.some((r) => r.priorityLabel);
   const columns = [
-    en('repo', 'repo', { frozen: true }),
+    en('repo', 'repo', {
+      frozen: true,
+      sorter: (a, b, aRow, bRow) => aRow.getData().repoOrder - bRow.getData().repoOrder,
+    }),
     num('PR', 'number', {
       frozen: true, width: 80, headerFilterPlaceholder: '#',
       formatter: (cell) => '<a href="' + esc(cell.getRow().getData().url) + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>',
@@ -293,7 +311,9 @@ const TABLE_SCRIPT = `
     en('bucket', 'bucket', {
       sorter: (a, b, aRow, bRow) => aRow.getData().bucketOrder - bRow.getData().bucketOrder,
     }),
-    ROWS.some((r) => r.priorityLabel) ? en('priority', 'priorityLabel') : null,
+    HAS_TIERS ? en('priority', 'priorityLabel', {
+      sorter: (a, b, aRow, bRow) => aRow.getData().priorityOrder - bRow.getData().priorityOrder,
+    }) : null,
     list('hide reasons', 'hideReasons', () => 'flag-HIDE'),
     list('flags', 'flags', flagClass),
     en('Copilot', 'copilot', {
@@ -342,11 +362,15 @@ const TABLE_SCRIPT = `
       },
       movableColumns: true,
       rowFormatter: (row) => { if (row.getData().bucket === ${JSON.stringify(BUCKET_LABELS.hidden)}) row.getElement().classList.add('row-hidden'); },
-      // Tabulator applies the last sorter first, so the primary key goes last.
+      // Same order as the bucket view: repo, priority tier, bucket, source
+      // lines, oldest update first. Tabulator applies the last sorter first,
+      // so the primary key goes last.
       initialSort: [
-        { column: 'ageDays', dir: 'desc' },
+        { column: 'updatedAt', dir: 'asc' },
         { column: 'srcLines', dir: 'asc' },
         { column: 'bucket', dir: 'asc' },
+        ...(HAS_TIERS ? [{ column: 'priorityLabel', dir: 'asc' }] : []),
+        { column: 'repo', dir: 'asc' },
       ],
     });
     table.on('dataSorted', renderSortChips);

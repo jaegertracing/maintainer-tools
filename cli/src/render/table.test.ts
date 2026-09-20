@@ -76,6 +76,8 @@ test('buildTableRows keeps the overridden signals next to the bucket', () => {
   assert.equal(row.repo, 'example/repo');
   assert.equal(row.bucket, 'Blocked on author');
   assert.equal(row.bucketOrder, 8);
+  assert.equal(row.repoOrder, 0);
+  assert.equal(row.priorityOrder, 0);
   assert.equal(row.isViewer, false);
   assert.equal(row.priorityAuthor, true);
   assert.deepEqual(row.hideReasons, ['DCO-MISSING', 'CI-FAILING']);
@@ -129,5 +131,6 @@ test('buildTableRows falls back to the no-priority label only when tiers are con
   const [withoutTiers] = buildTableRows([classified], { viewer: 'maintainer-a', now });
 
   assert.equal(withTiers?.priorityLabel, NO_PRIORITY_LABEL);
+  assert.equal(withTiers?.priorityOrder, 1);
   assert.equal(withoutTiers?.priorityLabel, '');
 });
