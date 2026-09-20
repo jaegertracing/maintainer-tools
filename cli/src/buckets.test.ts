@@ -230,7 +230,6 @@ test('facets flag non-dependency bots as a hide reason', () => {
 
   assert.equal(result.bucket, 'hidden');
   assert.deepEqual(result.facets.hideReasons, ['bot-authored']);
-  assert.equal(result.facets.bot, true);
   assert.equal(result.facets.dependencyBot, false);
 });
 

@@ -45,6 +45,15 @@ test('parseOverview extracts the light, headline, findings and open count', () =
   );
 });
 
+test('parseOverview reads counts from a bare img and skips deeper headings', () => {
+  const body =
+    '<!-- ccr-overview-v2 -->\n#### Not the verdict\n### 🟡 Review recommended\n**Findings:** 3 <img alt="High severity"> · 1 <img alt="Low severity">\n';
+  const r = parseOverview(body, null, 'x');
+  assert.equal(r.light, 'yellow');
+  assert.equal(r.headline, 'Review recommended');
+  assert.deepEqual(r.findings, { high: 3, medium: 0, low: 1 });
+});
+
 test('parseOverview tolerates a body with no findings line', () => {
   const r = parseOverview('<!-- ccr-overview-v2 -->\n### 🔴 Changes requested\n', null, 'x');
   assert.equal(r.light, 'red');
@@ -80,6 +89,13 @@ test('copilotReview picks the latest Copilot overview and ignores other reviews'
         url: 'new',
       },
       { author: COPILOT_LOGIN, state: 'COMMENTED', submittedAt: '2026-09-22T00:00:00Z' },
+      {
+        author: COPILOT_LOGIN,
+        state: 'COMMENTED',
+        submittedAt: '2026-09-23T00:00:00Z',
+        body: 'Just an inline comment review with no overview.',
+        url: 'no-marker',
+      },
     ],
   } as unknown as PullRequest;
   const r = copilotReview(pr);

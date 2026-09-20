@@ -121,6 +121,20 @@ test('buildTableRows carries the Copilot verdict and marks the viewer as author'
   assert.equal(row.copilotTip, 'Copilot: Review recommended · Findings: 2 high');
 });
 
+test('buildTableRows numbers repos in the order they were scanned', () => {
+  const first = classify(
+    pullRequest({ repo: { owner: 'z', name: 'later-alphabetically' } }),
+    context,
+  );
+  const second = classify(pullRequest({ repo: { owner: 'a', name: 'earlier' } }), context);
+  const rows = buildTableRows([first, second, first], { viewer: 'maintainer-a', now });
+
+  assert.deepEqual(
+    rows.map((r) => r.repoOrder),
+    [0, 1, 0],
+  );
+});
+
 test('buildTableRows falls back to the no-priority label only when tiers are configured', () => {
   const classified = classify(pullRequest({ labels: [] }), context);
   const [withTiers] = buildTableRows([classified], {

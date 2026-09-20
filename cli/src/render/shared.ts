@@ -112,7 +112,7 @@ function buildSections(prs: ClassifiedPR[]): {
   // quota-exceeded); tally each so the breakdown doesn't undercount.
   const hiddenBreakdown = new Map<string, number>();
   for (const c of prs.filter((p) => p.bucket === 'hidden')) {
-    for (const reason of c.reasons.length > 0 ? c.reasons : ['other']) {
+    for (const reason of hideReasonsOf(c)) {
       hiddenBreakdown.set(reason, (hiddenBreakdown.get(reason) ?? 0) + 1);
     }
   }
@@ -158,6 +158,13 @@ export function formatAge(pr: PullRequest, now: Date): string {
     return `${hours}h`;
   }
   return `${Math.floor(days)}d`;
+}
+
+// The classifier stops at the first hide rule when it fills `reasons`; the
+// facets carry every reason, which is what the report shows.
+export function hideReasonsOf(c: ClassifiedPR): string[] {
+  const reasons = c.facets.hideReasons.length > 0 ? c.facets.hideReasons : c.reasons;
+  return reasons.length > 0 ? reasons : ['other'];
 }
 
 // Classifier hide reasons come as `draft`, `bot-authored`, a label name, or

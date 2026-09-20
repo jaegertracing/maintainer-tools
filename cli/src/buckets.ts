@@ -116,7 +116,6 @@ export interface Facets {
   viewerReviewed: boolean;
   firstTimer: boolean;
   dependencyBot: boolean;
-  bot: boolean;
   codeownersHit: boolean;
   maintainerEngaged: boolean;
   // Every reason that would send the PR to Hidden, in the same `draft` /
@@ -170,7 +169,6 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     viewerReviewed: viewerReviews.length > 0,
     firstTimer: isFirstTimeContributor(pr),
     dependencyBot: isDependencyBot(pr),
-    bot: isBotAuthor(pr),
     codeownersHit: anyFileMatches(pr.files, ctx.codeownerPaths),
     maintainerEngaged: hasMaintainerActivity(pr, ctx.maintainers),
     hideReasons,

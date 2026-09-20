@@ -55,7 +55,7 @@ export function parseOverview(
 ): CopilotReview {
   let light: CopilotLight | null = null;
   let headline = '';
-  const heading = /^###\s*(.+)$/m.exec(body);
+  const heading = /^###(?!#)\s*(.+)$/m.exec(body);
   if (heading) {
     headline = heading[1]!.trim();
     for (const [emoji, value] of LIGHTS) {
@@ -70,7 +70,7 @@ export function parseOverview(
   const findings = { high: 0, medium: 0, low: 0 };
   const findingsLine = /\*\*Findings:\*\*(.*)/.exec(body);
   if (findingsLine) {
-    const re = /(\d+)\s*<picture>.*?alt="(\w+) severity"/gi;
+    const re = /(\d+)\s*<(?:picture|img)\b.*?alt="(\w+) severity"/gi;
     for (const m of findingsLine[1]!.matchAll(re)) {
       const severity = (m[2] ?? '').toLowerCase();
       const count = Number(m[1]);

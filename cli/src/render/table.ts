@@ -225,7 +225,13 @@ const TABLE_SCRIPT = `
   };
   const enumParams = { valuesLookup: 'active', itemFormatter: escapedItem, autocomplete: true, clearable: true, listOnEmpty: true, freetext: true };
   const boolParams = { values: [{ label: 'yes', value: 'true' }, { label: 'no', value: 'false' }], clearable: true };
-  const boolFilter = (needle, value) => String(value) === needle;
+  // Tabulator's live filter re-applies the typed label ("yes") in place of
+  // the selected value ("true") after the list closes, so both are accepted.
+  const boolFilter = (needle, value) => {
+    const n = String(needle).trim().toLowerCase();
+    if (n === '') return true;
+    return value ? n === 'true' || n === 'yes' : n === 'false' || n === 'no';
+  };
   const numFilter = (needle, value) => {
     const m = /^\\s*(<=|>=|<|>|=)?\\s*(-?\\d+(?:\\.\\d+)?)\\s*$/.exec(needle);
     if (!m) return true;
@@ -241,7 +247,7 @@ const TABLE_SCRIPT = `
 
   // Shown as a tooltip over each header, since the headers are short.
   const HEADER_DOCS = {
-    repo: 'Repository (owner/name).',
+    repo: 'Repository (owner/name). Sorts in the order the repos were scanned, as in the bucket view.',
     number: 'Pull request number, linking to GitHub.',
     title: 'Pull request title.',
     author: 'Author login. "you" marks your own PRs.',
@@ -276,9 +282,7 @@ const TABLE_SCRIPT = `
   const en = (title, field, extra) => Object.assign({ title, field, headerFilter: 'list', headerFilterParams: enumParams, headerFilterFunc: 'like' }, extra);
   const bool = (title, field, extra) => Object.assign({
     title, field, hozAlign: 'center', formatter: 'tickCross', formatterParams: { crossElement: false },
-    // Live filtering would re-apply the typed label ("yes") in place of the
-    // selected value ("true") after the list closes, matching nothing.
-    headerFilter: 'list', headerFilterParams: boolParams, headerFilterFunc: boolFilter, headerFilterLiveFilter: false, width: 105,
+    headerFilter: 'list', headerFilterParams: boolParams, headerFilterFunc: boolFilter, width: 105,
   }, extra);
   const list = (title, field, cls, extra) => Object.assign({
     title, field, cssClass: 'cell-flags',
