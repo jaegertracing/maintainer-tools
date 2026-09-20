@@ -197,13 +197,13 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
 
 [Repo: jaegertracing/jaeger]                        12 / 47 visible
   ▸ Trusted authors (2)                              [expanded by default]
-      - #6543  [+412/-87]  Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
-      - #412   [+8/-0]     Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
+      - #412   [src +8/-0]                         Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
+      - #6543  [src +20/-10] [test +392/-77]       Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
   ▸ Review requested on you (1)                     [expanded]
-      - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
+      - #2987  [src +34/-12]                       Fix span color regression       — @bob [1 open]                  — 6h
   ▸ You requested changes; author has revised (1)    [expanded]
   ▸ You're the bottleneck (1)                       [expanded]
-      - #6501  [+1203/-450]  Refactor query service       — @dave [5 open]  — author replied 18h ago
+      - #6501  [src +1203/-450]                    Refactor query service           — @dave [5 open]  — author replied 18h ago
   ▸ First-time contributors awaiting first response (1) [expanded]
   ▸ CODEOWNERS hits (4)                             [collapsed]
   ▸ FYI (6)                                         [collapsed]
@@ -233,7 +233,14 @@ Top of each repo block shows "visible / total" so a glance tells the maintainer 
 8. **Dependency bots.** PR author is a recognized dependency-update bot.
 9. **Hidden.** `waiting-for-author`, drafts, and bot-authored PRs. These PRs remain collapsed until the contributor moves.
 
-Within each bucket, PRs sort by staleness (oldest first). Per-row fields: `[+X/-Y]` line counts; `[N open]` author's open-PR count in this repo; inline flags `[BLOCKER]` (release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]` (`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
+Within each bucket, PRs sort by reported source-line count (smallest first), then by
+staleness (oldest first). The per-file query covers the first 100 changed files;
+rows sort on that subset, and non-empty truncated breakdowns display `+…`. When per-file
+data is unavailable, the renderer displays and sorts by the whole-PR `[+X/-Y]` total.
+Per-row fields: per-file-class line counts (`src`, `test`, `fix`, `doc`, `cfg`, and
+`gen`); `[N open]` author's open-PR count in this repo; inline flags `[BLOCKER]`
+(release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]`
+(`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
 
 ---
 
