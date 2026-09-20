@@ -1,7 +1,7 @@
 # RFC: Maintainer PR Triage and Nudge Tooling
 
 * **Status**: RFC
-* **Last Updated**: 2026-05-17
+* **Last Updated**: 2026-09-20
 
 ---
 
@@ -196,13 +196,14 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
 [Header: "PR Triage — 2026-05-16 09:00 — @yurishkuro"]
 
 [Repo: jaegertracing/jaeger]                        12 / 47 visible
-  ▸ Review requested on you (3)                     [expanded by default]
+  ▸ Trusted authors (2)                              [expanded by default]
       - #6543  [+412/-87]  Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
-      - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
       - #412   [+8/-0]     Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
+  ▸ Review requested on you (1)                     [expanded]
+      - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
+  ▸ You requested changes; author has revised (1)    [expanded]
   ▸ You're the bottleneck (1)                       [expanded]
       - #6501  [+1203/-450]  Refactor query service       — @dave [5 open]  — author replied 18h ago
-  ▸ High-trust authors awaiting first response (2)  [expanded]
   ▸ First-time contributors awaiting first response (1) [expanded]
   ▸ CODEOWNERS hits (4)                             [collapsed]
   ▸ FYI (6)                                         [collapsed]
@@ -218,17 +219,19 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
   (empty — only Hidden contains anything)
 ```
 
-Top of each repo block shows "visible / total" so a glance tells the maintainer whether a repo needs attention at all. Empty buckets are omitted entirely; the four high-priority buckets default expanded, the lower-signal buckets default collapsed but with a count.
+Top of each repo block shows "visible / total" so a glance tells the maintainer whether a repo needs attention at all. Empty buckets are omitted entirely; the five high-priority buckets default expanded, the lower-signal buckets default collapsed but with a count.
 
 ### Attention categories (within each repo)
 
-1. **Review requested on you.** Someone clicked your name in Reviewers. Single strongest signal.
-2. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
-3. **High-trust authors awaiting first response.** PR author is in `maintainers` or `interns`, no maintainer has commented or reviewed yet.
-4. **First-time contributors awaiting first response.** Their first contribution to the org, no maintainer response. Surfaced separately because the cost of ignoring a first-timer is contributor loss, not delay.
-5. **CODEOWNERS hits.** PR touches files in your CODEOWNERS paths; not explicitly requested.
-6. **FYI.** Open PRs not in any of the above.
-7. **Hidden.** Counts only. `waiting-for-author`, drafts, bot-authored (with separate auto-merge-eligible count). Not actionable until the contributor moves.
+1. **Trusted authors.** PR author is another user in `maintainers` or `interns`. Actionable PRs from trusted authors remain at the front of the queue after a maintainer responds.
+2. **Review requested on you.** Someone clicked your name in Reviewers.
+3. **You requested changes; author has revised.** Your request-changes review still blocks the merge, and the author has pushed or commented since.
+4. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
+5. **First-time contributors awaiting first response.** Their first contribution to the org, no maintainer response. Surfaced separately because the cost of ignoring a first-timer is contributor loss, not delay.
+6. **CODEOWNERS hits.** PR touches files in your CODEOWNERS paths; not explicitly requested.
+7. **FYI.** Open PRs not in any of the above.
+8. **Dependency bots.** PR author is a recognized dependency-update bot.
+9. **Hidden.** `waiting-for-author`, drafts, and bot-authored PRs. These PRs remain collapsed until the contributor moves.
 
 Within each bucket, PRs sort by staleness (oldest first). Per-row fields: `[+X/-Y]` line counts; `[N open]` author's open-PR count in this repo; inline flags `[BLOCKER]` (release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]` (`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
 
@@ -262,7 +265,7 @@ Ordering rationale:
 | Phase | Scope |
 |---|---|
 | **P0** ✅ | New `jaegertracing/maintainer-tools` repo. Workspace layout, shared `packages/checks/` predicate library + Octokit GraphQL data layer + SQLite cache (`node:sqlite`). Four most-load-bearing checks (`dco_missing`, `ci_failing`, `merge_conflict`, `stale_on_author`). First action subfolder (`pr-nudge/`) with its `action.yml`, committed `dist/index.js` built by `@vercel/ncc`. |
-| **P1** ✅ | Triage HTML output. All seven attention buckets, hide rules wired to predicate library, dependency-bots split out from generic-bot Hidden. CLI-side quota enrichment so the first-timer bucket is accurate without depending on the upstream `pr-quota-reached` label. Run locally; zero contributor-visible risk. |
+| **P1** ✅ | Triage HTML output. All nine attention buckets, hide rules wired to predicate library, dependency-bots split out from generic-bot Hidden. CLI-side quota enrichment so the first-timer bucket is accurate without depending on the upstream `pr-quota-reached` label. Run locally; zero contributor-visible risk. |
 | **P2** ✅ | Shared comment publisher in `packages/checks/`. Pure helpers (`formatFooter`, `parseFooter`, `bodyHash`) plus a `publishComment({kind, scope, body}, client, {dryRun})` writer that does the read → footer-parse → render → SHA-hash → POST/PATCH/SKIP decision in one place. Every later phase that posts or edits a PR comment consumes this module — without it, P4's weekly digest, P5's slash-command acks, and P6's quota one-shot would each reinvent the same idempotency logic. `--dry-run` is a flag on the publisher; the decision tree runs identically, only the mutation step is replaced with a log line. |
 | **P3** ✅ | Net-new check predicates: `description_empty`, `no_linked_issue`, `no_tests_for_code_change`, `unresolved_from_reviewer`, `resolved_without_reply`. (`bot_authored` is already covered by the classifier's existing dep-bot / generic-bot split.) Implemented in `packages/checks/src/predicates/`, wired into the triage CLI's classifier as hide-rules or per-row flags as appropriate. Local-only; no contributor-visible surface yet — the Checks-panel and digest outputs come later when the actions land. Each ships as `triggered: bool` only; calibration data over a few weeks of triage reports decides whether they're ready to surface on contributor-facing channels. |
 | **P4** | Add `pr-weekly-digest/` action subfolder. New `maintainer-tools-weekly-digest.yml` workflow with `uses: jaegertracing/maintainer-tools/pr-weekly-digest@vX.Y.Z` on a daily cron; one digest comment per PR, unscoped, idempotent via the P2 publisher's `kind=weekly_digest` footer (a rerun with the same triggered reasons is a no-op; a change edits the comment in place). P3's checks populate the digest body. Greenfield — no existing script being replaced — so it's the safest place to first exercise the full ncc-bundled-action + workflow plumbing. Ship with `dry-run: true` default; flip after a calibration window. |

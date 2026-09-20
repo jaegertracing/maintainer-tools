@@ -23,6 +23,7 @@ import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools
 import type { PrCache } from '@jaegertracing/maintainer-tools-checks/cache';
 
 import { log } from './log.js';
+import { hasLogin } from './logins.js';
 
 export function calculateQuota(mergedCount: number): number {
   if (mergedCount === 0) return 1;
@@ -81,7 +82,7 @@ export async function enrichQuotaState(
   for (const pr of prs) {
     const login = pr.author?.login;
     if (!login) continue;
-    if (opts.exemptLogins.has(login)) continue;
+    if (hasLogin(opts.exemptLogins, login)) continue;
     const key = `${pr.repo.owner}/${pr.repo.name}|${login}`;
     let arr = groups.get(key);
     if (!arr) {
