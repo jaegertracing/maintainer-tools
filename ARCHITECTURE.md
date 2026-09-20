@@ -256,33 +256,36 @@ publisher just does POST / PATCH / SKIP.
 ## Triage CLI: bucket classifier
 
 `cli/src/buckets.ts` is a pure function that lands every open PR in
-exactly one of eight priority-ordered buckets:
+exactly one of nine priority-ordered buckets:
 
-1. **review-requested-on-you** — viewer in `reviewRequests`. Strongest
-   signal; overrides every hide rule. Disabled entirely when
+1. **trusted-authors** — author is in the configured `maintainers` or
+   `interns` list. Actionable PRs remain in this bucket throughout review.
+2. **review-requested-on-you** — viewer in `reviewRequests`. The request
+   overrides every hide rule. This signal is disabled entirely when
    `TriageConfig.ignoreReviewRequestedOnYou` is `true` (GitHub review
    requests carry no trust signal — anyone, including the PR author, can
    send one).
-2. **youre-the-bottleneck** — viewer has reviewed previously, author has
+3. **changes-requested-revised** — viewer requested changes, and the author
+   has pushed or commented since.
+4. **youre-the-bottleneck** — viewer has reviewed previously, author has
    pushed or commented since.
-3. **high-trust-awaiting-first-response** — author is in the configured
-   `maintainers` or `interns` list, no maintainer has reviewed/commented.
-4. **first-timer-awaiting** — `authorAssociation` is `FIRST_TIME_*`, no
+5. **first-timer-awaiting** — `authorAssociation` is `FIRST_TIME_*`, no
    maintainer activity yet.
-5. **codeowners-hits** — PR files match the viewer's configured CODEOWNERS
+6. **codeowners-hits** — PR files match the viewer's configured CODEOWNERS
    globs for the repo.
-6. **fyi** — catch-all for open PRs with no stronger signal.
-7. **dependency-bots** — author is `dependabot[bot]` / `renovate[bot]` /
+7. **fyi** — catch-all for open PRs with no stronger signal.
+8. **dependency-bots** — author is `dependabot[bot]` / `renovate[bot]` /
    `renovate-bot[bot]`.
-8. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
+9. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
    predicate marked `hidesFromTriage`. Rendered as its own collapsed
    section with a `reason` column, not merely counted.
 
 Hide rules run before bucket assignment. The lone exception is
 `review-requested-on-you`: an explicit review request overrides hide rules
-because GitHub's request is treated as a deliberate signal — unless
-`ignoreReviewRequestedOnYou` is set, in which case the override (and the
-bucket itself) is switched off and hide rules apply unconditionally.
+because GitHub's request is treated as a deliberate signal. A trusted-author
+PR with a review request remains in `trusted-authors`. When
+`ignoreReviewRequestedOnYou` is set, the override and the review-request
+bucket are switched off, so hide rules apply unconditionally.
 
 The renderer (`cli/src/render/html.ts`) consumes the classified list
 as-is. The HTML output is self-contained (inline CSS, no external assets),

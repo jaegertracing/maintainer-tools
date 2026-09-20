@@ -9,7 +9,7 @@ const now = new Date('2026-09-20T12:00:00Z');
 
 const context: ClassifyContext = {
   viewer: 'maintainer-a',
-  maintainers: new Set(['maintainer-a']),
+  maintainers: new Set(['maintainer-a', 'trusted-maintainer']),
   interns: new Set(['trusted-author']),
   codeownerPaths: ['src/**'],
   now,
@@ -52,26 +52,31 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
   };
 }
 
-test('trusted authors outrank other actionable categories after a maintainer responds', () => {
-  const pr = pullRequest({
-    author: { login: 'trusted-author', typename: 'User' },
-    reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
-    reviews: [
-      {
-        author: 'maintainer-a',
-        state: 'COMMENTED',
-        submittedAt: '2026-09-20T09:00:00Z',
-      },
-    ],
-    comments: [{ author: 'maintainer-a', createdAt: '2026-09-20T10:00:00Z' }],
-    files: ['src/example.ts', 'src/example.test.ts'],
+for (const [role, login] of [
+  ['maintainer', 'trusted-maintainer'],
+  ['intern', 'trusted-author'],
+] as const) {
+  test(`${role} PRs outrank other actionable categories after a maintainer responds`, () => {
+    const pr = pullRequest({
+      author: { login, typename: 'User' },
+      reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
+      reviews: [
+        {
+          author: 'maintainer-a',
+          state: 'COMMENTED',
+          submittedAt: '2026-09-20T09:00:00Z',
+        },
+      ],
+      comments: [{ author: 'maintainer-a', createdAt: '2026-09-20T10:00:00Z' }],
+      files: ['src/example.ts', 'src/example.test.ts'],
+    });
+
+    const result = classify(pr, context);
+
+    assert.equal(result.bucket, 'trusted-authors');
+    assert.deepEqual(result.reasons, ['trusted author']);
   });
-
-  const result = classify(pr, context);
-
-  assert.equal(result.bucket, 'trusted-authors');
-  assert.deepEqual(result.reasons, ['trusted author']);
-});
+}
 
 test('trusted-author drafts remain hidden', () => {
   const pr = pullRequest({

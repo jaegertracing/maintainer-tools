@@ -196,13 +196,13 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
 [Header: "PR Triage — 2026-05-16 09:00 — @yurishkuro"]
 
 [Repo: jaegertracing/jaeger]                        12 / 47 visible
-  ▸ Review requested on you (3)                     [expanded by default]
+  ▸ Trusted authors (2)                              [expanded by default]
       - #6543  [+412/-87]  Add OTLP gRPC retry middleware  — @alice (maintainer) [3 open]  — 2d
-      - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
       - #412   [+8/-0]     Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
+  ▸ Review requested on you (1)                     [expanded]
+      - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
   ▸ You're the bottleneck (1)                       [expanded]
       - #6501  [+1203/-450]  Refactor query service       — @dave [5 open]  — author replied 18h ago
-  ▸ Trusted authors (2)                              [expanded]
   ▸ First-time contributors awaiting first response (1) [expanded]
   ▸ CODEOWNERS hits (4)                             [collapsed]
   ▸ FYI (6)                                         [collapsed]
