@@ -89,14 +89,22 @@ test('trusted authors outrank explicit review requests', () => {
   assert.deepEqual(result.reasons, ['trusted author']);
 });
 
-test('trusted-author drafts remain hidden', () => {
-  const pr = pullRequest({
-    author: { login: 'trusted-author', typename: 'User' },
-    isDraft: true,
+const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
+  ['draft', { isDraft: true }, 'draft'],
+  ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],
+  ['merge conflict', { mergeable: 'CONFLICTING' }, 'hide:merge_conflict'],
+];
+
+for (const [state, overrides, reason] of hiddenCases) {
+  test(`trusted-author PRs remain hidden when ${state}`, () => {
+    const pr = pullRequest({
+      author: { login: 'trusted-author', typename: 'User' },
+      ...overrides,
+    });
+
+    const result = classify(pr, context);
+
+    assert.equal(result.bucket, 'hidden');
+    assert.deepEqual(result.reasons, [reason]);
   });
-
-  const result = classify(pr, context);
-
-  assert.equal(result.bucket, 'hidden');
-  assert.deepEqual(result.reasons, ['draft']);
-});
+}

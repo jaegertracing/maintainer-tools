@@ -201,6 +201,7 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
       - #412   [+8/-0]     Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
   ▸ Review requested on you (1)                     [expanded]
       - #2987  [+34/-12]   Fix span color regression       — @bob [1 open]                  — 6h
+  ▸ You requested changes; author has revised (1)    [expanded]
   ▸ You're the bottleneck (1)                       [expanded]
       - #6501  [+1203/-450]  Refactor query service       — @dave [5 open]  — author replied 18h ago
   ▸ First-time contributors awaiting first response (1) [expanded]
@@ -218,17 +219,18 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
   (empty — only Hidden contains anything)
 ```
 
-Top of each repo block shows "visible / total" so a glance tells the maintainer whether a repo needs attention at all. Empty buckets are omitted entirely; the four high-priority buckets default expanded, the lower-signal buckets default collapsed but with a count.
+Top of each repo block shows "visible / total" so a glance tells the maintainer whether a repo needs attention at all. Empty buckets are omitted entirely; the five high-priority buckets default expanded, the lower-signal buckets default collapsed but with a count.
 
 ### Attention categories (within each repo)
 
 1. **Trusted authors.** PR author is in `maintainers` or `interns`. Actionable PRs from trusted authors remain at the front of the queue after a maintainer responds.
 2. **Review requested on you.** Someone clicked your name in Reviewers.
-3. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
-4. **First-time contributors awaiting first response.** Their first contribution to the org, no maintainer response. Surfaced separately because the cost of ignoring a first-timer is contributor loss, not delay.
-5. **CODEOWNERS hits.** PR touches files in your CODEOWNERS paths; not explicitly requested.
-6. **FYI.** Open PRs not in any of the above.
-7. **Hidden.** Counts only. `waiting-for-author`, drafts, bot-authored (with separate auto-merge-eligible count). Not actionable until the contributor moves.
+3. **You requested changes; author has revised.** Your request-changes review still blocks the merge, and the author has pushed or commented since.
+4. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
+5. **First-time contributors awaiting first response.** Their first contribution to the org, no maintainer response. Surfaced separately because the cost of ignoring a first-timer is contributor loss, not delay.
+6. **CODEOWNERS hits.** PR touches files in your CODEOWNERS paths; not explicitly requested.
+7. **FYI.** Open PRs not in any of the above.
+8. **Hidden.** Counts only. `waiting-for-author`, drafts, bot-authored (with separate auto-merge-eligible count). Not actionable until the contributor moves.
 
 Within each bucket, PRs sort by staleness (oldest first). Per-row fields: `[+X/-Y]` line counts; `[N open]` author's open-PR count in this repo; inline flags `[BLOCKER]` (release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]` (`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
 
