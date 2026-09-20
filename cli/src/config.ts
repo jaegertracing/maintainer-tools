@@ -94,12 +94,12 @@ export function loadConfig(explicitPath?: string): TriageConfig {
   return {
     viewer: raw.viewer,
     repos: raw.repos,
-    maintainers: raw.maintainers ?? [],
-    interns: raw.interns ?? [],
-    priorityAuthors: raw.priorityAuthors ?? [],
+    maintainers: validateStringArray(raw.maintainers, 'maintainers', path),
+    interns: validateStringArray(raw.interns, 'interns', path),
+    priorityAuthors: validateStringArray(raw.priorityAuthors, 'priorityAuthors', path),
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
-    priorityLabels: validatePriorityLabels(raw.priorityLabels, path),
+    priorityLabels: validateStringArray(raw.priorityLabels, 'priorityLabels', path),
     ignoreReviewRequestedOnYou: validateBoolean(
       raw.ignoreReviewRequestedOnYou,
       'ignoreReviewRequestedOnYou',
@@ -108,10 +108,10 @@ export function loadConfig(explicitPath?: string): TriageConfig {
   };
 }
 
-function validatePriorityLabels(value: unknown, configPath: string): string[] {
+function validateStringArray(value: unknown, field: string, configPath: string): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
-    throw new Error(`Config at ${configPath}: "priorityLabels" must be an array of strings.`);
+    throw new Error(`Config at ${configPath}: "${field}" must be an array of strings.`);
   }
   return value as string[];
 }
