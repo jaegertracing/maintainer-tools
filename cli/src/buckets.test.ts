@@ -169,3 +169,57 @@ test('trusted-author quota exemptions are case-insensitive', async () => {
     ['trusted-authors', 'trusted-authors'],
   );
 });
+
+test('maintainer activity is case-insensitive for first-response buckets', () => {
+  const pr = pullRequest({
+    authorAssociation: 'FIRST_TIMER',
+    comments: [{ author: 'maintainer-a', createdAt: hoursAgo(2) }],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'codeowners-hits');
+});
+
+test('author replies are case-insensitive for bottleneck detection', () => {
+  const pr = pullRequest({
+    reviews: [
+      {
+        author: 'MAINTAINER-A',
+        state: 'COMMENTED',
+        submittedAt: hoursAgo(3),
+      },
+    ],
+    commits: [
+      {
+        sha: 'abc1234',
+        messageHeadline: 'Test trusted-author priority',
+        messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
+        authorEmail: 'contributor@example.com',
+        committedDate: hoursAgo(4),
+        parents: 1,
+      },
+    ],
+    comments: [{ author: 'CONTRIBUTOR', createdAt: hoursAgo(2) }],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'youre-the-bottleneck');
+});
+
+test('trusted-author issue flags use case-insensitive membership', () => {
+  const ref = { owner: 'example', repo: 'repo', number: 1 };
+  const pr = pullRequest({
+    author: { login: 'trusted-author', typename: 'User' },
+    computed: {
+      issueRefs: [ref],
+      issueMeta: {
+        'example/repo#1': {
+          author: 'trusted-author',
+          state: 'OPEN',
+          title: 'Example issue',
+          isPullRequest: false,
+        },
+      },
+    },
+  });
+
+  assert.equal(classify(pr, context).flags.includes('SELF-FILED'), false);
+});
