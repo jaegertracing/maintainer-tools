@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@jaegertracing/maintainer-tools-checks": "*",
     "@octokit/graphql": "9.0.3",
     "exceljs": "4.4.0",
-    "tabulator-tables": "^6.5.3"
+    "tabulator-tables": "6.5.3"
   }
 }

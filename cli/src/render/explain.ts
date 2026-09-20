@@ -5,7 +5,7 @@
 
 import type { CheckResult } from '@jaegertracing/maintainer-tools-checks';
 import { BUCKET_DESCRIPTIONS, BUCKET_LABELS, type ClassifiedPR } from '../buckets.js';
-import { copilotReview, copilotTooltip } from '../copilot.js';
+import { copilotTooltip } from '../copilot.js';
 import { ageInDays } from './shared.js';
 
 export function renderExplain(c: ClassifiedPR, now: Date): string {
@@ -45,7 +45,7 @@ export function renderExplain(c: ClassifiedPR, now: Date): string {
     const shown = Array.isArray(value) ? (value.length > 0 ? value.join(', ') : '(none)') : value;
     lines.push(`  ${key.padEnd(20)} ${shown}`);
   }
-  const review = copilotReview(pr);
+  const review = c.copilot;
   lines.push('');
   lines.push(
     review

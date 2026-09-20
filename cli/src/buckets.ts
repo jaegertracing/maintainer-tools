@@ -7,6 +7,7 @@
 //
 import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
 
+import { type CopilotReview, copilotReview } from './copilot.js';
 import { hasLogin, sameLogin } from './logins.js';
 
 export type Bucket =
@@ -101,6 +102,8 @@ export interface ClassifiedPR {
   // Inline row flags derived from PR state, not from a single predicate.
   flags: RowFlag[];
   facets: Facets;
+  // Latest GitHub Copilot review verdict, parsed once here for every renderer.
+  copilot: CopilotReview | null;
 }
 
 // The signals the classifier weighs, recorded independently of which one won.
@@ -172,6 +175,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     maintainerEngaged: hasMaintainerActivity(pr, ctx.maintainers),
     hideReasons,
   };
+  const copilot = copilotReview(pr);
   const mk = (bucket: Bucket, reasons: string[]): ClassifiedPR => ({
     pr,
     bucket,
@@ -179,6 +183,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     checks,
     flags,
     facets,
+    copilot,
   });
 
   if (pr.isDraft && !explicitlyRequested) {

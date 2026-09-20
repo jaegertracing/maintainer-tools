@@ -22,7 +22,7 @@ import {
   type Bucket,
   type ClassifiedPR,
 } from '../buckets.js';
-import { copilotLabel, copilotReview, copilotTooltip } from '../copilot.js';
+import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
 import {
   type BucketSection,
@@ -331,7 +331,7 @@ function renderRow(
   const lastCell =
     (c.bucket === 'hidden'
       ? (c.reasons.length > 0 ? c.reasons : ['unknown']).map(renderHideReason).join(' ')
-      : c.flags.map(renderFlag).join(' ')) + renderCopilot(pr);
+      : c.flags.map(renderFlag).join(' ')) + renderCopilot(c);
   const age = formatAge(pr, now);
   return `<tr>
         <td><a href="${escape(pr.url)}" ${NEW_TAB}>#${pr.number}</a></td>
@@ -496,10 +496,12 @@ function renderFlag(label: string): string {
 
 // GitHub Copilot's latest review verdict as a chip linking to the review:
 // traffic light plus the non-zero finding counts by severity.
-function renderCopilot(pr: PullRequest): string {
-  const review = copilotReview(pr);
+function renderCopilot(c: ClassifiedPR): string {
+  const review = c.copilot;
   if (!review) return '';
-  const inner = `<span class="flag flag-COPILOT copilot-${escape(review.light ?? 'none')}" data-tip="${escape(copilotTooltip(review))}">${escape(copilotLabel(review))}</span>`;
+  const label = copilotLabel(review);
+  if (!label) return '';
+  const inner = `<span class="flag flag-COPILOT copilot-${escape(review.light ?? 'none')}" data-tip="${escape(copilotTooltip(review))}">${escape(label)}</span>`;
   return review.url ? ` <a href="${escape(review.url)}" ${NEW_TAB}>${inner}</a>` : ` ${inner}`;
 }
 

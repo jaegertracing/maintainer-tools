@@ -102,9 +102,9 @@ export interface PullRequest {
     author: string | null;
     state: ReviewState;
     submittedAt: string;
-    // Review URL and body. Optional because cache entries written before the
-    // fields existed lack them; the triage CLI reads the body of bot reviews
-    // (GitHub Copilot's review overview) and degrades to no verdict without it.
+    // Review URL and body. Only the triage CLI reads them (GitHub Copilot's
+    // review overview); the actions carry them because the query is shared.
+    // Optional so consumers degrade gracefully when they are absent.
     url?: string;
     body?: string;
   }>;

@@ -70,9 +70,9 @@ export function parseOverview(
   const findings = { high: 0, medium: 0, low: 0 };
   const findingsLine = /\*\*Findings:\*\*(.*)/.exec(body);
   if (findingsLine) {
-    const re = /(\d+)\s*(?:<picture>.*?alt="(\w+) severity"|(High|Medium|Low) severity)/gi;
+    const re = /(\d+)\s*<picture>.*?alt="(\w+) severity"/gi;
     for (const m of findingsLine[1]!.matchAll(re)) {
-      const severity = (m[2] ?? m[3] ?? '').toLowerCase();
+      const severity = (m[2] ?? '').toLowerCase();
       const count = Number(m[1]);
       if (severity === 'high') findings.high += count;
       else if (severity === 'medium') findings.medium += count;

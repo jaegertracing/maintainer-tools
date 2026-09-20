@@ -14,7 +14,7 @@ import { createRequire } from 'node:module';
 import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
-import { copilotLabel, copilotReview, copilotTooltip } from '../copilot.js';
+import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
 import { ageInDays, NO_PRIORITY_LABEL } from './shared.js';
 
@@ -69,10 +69,10 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
   return classified.map((c) => {
     const pr = c.pr;
     const author = pr.author?.login ?? '(unknown)';
-    const review = copilotReview(pr);
+    const review = c.copilot;
     const priorityLabel = (opts.priorityLabels ?? []).find((l) => pr.labels.includes(l));
     return {
-      repo: pr.repo.name,
+      repo: `${pr.repo.owner}/${pr.repo.name}`,
       number: pr.number,
       url: pr.url,
       title: pr.title,
@@ -198,20 +198,24 @@ const TABLE_SCRIPT = `
   const chips = (values, cls) => values.map((v) => '<span class="flag ' + cls(v) + '">' + esc(v) + '</span>').join(' ');
   const flagClass = (v) => 'flag-' + (v.split(':')[0] || v).trim().replace(/[^A-Za-z0-9-]/g, '-');
 
+  // Tabulator inserts tooltips and list items as HTML, so every value that
+  // came from a PR (titles, labels, author logins) is escaped first.
+  const escapedItem = (label) => esc(label);
   const listParams = (field) => ({
     valuesLookup: () => {
       const seen = new Set();
       for (const row of table.getData('active')) for (const v of row[field]) seen.add(v);
       return [...seen].sort();
     },
+    itemFormatter: escapedItem,
     autocomplete: true, clearable: true, listOnEmpty: true, freetext: true,
   });
   const listFilter = (needle, values) => {
     const n = String(needle).toLowerCase();
     return values.some((v) => String(v).toLowerCase().includes(n));
   };
-  const enumParams = { valuesLookup: 'active', autocomplete: true, clearable: true, listOnEmpty: true, freetext: true };
-  const boolParams = { values: [{ label: 'yes', value: 'true' }, { label: 'no', value: 'false' }], clearable: true, listOnEmpty: true };
+  const enumParams = { valuesLookup: 'active', itemFormatter: escapedItem, autocomplete: true, clearable: true, listOnEmpty: true, freetext: true };
+  const boolParams = { values: [{ label: 'yes', value: 'true' }, { label: 'no', value: 'false' }], clearable: true };
   const boolFilter = (needle, value) => String(value) === needle;
   const numFilter = (needle, value) => {
     const m = /^\\s*(<=|>=|<|>|=)?\\s*(-?\\d+(?:\\.\\d+)?)\\s*$/.exec(needle);
@@ -230,7 +234,9 @@ const TABLE_SCRIPT = `
   const en = (title, field, extra) => Object.assign({ title, field, headerFilter: 'list', headerFilterParams: enumParams }, extra);
   const bool = (title, field, extra) => Object.assign({
     title, field, hozAlign: 'center', formatter: 'tickCross', formatterParams: { crossElement: false },
-    headerFilter: 'list', headerFilterParams: boolParams, headerFilterFunc: boolFilter, width: 70,
+    // Live filtering would re-apply the typed label ("yes") in place of the
+    // selected value ("true") after the list closes, matching nothing.
+    headerFilter: 'list', headerFilterParams: boolParams, headerFilterFunc: boolFilter, headerFilterLiveFilter: false, width: 70,
   }, extra);
   const list = (title, field, cls, extra) => Object.assign({
     title, field, cssClass: 'cell-flags',
@@ -249,7 +255,7 @@ const TABLE_SCRIPT = `
       frozen: true, width: 80, headerFilterPlaceholder: '#',
       formatter: (cell) => '<a href="' + esc(cell.getRow().getData().url) + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>',
     }),
-    text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: true }),
+    text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('author', 'author', {
       formatter: (cell) => {
         const r = cell.getRow().getData();

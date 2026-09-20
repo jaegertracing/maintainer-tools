@@ -81,7 +81,8 @@ interface CacheRow {
 //       so entries cached at the old page size hold a shorter prefix
 //   6 — reviewThreads is now paginated in full, so entries cached before it
 //       hold at most the first 100 threads
-const SCHEMA_VERSION = 6;
+//   7 — added reviews[].url and reviews[].body for Copilot review verdicts
+const SCHEMA_VERSION = 7;
 
 interface CachePayload {
   v: number;
