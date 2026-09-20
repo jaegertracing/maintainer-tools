@@ -3,28 +3,36 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { classify, type ClassifiedPR } from './buckets.js';
 import type { TriageConfig } from './config.js';
 
-export function priorityAuthorLogins(
-  config: Pick<TriageConfig, 'maintainers' | 'interns' | 'priorityAuthors'>,
-): Set<string> {
-  return new Set([...config.maintainers, ...config.interns, ...config.priorityAuthors]);
+export interface TriagePolicy {
+  maintainers: Set<string>;
+  priorityAuthors: Set<string>;
+  codeowners: Record<string, string[]>;
+  ignoreReviewRequestedOnYou: boolean;
+}
+
+export function buildTriagePolicy(config: TriageConfig): TriagePolicy {
+  return {
+    maintainers: new Set(config.maintainers),
+    priorityAuthors: new Set([...config.maintainers, ...config.interns, ...config.priorityAuthors]),
+    codeowners: config.codeowners,
+    ignoreReviewRequestedOnYou: config.ignoreReviewRequestedOnYou,
+  };
 }
 
 export function classifyAll(
   prs: PullRequest[],
   viewer: string,
-  config: TriageConfig,
+  policy: TriagePolicy,
   now: Date,
 ): ClassifiedPR[] {
-  const maintainers = new Set(config.maintainers);
-  const priorityAuthors = priorityAuthorLogins(config);
   return prs.map((pr) =>
     classify(pr, {
       viewer,
-      maintainers,
-      priorityAuthors,
-      codeownerPaths: config.codeowners[`${pr.repo.owner}/${pr.repo.name}`] ?? [],
+      maintainers: policy.maintainers,
+      priorityAuthors: policy.priorityAuthors,
+      codeownerPaths: policy.codeowners[`${pr.repo.owner}/${pr.repo.name}`] ?? [],
       now,
-      ignoreReviewRequestedOnYou: config.ignoreReviewRequestedOnYou,
+      ignoreReviewRequestedOnYou: policy.ignoreReviewRequestedOnYou,
     }),
   );
 }

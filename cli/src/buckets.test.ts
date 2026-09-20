@@ -7,7 +7,7 @@ import { classify, type ClassifyContext } from './buckets.js';
 import type { TriageConfig } from './config.js';
 import { enrichQuotaState } from './quota.js';
 import { renderHtml } from './render/html.js';
-import { classifyAll, priorityAuthorLogins } from './triage-policy.js';
+import { buildTriagePolicy, classifyAll } from './triage-policy.js';
 
 const now = new Date();
 
@@ -76,8 +76,11 @@ test('triage policy wires every priority source into classification and quota', 
     pullRequest({ number: 1, author: { login: 'priority-author', typename: 'User' } }),
     pullRequest({ number: 2, author: { login: 'priority-author', typename: 'User' } }),
     pullRequest({ number: 3, author: { login: 'maintainer-b', typename: 'User' } }),
-    pullRequest({ number: 4, author: { login: 'priority-intern', typename: 'User' } }),
+    pullRequest({ number: 4, author: { login: 'maintainer-b', typename: 'User' } }),
+    pullRequest({ number: 5, author: { login: 'priority-intern', typename: 'User' } }),
+    pullRequest({ number: 6, author: { login: 'priority-intern', typename: 'User' } }),
   ];
+  const policy = buildTriagePolicy(triageConfig);
   let mergedCountCalls = 0;
   const client = {
     countMergedPRs: async () => {
@@ -86,12 +89,19 @@ test('triage policy wires every priority source into classification and quota', 
     },
   } as unknown as GraphqlClient;
 
-  await enrichQuotaState(prs, client, { exemptLogins: priorityAuthorLogins(triageConfig) });
+  await enrichQuotaState(prs, client, { exemptLogins: policy.priorityAuthors });
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
-    classifyAll(prs, 'maintainer-a', triageConfig, now).map((result) => result.bucket),
-    ['priority-authors', 'priority-authors', 'priority-authors', 'priority-authors'],
+    classifyAll(prs, 'maintainer-a', policy, now).map((result) => result.bucket),
+    [
+      'priority-authors',
+      'priority-authors',
+      'priority-authors',
+      'priority-authors',
+      'priority-authors',
+      'priority-authors',
+    ],
   );
 });
 
