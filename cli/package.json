@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "tsx --test src/**/*.test.ts",
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -6,9 +6,9 @@
 // contributor moves.
 //
 // Buckets follow the RFC, "Attention categories":
-//   1. review-requested-on-you
-//   2. youre-the-bottleneck
-//   3. high-trust-awaiting-first-response
+//   1. trusted-authors
+//   2. review-requested-on-you
+//   3. youre-the-bottleneck
 //   4. first-timer-awaiting
 //   5. codeowners-hits
 //   6. fyi
@@ -17,10 +17,10 @@
 import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
 
 export type Bucket =
+  | 'trusted-authors'
   | 'review-requested-on-you'
   | 'changes-requested-revised'
   | 'youre-the-bottleneck'
-  | 'high-trust-awaiting-first-response'
   | 'first-timer-awaiting'
   | 'codeowners-hits'
   | 'fyi'
@@ -28,10 +28,10 @@ export type Bucket =
   | 'hidden';
 
 export const BUCKET_ORDER: Bucket[] = [
+  'trusted-authors',
   'review-requested-on-you',
   'changes-requested-revised',
   'youre-the-bottleneck',
-  'high-trust-awaiting-first-response',
   'first-timer-awaiting',
   'codeowners-hits',
   'fyi',
@@ -40,10 +40,10 @@ export const BUCKET_ORDER: Bucket[] = [
 ];
 
 export const BUCKET_LABELS: Record<Bucket, string> = {
+  'trusted-authors': 'Trusted authors',
   'review-requested-on-you': 'Review requested on you',
   'changes-requested-revised': 'You requested changes; author has revised',
   'youre-the-bottleneck': "You're the bottleneck",
-  'high-trust-awaiting-first-response': 'High-trust authors awaiting first response',
   'first-timer-awaiting': 'First-time contributors awaiting first response',
   'codeowners-hits': 'CODEOWNERS hits',
   fyi: 'Needs triage',
@@ -54,13 +54,12 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 // One-sentence explanation shown under each bucket header in the report, so
 // a reader doesn't have to go dig through docs to know what a section means.
 export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
+  'trusted-authors': 'Author is a configured maintainer or intern.',
   'review-requested-on-you': 'Someone added you to the Reviewers field on this PR.',
   'changes-requested-revised':
     'You submitted a Request changes review and the author has pushed or commented since, so the ball is back with you. Your review is also still blocking the merge until you clear it.',
   'youre-the-bottleneck':
     "You've reviewed this PR before, and the author has pushed a commit or commented since — it's waiting on you again.",
-  'high-trust-awaiting-first-response':
-    'Author is a configured maintainer or intern, and no maintainer has engaged with the PR yet.',
   'first-timer-awaiting':
     "Author's first PR to the repo (GitHub-reported), and no maintainer has engaged with it yet.",
   'codeowners-hits': 'PR touches file paths you are configured as a CODEOWNER for.',
@@ -82,10 +81,10 @@ const DEPENDENCY_BOT_LOGINS = new Set<string>([
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
+  'trusted-authors',
   'review-requested-on-you',
   'changes-requested-revised',
   'youre-the-bottleneck',
-  'high-trust-awaiting-first-response',
   'first-timer-awaiting',
 ]);
 
@@ -173,7 +172,14 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('hidden', ['bot-authored'], pr, checks, flags);
   }
 
-  // --- Priority 1: someone clicked the viewer in Reviewers.
+  // --- Priority 1: actionable PRs from configured trusted authors.
+  const authorLogin = pr.author?.login;
+  if (authorLogin && (ctx.maintainers.has(authorLogin) || ctx.interns.has(authorLogin))) {
+    reasons.push('trusted author');
+    return mk('trusted-authors', reasons, pr, checks, flags);
+  }
+
+  // --- Priority 2: someone clicked the viewer in Reviewers.
   if (explicitlyRequested) {
     reasons.push('viewer in reviewRequests');
     return mk('review-requested-on-you', reasons, pr, checks, flags);
@@ -187,7 +193,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('dependency-bots', reasons, pr, checks, flags);
   }
 
-  // --- Priority 2: viewer previously reviewed, author has acted since.
+  // --- Priority 3: viewer previously reviewed, author has acted since.
   //
   // Split by what kind of review it was. "Request changes" is a commitment: it
   // names things the author had to fix and it blocks the merge until dismissed,
@@ -205,16 +211,9 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('youre-the-bottleneck', reasons, pr, checks, flags);
   }
 
-  // --- Priority 3 & 4: first-response triage for high-trust authors and
-  // first-time contributors. Both require "no maintainer has engaged yet"
-  // — a comment from a maintainer or any review by a maintainer disqualifies.
+  // --- Priority 4: first-time contributors awaiting a first response.
   const noMaintainerActivity = !hasMaintainerActivity(pr, ctx.maintainers);
-  const authorLogin = pr.author?.login;
   if (noMaintainerActivity && authorLogin) {
-    if (ctx.maintainers.has(authorLogin) || ctx.interns.has(authorLogin)) {
-      reasons.push('high-trust author; no maintainer response yet');
-      return mk('high-trust-awaiting-first-response', reasons, pr, checks, flags);
-    }
     if (isFirstTimeContributor(pr)) {
       reasons.push('first-time contributor; no maintainer response yet');
       return mk('first-timer-awaiting', reasons, pr, checks, flags);

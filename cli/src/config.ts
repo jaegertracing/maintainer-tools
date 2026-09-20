@@ -14,13 +14,13 @@ export interface TriageConfig {
   viewer?: string;
   // Repos to scan, formatted `owner/name`.
   repos: string[];
-  // Logins treated as "high-trust authors" — their PRs surface in the
-  // "high-trust authors awaiting first response" bucket. Maintainers
-  // appearing here implicitly count as maintainer-side activity for the
-  // first-response heuristic in *every* bucket.
+  // Logins treated as trusted authors. Their actionable PRs surface in the
+  // highest-priority bucket, and their activity counts as maintainer-side
+  // activity for the first-response heuristic.
   maintainers: string[];
-  // Logins treated as interns / similar trusted role. Same bucket as
-  // maintainers for triage purposes, but called out separately.
+  // Logins treated as interns or a similar trusted role. Their PRs share the
+  // trusted-author bucket, but their activity does not count as a maintainer
+  // response on other PRs.
   interns: string[];
   // Per-repo path globs the viewer is a CODEOWNER for. Glob syntax is
   // minimal: `*` (within a path segment), `**` (across segments), and

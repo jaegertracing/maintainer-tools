@@ -1,7 +1,7 @@
 # RFC: Maintainer PR Triage and Nudge Tooling
 
 * **Status**: RFC
-* **Last Updated**: 2026-05-17
+* **Last Updated**: 2026-09-20
 
 ---
 
@@ -202,7 +202,7 @@ Each PR row carries the same columns: `#number`, line-count diff, title, author 
       - #412   [+8/-0]     Add v3 protobuf field           — @carol (intern) [2 open] [BLOCKER]  — 4d
   ▸ You're the bottleneck (1)                       [expanded]
       - #6501  [+1203/-450]  Refactor query service       — @dave [5 open]  — author replied 18h ago
-  ▸ High-trust authors awaiting first response (2)  [expanded]
+  ▸ Trusted authors (2)                              [expanded]
   ▸ First-time contributors awaiting first response (1) [expanded]
   ▸ CODEOWNERS hits (4)                             [collapsed]
   ▸ FYI (6)                                         [collapsed]
@@ -222,9 +222,9 @@ Top of each repo block shows "visible / total" so a glance tells the maintainer 
 
 ### Attention categories (within each repo)
 
-1. **Review requested on you.** Someone clicked your name in Reviewers. Single strongest signal.
-2. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
-3. **High-trust authors awaiting first response.** PR author is in `maintainers` or `interns`, no maintainer has commented or reviewed yet.
+1. **Trusted authors.** PR author is in `maintainers` or `interns`. Actionable PRs from trusted authors remain at the front of the queue after a maintainer responds.
+2. **Review requested on you.** Someone clicked your name in Reviewers.
+3. **You're the bottleneck.** You're a listed reviewer and last activity is the author/contributor — ball is in your court. Includes PRs you previously reviewed where the author has since pushed or replied.
 4. **First-time contributors awaiting first response.** Their first contribution to the org, no maintainer response. Surfaced separately because the cost of ignoring a first-timer is contributor loss, not delay.
 5. **CODEOWNERS hits.** PR touches files in your CODEOWNERS paths; not explicitly requested.
 6. **FYI.** Open PRs not in any of the above.
