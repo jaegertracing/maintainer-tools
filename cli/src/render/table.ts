@@ -230,13 +230,46 @@ const TABLE_SCRIPT = `
     }
   };
 
+  // Shown as a tooltip over each header, since the headers are short.
+  const HEADER_DOCS = {
+    repo: 'Repository (owner/name).',
+    number: 'Pull request number, linking to GitHub.',
+    title: 'Pull request title.',
+    author: 'Author login. "you" marks your own PRs.',
+    bucket: 'The one attention bucket the classifier placed this PR in; the bucket view groups by it.',
+    priorityLabel: 'First matching priority label from the configured tiers.',
+    hideReasons: 'Every reason that would send this PR to "Blocked on author", even when another signal overrode it.',
+    flags: 'Inline row flags, same as the bucket view.',
+    copilot: 'Latest GitHub Copilot review verdict: traffic light plus finding counts by severity (H/M/L).',
+    priorityAuthor: 'Author is a configured maintainer, intern, or priority author.',
+    reviewRequested: 'You are in the Reviewers field of this PR.',
+    viewerReviewed: 'You have submitted at least one review on this PR.',
+    firstTimer: 'GitHub reports this as the first contribution by this author to the repo.',
+    codeownersHit: 'PR touches a path you are configured as a CODEOWNER for.',
+    maintainerEngaged: 'Some maintainer has reviewed or commented on this PR.',
+    dependencyBot: 'Opened by Dependabot or Renovate.',
+    dco: 'Whether every non-merge commit carries a Signed-off-by trailer.',
+    ci: 'Status check rollup on the head commit.',
+    mergeable: 'GitHub mergeability: mergeable, conflicting, or unknown.',
+    openThreads: 'Unresolved review threads.',
+    srcLines: 'Lines added plus deleted in source files, ignoring tests, fixtures, docs, config and generated files. The bucket view sorts by this.',
+    additions: 'Lines added across the whole PR.',
+    deletions: 'Lines deleted across the whole PR.',
+    changedFiles: 'Number of changed files.',
+    ageDays: 'Days since the last update.',
+    updatedAt: 'Date of the last update.',
+    createdAt: 'Date the PR was opened.',
+    labels: 'GitHub labels on the PR.',
+    issues: 'Issues the PR description claims to close.',
+  };
+
   const text = (title, field, extra) => Object.assign({ title, field, headerFilter: 'input' }, extra);
   const en = (title, field, extra) => Object.assign({ title, field, headerFilter: 'list', headerFilterParams: enumParams }, extra);
   const bool = (title, field, extra) => Object.assign({
     title, field, hozAlign: 'center', formatter: 'tickCross', formatterParams: { crossElement: false },
     // Live filtering would re-apply the typed label ("yes") in place of the
     // selected value ("true") after the list closes, matching nothing.
-    headerFilter: 'list', headerFilterParams: boolParams, headerFilterFunc: boolFilter, headerFilterLiveFilter: false, width: 70,
+    headerFilter: 'list', headerFilterParams: boolParams, headerFilterFunc: boolFilter, headerFilterLiveFilter: false, width: 105,
   }, extra);
   const list = (title, field, cls, extra) => Object.assign({
     title, field, cssClass: 'cell-flags',
@@ -246,7 +279,7 @@ const TABLE_SCRIPT = `
   }, extra);
   const num = (title, field, extra) => Object.assign({
     title, field, hozAlign: 'right', sorter: 'number',
-    headerFilter: 'input', headerFilterPlaceholder: '>= n', headerFilterFunc: numFilter, width: 80,
+    headerFilter: 'input', headerFilterPlaceholder: '>= n', headerFilterFunc: numFilter, width: 90,
   }, extra);
 
   const columns = [
@@ -278,19 +311,19 @@ const TABLE_SCRIPT = `
       },
     }),
     bool('priority author', 'priorityAuthor'),
-    bool('requested', 'reviewRequested'),
+    bool('review requested', 'reviewRequested'),
     bool('you reviewed', 'viewerReviewed'),
     bool('first-timer', 'firstTimer'),
-    bool('CODEOWNERS', 'codeownersHit'),
+    bool('code owner', 'codeownersHit'),
     bool('maintainer engaged', 'maintainerEngaged'),
     bool('dep bot', 'dependencyBot'),
     en('DCO', 'dco', { width: 90 }),
     en('CI', 'ci', { width: 90 }),
     en('mergeable', 'mergeable', { width: 110 }),
     num('open threads', 'openThreads'),
-    num('src lines', 'srcLines'),
-    num('+', 'additions'),
-    num('-', 'deletions'),
+    num('LOC src', 'srcLines'),
+    num('LOC+', 'additions'),
+    num('LOC-', 'deletions'),
     num('files', 'changedFiles'),
     num('age (d)', 'ageDays'),
     en('updated', 'updatedAt', { width: 110 }),
@@ -308,6 +341,10 @@ const TABLE_SCRIPT = `
       layout: 'fitDataStretch',
       height: '78vh',
       columnHeaderSortMulti: true,
+      columnDefaults: {
+        headerWordWrap: true,
+        headerTooltip: (e, column) => HEADER_DOCS[column.getField()] || '',
+      },
       movableColumns: true,
       rowFormatter: (row) => { if (row.getData().bucket === ${JSON.stringify(BUCKET_LABELS.hidden)}) row.getElement().classList.add('row-hidden'); },
       // Tabulator applies the last sorter first, so the primary key goes last.
