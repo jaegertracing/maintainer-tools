@@ -64,7 +64,7 @@ No native build steps — everything pure JS + builtin Node modules.
 | `npm run lint`     | `tsc --noEmit` + prettier `--check`, in parallel                  |
 | `npm run tsc-lint` | TypeScript type-check only                                        |
 | `npm run fmt`      | Prettier `--write`                                                |
-| `npm test`         | Run tests across workspaces (none yet)                            |
+| `npm test`         | Run tests across workspaces (currently CLI classifier tests)      |
 
 ## Action Bundles
 
@@ -149,7 +149,7 @@ upgrades are grouped. Patch/digest upgrades to workflows are also disabled.
 | `packages/checks/src/cache.ts`            | SQLite-backed PR cache (Node 22.5+ `node:sqlite`).                                   |
 | `cli/src/index.ts`                        | CLI entry point — arg parsing, orchestration, output.                                |
 | `cli/src/config.ts`                       | Config schema (`TriageConfig`), loader, validation, and defaults.                    |
-| `cli/src/buckets.ts`                      | `classify()` — assigns each PR to exactly one of 8 buckets; `computeFlags()`.        |
+| `cli/src/buckets.ts`                      | `classify()` — assigns each PR to exactly one of 9 buckets; `computeFlags()`.        |
 | `cli/src/scan.ts`                         | Multi-repo scanner: list → cache-check → fetch loop.                                 |
 | `cli/src/quota.ts`                        | Cross-PR quota enrichment (`enrichQuotaState()`).                                    |
 | `cli/src/render/shared.ts`                | Renderer-agnostic grouping (`groupByRepo`, `buildPriorityGroups`).                   |

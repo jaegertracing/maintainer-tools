@@ -94,7 +94,7 @@ test("the viewer's own PRs do not enter the trusted-author bucket", () => {
     author: { login: 'maintainer-a', typename: 'User' },
   });
 
-  const result = classify(pr, context);
+  const result = classify(pr, { ...context, viewer: 'Maintainer-A' });
 
   assert.equal(result.bucket, 'codeowners-hits');
 });
@@ -114,6 +114,19 @@ const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   ['draft', { isDraft: true }, 'draft'],
   ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],
   ['merge conflict', { mergeable: 'CONFLICTING' }, 'hide:merge_conflict'],
+  [
+    'requested changes still await the author',
+    {
+      reviews: [
+        {
+          author: 'maintainer-a',
+          state: 'CHANGES_REQUESTED',
+          submittedAt: '2026-09-20T12:00:00Z',
+        },
+      ],
+    },
+    'changes-requested',
+  ],
 ];
 
 for (const [state, overrides, reason] of hiddenCases) {

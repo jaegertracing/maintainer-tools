@@ -167,7 +167,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const authorLogin = pr.author?.login;
   if (
     authorLogin &&
-    authorLogin !== ctx.viewer &&
+    authorLogin.toLowerCase() !== ctx.viewer.toLowerCase() &&
     (ctx.maintainers.has(authorLogin) || ctx.interns.has(authorLogin))
   ) {
     reasons.push('trusted author');
