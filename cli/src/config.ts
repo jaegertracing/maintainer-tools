@@ -109,7 +109,7 @@ export function loadConfig(explicitPath?: string): TriageConfig {
 }
 
 function validateStringArray(value: unknown, field: string, configPath: string): string[] {
-  if (value === undefined || value === null) return [];
+  if (value === undefined) return [];
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
     throw new Error(`Config at ${configPath}: "${field}" must be an array of strings.`);
   }

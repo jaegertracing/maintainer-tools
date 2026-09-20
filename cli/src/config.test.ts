@@ -36,6 +36,7 @@ test('priorityAuthorLogins combines every configured priority source', (t) => {
 for (const field of ['maintainers', 'interns', 'priorityAuthors'] as const) {
   for (const [shape, value] of [
     ['scalar', 'author'],
+    ['null', null],
     ['non-string element', ['author', 42]],
   ] as const) {
     test(`${field} rejects a ${shape}`, (t) => {

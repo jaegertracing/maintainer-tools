@@ -4,8 +4,10 @@ import test from 'node:test';
 import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifyContext } from './buckets.js';
+import type { TriageConfig } from './config.js';
 import { enrichQuotaState } from './quota.js';
 import { renderHtml } from './render/html.js';
+import { classifyAll, quotaExemptLogins } from './triage-policy.js';
 
 const now = new Date();
 
@@ -57,6 +59,39 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
     ...overrides,
   };
 }
+
+const triageConfig: TriageConfig = {
+  repos: ['example/repo'],
+  maintainers: ['Maintainer-A'],
+  interns: ['Priority-Intern'],
+  priorityAuthors: ['Priority-Author'],
+  codeowners: {},
+  cachePath: ':memory:',
+  priorityLabels: [],
+  ignoreReviewRequestedOnYou: false,
+};
+
+test('triage policy wires configured priority authors into classification and quota', async () => {
+  const prs = [
+    pullRequest({ number: 1, author: { login: 'priority-author', typename: 'User' } }),
+    pullRequest({ number: 2, author: { login: 'priority-author', typename: 'User' } }),
+  ];
+  let mergedCountCalls = 0;
+  const client = {
+    countMergedPRs: async () => {
+      mergedCountCalls++;
+      return 0;
+    },
+  } as unknown as GraphqlClient;
+
+  await enrichQuotaState(prs, client, { exemptLogins: quotaExemptLogins(triageConfig) });
+
+  assert.equal(mergedCountCalls, 0);
+  assert.deepEqual(
+    classifyAll(prs, 'maintainer-a', triageConfig, now).map((result) => result.bucket),
+    ['priority-authors', 'priority-authors'],
+  );
+});
 
 for (const [role, login] of [
   ['maintainer', 'priority-maintainer'],
