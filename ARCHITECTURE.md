@@ -25,7 +25,7 @@ Two kinds of consumer sit on top of it:
    events; writes back via the GitHub API (Check Runs, labels, comments).
 2. **Local CLI** — `cli/`, exposed as `maintainer-tools triage`. Runs on a
    maintainer's laptop; reads the same library, scans configured repos via
-   the SQLite cache, classifies each open PR into one of seven attention
+   the SQLite cache, classifies each open PR into one of nine attention
    buckets, and writes a self-contained HTML triage report. Never touches
    the GitHub write API.
 
@@ -258,8 +258,8 @@ publisher just does POST / PATCH / SKIP.
 `cli/src/buckets.ts` is a pure function that lands every open PR in
 exactly one of nine priority-ordered buckets:
 
-1. **trusted-authors** — author is in the configured `maintainers` or
-   `interns` list. Actionable PRs remain in this bucket throughout review.
+1. **trusted-authors** — author is another user in the configured `maintainers`
+   or `interns` list. Actionable PRs remain in this bucket throughout review.
 2. **review-requested-on-you** — viewer in `reviewRequests`. The request
    overrides every hide rule. This signal is disabled entirely when
    `TriageConfig.ignoreReviewRequestedOnYou` is `true` (GitHub review

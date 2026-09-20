@@ -2,8 +2,8 @@
 // double-clickable from the desktop.
 //
 // Layout: repo first, then (optionally) priority groups, then bucket sections.
-// Per the RFC, the four high-signal buckets default expanded; CODEOWNERS/FYI/
-// Hidden default collapsed. Empty buckets are omitted entirely.
+// Per the RFC, the five high-signal buckets default expanded. CODEOWNERS, FYI,
+// dependency bots, and Hidden default collapsed. Empty buckets are omitted.
 
 import {
   computeComposition,

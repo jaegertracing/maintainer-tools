@@ -45,7 +45,7 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 // One-sentence explanation shown under each bucket header in the report, so
 // a reader doesn't have to go dig through docs to know what a section means.
 export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
-  'trusted-authors': 'Author is a configured maintainer or intern.',
+  'trusted-authors': 'Author is another configured maintainer or intern.',
   'review-requested-on-you': 'Someone added you to the Reviewers field on this PR.',
   'changes-requested-revised':
     'You submitted a Request changes review and the author has pushed or commented since, so the ball is back with you. Your review is also still blocking the merge until you clear it.',
@@ -165,7 +165,11 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
 
   // --- Priority 1: actionable PRs from configured trusted authors.
   const authorLogin = pr.author?.login;
-  if (authorLogin && (ctx.maintainers.has(authorLogin) || ctx.interns.has(authorLogin))) {
+  if (
+    authorLogin &&
+    authorLogin !== ctx.viewer &&
+    (ctx.maintainers.has(authorLogin) || ctx.interns.has(authorLogin))
+  ) {
     reasons.push('trusted author');
     return mk('trusted-authors', reasons, pr, checks, flags);
   }

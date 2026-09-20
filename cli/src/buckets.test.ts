@@ -89,6 +89,27 @@ test('trusted authors outrank explicit review requests', () => {
   assert.deepEqual(result.reasons, ['trusted author']);
 });
 
+test("the viewer's own PRs do not enter the trusted-author bucket", () => {
+  const pr = pullRequest({
+    author: { login: 'maintainer-a', typename: 'User' },
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'codeowners-hits');
+});
+
+test('a review request makes a blocked trusted-author PR actionable', () => {
+  const pr = pullRequest({
+    author: { login: 'trusted-author', typename: 'User' },
+    isDraft: true,
+    reviewRequests: [{ kind: 'user', login: 'maintainer-a' }],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'trusted-authors');
+  assert.equal(classify(pr, { ...context, ignoreReviewRequestedOnYou: true }).bucket, 'hidden');
+});
+
 const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   ['draft', { isDraft: true }, 'draft'],
   ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],

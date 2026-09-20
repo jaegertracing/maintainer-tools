@@ -15,8 +15,8 @@ export interface TriageConfig {
   // Repos to scan, formatted `owner/name`.
   repos: string[];
   // Logins treated as trusted authors. Their actionable PRs surface in the
-  // highest-priority bucket, and their activity counts as maintainer-side
-  // activity for the first-response heuristic.
+  // highest-priority bucket for every viewer except the PR author, and their
+  // activity counts as maintainer-side activity for the first-response heuristic.
   maintainers: string[];
   // Logins treated as interns or a similar trusted role. Their PRs share the
   // trusted-author bucket, but their activity does not count as a maintainer
