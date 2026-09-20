@@ -15,8 +15,9 @@ function hoursAgo(hours: number): string {
 
 const context: ClassifyContext = {
   viewer: 'maintainer-a',
-  maintainers: new Set(['Maintainer-A', 'Trusted-Maintainer']),
-  interns: new Set(['Trusted-Author']),
+  maintainers: new Set(['Maintainer-A', 'Priority-Maintainer']),
+  interns: new Set(['Priority-Intern']),
+  priorityAuthors: new Set(['Priority-Author']),
   codeownerPaths: ['src/**'],
   now,
   ignoreReviewRequestedOnYou: false,
@@ -26,7 +27,7 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
   return {
     repo: { owner: 'example', name: 'repo' },
     number: 1,
-    title: 'Test trusted-author priority',
+    title: 'Test priority-author classification',
     url: 'https://github.com/example/repo/pull/1',
     author: { login: 'contributor', typename: 'User' },
     authorAssociation: 'CONTRIBUTOR',
@@ -43,7 +44,7 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
     commits: [
       {
         sha: 'abc1234',
-        messageHeadline: 'Test trusted-author priority',
+        messageHeadline: 'Test priority-author classification',
         messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
         authorEmail: 'contributor@example.com',
         committedDate: hoursAgo(1),
@@ -59,8 +60,9 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
 }
 
 for (const [role, login] of [
-  ['maintainer', 'trusted-maintainer'],
-  ['intern', 'trusted-author'],
+  ['maintainer', 'priority-maintainer'],
+  ['intern', 'priority-intern'],
+  ['priority author', 'priority-author'],
 ] as const) {
   test(`${role} PRs remain prioritized after a maintainer responds`, () => {
     const pr = pullRequest({
@@ -78,26 +80,26 @@ for (const [role, login] of [
 
     const result = classify(pr, context);
 
-    assert.equal(result.bucket, 'trusted-authors');
-    assert.deepEqual(result.reasons, ['trusted author']);
+    assert.equal(result.bucket, 'priority-authors');
+    assert.deepEqual(result.reasons, ['priority author']);
   });
 }
 
-test('trusted authors outrank explicit review requests', () => {
+test('priority authors outrank explicit review requests', () => {
   const pr = pullRequest({
-    author: { login: 'trusted-author', typename: 'User' },
+    author: { login: 'priority-author', typename: 'User' },
     reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
   });
 
   const result = classify(pr, context);
 
-  assert.equal(result.bucket, 'trusted-authors');
-  assert.deepEqual(result.reasons, ['trusted author']);
+  assert.equal(result.bucket, 'priority-authors');
+  assert.deepEqual(result.reasons, ['priority author']);
 });
 
-test('trusted authors remain prioritized after revising requested changes', () => {
+test('priority authors remain prioritized after revising requested changes', () => {
   const pr = pullRequest({
-    author: { login: 'trusted-author', typename: 'User' },
+    author: { login: 'priority-author', typename: 'User' },
     reviews: [
       {
         author: 'MAINTAINER-A',
@@ -107,10 +109,10 @@ test('trusted authors remain prioritized after revising requested changes', () =
     ],
   });
 
-  assert.equal(classify(pr, context).bucket, 'trusted-authors');
+  assert.equal(classify(pr, context).bucket, 'priority-authors');
 });
 
-test("the viewer's own PRs do not enter the trusted-author bucket", () => {
+test("the viewer's own PRs do not enter the priority-author bucket", () => {
   const pr = pullRequest({
     author: { login: 'maintainer-a', typename: 'User' },
   });
@@ -128,14 +130,14 @@ test("the viewer's own PRs do not enter the trusted-author bucket", () => {
   );
 });
 
-test('a review request makes a blocked trusted-author PR actionable', () => {
+test('a review request makes a blocked priority-author PR actionable', () => {
   const pr = pullRequest({
-    author: { login: 'trusted-author', typename: 'User' },
+    author: { login: 'priority-author', typename: 'User' },
     isDraft: true,
     reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
   });
 
-  assert.equal(classify(pr, context).bucket, 'trusted-authors');
+  assert.equal(classify(pr, context).bucket, 'priority-authors');
   assert.equal(classify(pr, { ...context, ignoreReviewRequestedOnYou: true }).bucket, 'hidden');
 });
 
@@ -159,9 +161,9 @@ const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
 ];
 
 for (const [state, overrides, reason] of hiddenCases) {
-  test(`trusted-author PRs remain hidden when ${state}`, () => {
+  test(`priority-author PRs remain hidden when ${state}`, () => {
     const pr = pullRequest({
-      author: { login: 'trusted-author', typename: 'User' },
+      author: { login: 'priority-author', typename: 'User' },
       ...overrides,
     });
 
@@ -172,10 +174,10 @@ for (const [state, overrides, reason] of hiddenCases) {
   });
 }
 
-test('trusted-author quota exemptions are case-insensitive', async () => {
+test('priority-author quota exemptions are case-insensitive', async () => {
   const prs = [
-    pullRequest({ number: 1, author: { login: 'trusted-author', typename: 'User' } }),
-    pullRequest({ number: 2, author: { login: 'trusted-author', typename: 'User' } }),
+    pullRequest({ number: 1, author: { login: 'priority-author', typename: 'User' } }),
+    pullRequest({ number: 2, author: { login: 'priority-author', typename: 'User' } }),
   ];
   let mergedCountCalls = 0;
   const client = {
@@ -185,12 +187,12 @@ test('trusted-author quota exemptions are case-insensitive', async () => {
     },
   } as unknown as GraphqlClient;
 
-  await enrichQuotaState(prs, client, { exemptLogins: new Set(['Trusted-Author']) });
+  await enrichQuotaState(prs, client, { exemptLogins: new Set(['Priority-Author']) });
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
     prs.map((pr) => classify(pr, context).bucket),
-    ['trusted-authors', 'trusted-authors'],
+    ['priority-authors', 'priority-authors'],
   );
 });
 
@@ -215,7 +217,7 @@ test('author replies are case-insensitive for bottleneck detection', () => {
     commits: [
       {
         sha: 'abc1234',
-        messageHeadline: 'Test trusted-author priority',
+        messageHeadline: 'Test priority-author classification',
         messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
         authorEmail: 'contributor@example.com',
         committedDate: hoursAgo(4),
@@ -228,15 +230,15 @@ test('author replies are case-insensitive for bottleneck detection', () => {
   assert.equal(classify(pr, context).bucket, 'youre-the-bottleneck');
 });
 
-test('trusted-author issue flags use case-insensitive membership', () => {
+test('priority-author issue flags use case-insensitive membership', () => {
   const ref = { owner: 'example', repo: 'repo', number: 1 };
   const pr = pullRequest({
-    author: { login: 'trusted-author', typename: 'User' },
+    author: { login: 'priority-author', typename: 'User' },
     computed: {
       issueRefs: [ref],
       issueMeta: {
         'example/repo#1': {
-          author: 'trusted-author',
+          author: 'priority-author',
           state: 'OPEN',
           title: 'Example issue',
           isPullRequest: false,

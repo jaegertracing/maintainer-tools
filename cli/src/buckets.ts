@@ -10,7 +10,7 @@ import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maint
 import { hasLogin, sameLogin } from './logins.js';
 
 export type Bucket =
-  | 'trusted-authors'
+  | 'priority-authors'
   | 'review-requested-on-you'
   | 'changes-requested-revised'
   | 'youre-the-bottleneck'
@@ -21,7 +21,7 @@ export type Bucket =
   | 'hidden';
 
 export const BUCKET_ORDER: Bucket[] = [
-  'trusted-authors',
+  'priority-authors',
   'review-requested-on-you',
   'changes-requested-revised',
   'youre-the-bottleneck',
@@ -33,7 +33,7 @@ export const BUCKET_ORDER: Bucket[] = [
 ];
 
 export const BUCKET_LABELS: Record<Bucket, string> = {
-  'trusted-authors': 'Trusted authors',
+  'priority-authors': 'Priority authors',
   'review-requested-on-you': 'Review requested on you',
   'changes-requested-revised': 'You requested changes; author has revised',
   'youre-the-bottleneck': "You're the bottleneck",
@@ -47,7 +47,7 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 // One-sentence explanation shown under each bucket header in the report, so
 // a reader doesn't have to go dig through docs to know what a section means.
 export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
-  'trusted-authors': 'Author is another configured maintainer or intern.',
+  'priority-authors': 'Author is a configured maintainer, intern, or priority author.',
   'review-requested-on-you': 'Someone added you to the Reviewers field on this PR.',
   'changes-requested-revised':
     'You submitted a Request changes review and the author has pushed or commented since, so the ball is back with you. Your review is also still blocking the merge until you clear it.',
@@ -74,7 +74,7 @@ const DEPENDENCY_BOT_LOGINS = new Set<string>([
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
-  'trusted-authors',
+  'priority-authors',
   'review-requested-on-you',
   'changes-requested-revised',
   'youre-the-bottleneck',
@@ -85,6 +85,7 @@ export interface ClassifyContext {
   viewer: string;
   maintainers: Set<string>;
   interns: Set<string>;
+  priorityAuthors: Set<string>;
   codeownerPaths: string[]; // for the current PR's repo
   now: Date;
   // See TriageConfig.ignoreReviewRequestedOnYou.
@@ -164,15 +165,11 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('hidden', ['bot-authored'], pr, checks, flags);
   }
 
-  // --- Priority 1: actionable PRs from configured trusted authors.
+  // --- Priority 1: actionable PRs from configured priority authors.
   const authorLogin = pr.author?.login;
-  if (
-    authorLogin &&
-    !sameLogin(authorLogin, ctx.viewer) &&
-    (hasLogin(ctx.maintainers, authorLogin) || hasLogin(ctx.interns, authorLogin))
-  ) {
-    reasons.push('trusted author');
-    return mk('trusted-authors', reasons, pr, checks, flags);
+  if (authorLogin && !sameLogin(authorLogin, ctx.viewer) && isPriorityAuthor(ctx, authorLogin)) {
+    reasons.push('priority author');
+    return mk('priority-authors', reasons, pr, checks, flags);
   }
 
   // --- Priority 2: someone clicked the viewer in Reviewers.
@@ -393,12 +390,10 @@ function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
   const colliding = pr.computed?.collidingPrs ?? [];
   if (colliding.length > 0) flags.push(`ISSUE-COLLISION: ${colliding.length + 1}`);
 
-  // Self-filed only counts for outside contributors. A maintainer or intern
-  // filing an issue and then fixing it is ordinary planned work, so flagging
-  // it would fire on most of the team's own PRs and mean nothing.
-  const isHighTrust =
-    !!author && (hasLogin(ctx.maintainers, author) || hasLogin(ctx.interns, author));
-  if (author && !isHighTrust) {
+  // Self-filed only counts for outside contributors. A priority author filing
+  // an issue and then fixing it is ordinary planned work, so flagging it would
+  // fire on the expected PRs and mean nothing.
+  if (author && !isPriorityAuthor(ctx, author)) {
     for (const ref of refs) {
       const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];
       if (m && !m.isPullRequest && m.author === author) {
@@ -418,6 +413,14 @@ function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
     }
   }
   return flags;
+}
+
+function isPriorityAuthor(ctx: ClassifyContext, login: string): boolean {
+  return (
+    hasLogin(ctx.maintainers, login) ||
+    hasLogin(ctx.interns, login) ||
+    hasLogin(ctx.priorityAuthors, login)
+  );
 }
 
 function countResolvedWithoutReply(pr: PullRequest): number {

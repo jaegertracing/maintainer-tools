@@ -461,7 +461,7 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   'ISSUE-COLLISION':
     'Another open PR claims to close the same issue. The count includes this PR, so `2` means one other PR is duplicating the work.',
   'SELF-FILED':
-    'The author of this PR also opened the issue it closes — often a manufactured task rather than a problem the project had already identified. Not applied to maintainers or interns.',
+    'The author of this PR also opened the issue it closes — often a manufactured task rather than a problem the project had already identified. Not applied to maintainers, interns, or priority authors.',
   'ISSUE-CLOSED':
     'The issue this PR claims to close is already closed, so the PR is likely superseded or stale.',
 };
@@ -521,7 +521,7 @@ const CSS = `
   details.bucket-review-requested-on-you { border-left-color: #d29922; }
   details.bucket-changes-requested-revised { border-left-color: #a40e26; }
   details.bucket-youre-the-bottleneck { border-left-color: #cf222e; }
-  details.bucket-trusted-authors { border-left-color: #1f883d; }
+  details.bucket-priority-authors { border-left-color: #1f883d; }
   details.bucket-first-timer-awaiting { border-left-color: #8250df; }
   details.bucket-codeowners-hits, details.bucket-fyi, details.bucket-dependency-bots, details.bucket-hidden { border-left-color: #d0d7de; }
   summary { cursor: pointer; padding: 0.3em 0; font-weight: 600; }

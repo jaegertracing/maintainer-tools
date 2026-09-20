@@ -14,14 +14,15 @@ export interface TriageConfig {
   viewer?: string;
   // Repos to scan, formatted `owner/name`.
   repos: string[];
-  // Logins treated as trusted authors. Their actionable PRs surface in the
-  // highest-priority bucket for every viewer except the PR author, and their
-  // activity counts as maintainer-side activity for the first-response heuristic.
+  // Logins whose activity counts as maintainer-side activity for the
+  // first-response heuristic. Their PRs also receive priority-author treatment.
   maintainers: string[];
-  // Logins treated as interns or a similar trusted role. Their PRs share the
-  // trusted-author bucket, but their activity does not count as a maintainer
-  // response on other PRs.
+  // Intern PRs receive priority-author treatment, but intern activity does not
+  // count as a maintainer response on other PRs.
   interns: string[];
+  // Additional logins whose actionable PRs surface in the highest-priority
+  // bucket and remain exempt from contributor quotas.
+  priorityAuthors: string[];
   // Per-repo path globs the viewer is a CODEOWNER for. Glob syntax is
   // minimal: `*` (within a path segment), `**` (across segments), and
   // literal characters. Matched against PR file paths.
@@ -48,6 +49,7 @@ interface RawConfig {
   repos?: string[];
   maintainers?: string[];
   interns?: string[];
+  priorityAuthors?: string[];
   codeowners?: Record<string, string[]>;
   cachePath?: string;
   priorityLabels?: string[];
@@ -94,6 +96,7 @@ export function loadConfig(explicitPath?: string): TriageConfig {
     repos: raw.repos,
     maintainers: raw.maintainers ?? [],
     interns: raw.interns ?? [],
+    priorityAuthors: raw.priorityAuthors ?? [],
     codeowners: raw.codeowners ?? {},
     cachePath: raw.cachePath ?? DEFAULT_CACHE_PATH,
     priorityLabels: validatePriorityLabels(raw.priorityLabels, path),

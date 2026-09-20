@@ -258,8 +258,9 @@ publisher just does POST / PATCH / SKIP.
 `cli/src/buckets.ts` is a pure function that lands every open PR in
 exactly one of nine priority-ordered buckets:
 
-1. **trusted-authors** — author is another user in the configured `maintainers`
-   or `interns` list. Actionable PRs remain in this bucket throughout review.
+1. **priority-authors** — author is another user in the configured `maintainers`,
+   `interns`, or `priorityAuthors` list. Actionable PRs remain in this bucket
+   throughout review.
 2. **review-requested-on-you** — viewer in `reviewRequests`. The request
    overrides every hide rule. This signal is disabled entirely when
    `TriageConfig.ignoreReviewRequestedOnYou` is `true` (GitHub review
@@ -282,8 +283,8 @@ exactly one of nine priority-ordered buckets:
 
 Hide rules run before bucket assignment. The lone exception is
 `review-requested-on-you`: an explicit review request overrides hide rules
-because GitHub's request is treated as a deliberate signal. A trusted-author
-PR with a review request remains in `trusted-authors`. When
+because GitHub's request is treated as a deliberate signal. A priority-author
+PR with a review request remains in `priority-authors`. When
 `ignoreReviewRequestedOnYou` is set, the override and the review-request
 bucket are switched off, so hide rules apply unconditionally.
 
