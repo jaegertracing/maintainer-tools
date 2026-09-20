@@ -20,16 +20,17 @@ test('priorityAuthors defaults to an empty list', (t) => {
   assert.deepEqual(config.priorityAuthors, []);
 });
 
-test('priorityLabels preserves null as an empty list', (t) => {
-  const config = loadConfig(configFile(t, { repos: ['example/repo'], priorityLabels: null }));
+for (const field of ['maintainers', 'interns', 'priorityAuthors', 'priorityLabels'] as const) {
+  test(`${field} preserves null as an empty list`, (t) => {
+    const config = loadConfig(configFile(t, { repos: ['example/repo'], [field]: null }));
 
-  assert.deepEqual(config.priorityLabels, []);
-});
+    assert.deepEqual(config[field], []);
+  });
+}
 
 for (const field of ['maintainers', 'interns', 'priorityAuthors'] as const) {
   for (const [shape, value] of [
     ['scalar', 'author'],
-    ['null', null],
     ['non-string element', ['author', 42]],
   ] as const) {
     test(`${field} rejects a ${shape}`, (t) => {
