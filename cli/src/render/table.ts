@@ -439,6 +439,19 @@ const TABLE_SCRIPT = `
   }
   clearBtn.addEventListener('click', () => table.clearHeaderFilter());
 
+  // --- Summary-table links double as filters in Table view: a cell filters
+  // by repo and bucket, a repo header by repo alone. In Buckets view these
+  // same links are plain anchors, handled elsewhere.
+  document.querySelectorAll('.summary-table a[data-repo]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      if (!document.body.classList.contains('table-mode')) return;
+      e.preventDefault();
+      table.clearHeaderFilter();
+      table.setHeaderFilterValue('repo', a.dataset.repo);
+      if (a.dataset.bucket) table.setHeaderFilterValue('bucket', a.dataset.bucket);
+    });
+  });
+
   // --- View switch. The chosen view is kept in the URL hash so a reload or a
   // bookmark lands on the same one.
   const views = { buckets: document.getElementById('view-buckets'), table: document.getElementById('view-table') };

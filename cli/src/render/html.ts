@@ -73,17 +73,17 @@ export function renderHtml(classified: ClassifiedPR[], opts: RenderOptions): str
   <div class="meta">${escape(date)} UTC &middot; @${escape(opts.viewer)}</div>
   <div class="toolbar">
     <span class="view-switch">
-      <button type="button" data-view="buckets" aria-pressed="true">Buckets</button>
+      <button type="button" data-view="buckets" aria-pressed="true">Categorized</button>
       <button type="button" data-view="table" aria-pressed="false">Table</button>
     </span>
   </div>
 </header>
+${summary}
 <section id="view-buckets" class="view">
 <div class="toolbar">
   <button type="button" id="expand-all">Expand All</button>
   <button type="button" id="collapse-all">Collapse All</button>
 </div>
-${summary}
 ${body}
 </section>
 ${tableView}
@@ -105,6 +105,7 @@ ${tableView}
   // open the whole chain first and then scroll.
   document.querySelectorAll('.summary-table a[href^="#"]').forEach((a) => {
     a.addEventListener('click', (e) => {
+      if (document.body.classList.contains('table-mode')) return;
       const target = document.getElementById(a.getAttribute('href').slice(1));
       if (!target) return;
       e.preventDefault();
@@ -171,13 +172,20 @@ function cellTargets(block: RepoBlock, bucket: Bucket): CellTargets {
 // where. The per-repo headings below already say "N / M visible", but nothing
 // showed the shape of the queue across repos in one place.
 //
-// The total row counts visible buckets only. Blocked-on-author is listed under
-// it, outside the total, because it is the bucket the report exists to exclude
-// — folding it in would make the headline number the size of the whole queue
-// rather than the size of the work.
+// The subtotal row counts the buckets that need a maintainer's attention;
+// the headline "waiting on you" count above the table is this subtotal.
+// Blocked-on-author and Dependency bots are each listed below it, still
+// excluded from the subtotal, because neither needs triage the way the
+// buckets above do: one is waiting on the contributor, the other is managed
+// by Renovate/Dependabot rather than a person. Folding either in would make
+// the headline number the size of the whole queue rather than the size of
+// the work. The final Total row adds both back for readers who want the
+// full queue size in one place.
+const SUBTOTAL_EXCLUDED_BUCKETS: Bucket[] = ['dependency-bots', 'hidden'];
+
 function renderSummary(blocks: RepoBlock[]): string {
   if (blocks.length === 0) return '';
-  const visibleBuckets = BUCKET_ORDER.filter((b) => b !== 'hidden');
+  const visibleBuckets = BUCKET_ORDER.filter((b) => !SUBTOTAL_EXCLUDED_BUCKETS.includes(b));
 
   // A cell links to the first section holding its PRs. When the count spans
   // several priority groups the tooltip names the split, so the number a
@@ -190,7 +198,7 @@ function renderSummary(blocks: RepoBlock[]): string {
       parts.length > 1
         ? ` data-tip="${escape(parts.map((p) => `${p.group}: ${p.count}`).join(' · '))}"`
         : '';
-    return `<td><a href="#${first.anchor}"${tip}>${count}</a></td>`;
+    return `<td><a href="#${first.anchor}" data-repo="${escape(block.repo)}" data-bucket="${escape(BUCKET_LABELS[bucket])}"${tip}>${count}</a></td>`;
   };
 
   const rowTotal = (bucket: Bucket): number =>
@@ -212,6 +220,12 @@ function renderSummary(blocks: RepoBlock[]): string {
   const grandTotal = perRepoVisible.reduce((a, b) => a + b, 0);
   const hiddenPer = blocks.map((b) => cellTargets(b, 'hidden'));
   const hiddenTotal = hiddenPer.reduce((a, h) => a + h.count, 0);
+  const botPer = blocks.map((b) => cellTargets(b, 'dependency-bots'));
+  const botTotal = botPer.reduce((a, h) => a + h.count, 0);
+  const totalPerRepo = perRepoVisible.map(
+    (n, i) => n + (hiddenPer[i]?.count ?? 0) + (botPer[i]?.count ?? 0),
+  );
+  const totalAll = grandTotal + hiddenTotal + botTotal;
 
   return `<section class="summary">
   <h2>Waiting on you <span class="count">${grandTotal} across ${blocks.length} repo${blocks.length === 1 ? '' : 's'}</span></h2>
@@ -220,7 +234,7 @@ function renderSummary(blocks: RepoBlock[]): string {
       <tr><th scope="col">bucket</th>${blocks
         .map(
           (b) =>
-            `<th scope="col"><a href="#${repoAnchor(b.repo)}">${escape(b.repo.split('/')[1] ?? b.repo)}</a></th>`,
+            `<th scope="col"><a href="#${repoAnchor(b.repo)}" data-repo="${escape(b.repo)}">${escape(b.repo.split('/')[1] ?? b.repo)}</a></th>`,
         )
         .join('')}<th scope="col">total</th></tr>
     </thead>
@@ -228,12 +242,18 @@ function renderSummary(blocks: RepoBlock[]): string {
         ${rows}
     </tbody>
     <tfoot>
-      <tr class="grand"><th scope="row">total</th>${perRepoVisible
+      <tr class="grand"><th scope="row">subtotal</th>${perRepoVisible
         .map((n) => `<td>${n}</td>`)
         .join('')}<td class="row-total">${grandTotal}</td></tr>
+      <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS['dependency-bots'])}<span class="note"> (excluded)</span></th>${blocks
+        .map((b) => cell(b, 'dependency-bots'))
+        .join('')}<td class="row-total">${botTotal}</td></tr>
       <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS.hidden)}<span class="note"> (excluded)</span></th>${blocks
         .map((b) => cell(b, 'hidden'))
         .join('')}<td class="row-total">${hiddenTotal}</td></tr>
+      <tr class="all-total"><th scope="row">Total</th>${totalPerRepo
+        .map((n) => `<td>${n}</td>`)
+        .join('')}<td class="row-total">${totalAll}</td></tr>
     </tfoot>
   </table>
 </section>`;
@@ -603,6 +623,7 @@ const CSS = `
   table.summary-table .row-total { font-weight: 600; }
   table.summary-table tfoot .grand th, table.summary-table tfoot .grand td { border-top: 1px solid #d0d7de; font-weight: 600; }
   table.summary-table tfoot .excluded th, table.summary-table tfoot .excluded td { color: #8c959f; font-weight: normal; }
+  table.summary-table tfoot .all-total th, table.summary-table tfoot .all-total td { border-top: 1px solid #d0d7de; font-weight: 600; }
   table.summary-table .note { font-size: 0.85em; }
   table.summary-table td a { color: #0969da; text-decoration: none; }
   table.summary-table td a:hover { text-decoration: underline; }
