@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util';
 import { createGraphqlClient } from '@jaegertracing/maintainer-tools-checks';
 import type { CommentClient } from '@jaegertracing/maintainer-tools-checks/comments';
 import { runDigest } from '@jaegertracing/maintainer-tools-checks/digest';
-import { loadConfig } from './config.js';
+import { loadConfigInteractive } from './config-setup.js';
 import { log } from './log.js';
 import { type NudgeEntry, renderNudgeHtml } from './render/nudge-html.js';
 import { resolveToken } from './token.js';
@@ -83,7 +83,7 @@ export async function runNudge(argv: string[]): Promise<void> {
   const output = values.output ?? 'nudge.html';
 
   log('loading config');
-  const cfg = loadConfig(values.config);
+  const cfg = await loadConfigInteractive(values.config);
 
   const { token, source } = resolveToken();
   log(`token: ${source}`);

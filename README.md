@@ -80,9 +80,14 @@ open triage.html
 The CLI looks for a JSON config in this order:
 
 1. `--config <path>` on the command line.
-2. `$MAINTAINER_TOOLS_CONFIG` environment variable.
-3. `./.maintainer-tools.json` in the current directory.
-4. `~/.config/maintainer-tools/config.json` (respects `$XDG_CONFIG_HOME`).
+2. `./.maintainer-tools.json` in the current directory.
+3. `~/.config/maintainer-tools/config.json` (respects `$XDG_CONFIG_HOME`).
+
+If none of these exist and the command is run in a terminal, it offers to
+copy a sample config (generic or Jaeger org) to
+`~/.config/maintainer-tools/config.json`, then exits so you can edit it
+before rerunning. In a non-interactive context (CI, a script), it exits
+immediately with an error listing the paths it checked.
 
 Schema:
 
