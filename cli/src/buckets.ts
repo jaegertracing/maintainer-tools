@@ -63,13 +63,21 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
 };
 
 // Logins treated as "dependency bots" — PRs they open are reviewable
-// merges, just authored by a service account. They follow the same hide
-// rules as humans (draft / merge-conflict / CI red still send them to
-// Hidden) but otherwise get their own section so they don't drown out
-// human-authored PRs in CODEOWNERS hits / FYI.
+// merges, just authored by a service account. They always land in their
+// own bucket, regardless of draft state, CI status, or merge conflicts, so
+// they never drown out human-authored PRs in CODEOWNERS hits / FYI and
+// never inflate Blocked-on-author with noise nobody needs to triage.
+// Both bracketed (App-installed) and unbracketed (self-hosted service
+// account) forms are listed: GitHub's own dependabot and this org's
+// self-hosted Renovate runner report their logins as plain `dependabot`
+// and `renovate-bot`, with no `[bot]` suffix and, for Renovate, typename
+// `User` rather than `Bot`.
 const DEPENDENCY_BOT_LOGINS = new Set<string>([
+  'dependabot',
   'dependabot[bot]',
+  'renovate',
   'renovate[bot]',
+  'renovate-bot',
   'renovate-bot[bot]',
 ]);
 
@@ -184,6 +192,17 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     copilot,
   });
 
+  // Dependency bots go to their own bucket regardless of draft state, CI
+  // status, merge conflicts, or any other hide signal — Renovate and
+  // Dependabot manage their own PRs, so none of that is something a
+  // maintainer needs to triage. Checking this first, ahead of the hide
+  // rules below, keeps every dependency-bot PR out of Blocked-on-author
+  // instead of only the ones that happen to pass every hide check.
+  if (isDependencyBot(pr) && !explicitlyRequested) {
+    reasons.push('dependency bot');
+    return mk('dependency-bots', reasons);
+  }
+
   if (pr.isDraft && !explicitlyRequested) {
     return mk('hidden', ['draft']);
   }
@@ -206,8 +225,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('hidden', ['changes-requested']);
   }
   // Non-dependency bots (anything matching __typename=Bot or `*[bot]`
-  // login that we don't know about) → Hidden. Dependency bots get their
-  // own bucket below.
+  // login that we don't know about) → Hidden.
   if (isBotAuthor(pr) && !isDependencyBot(pr) && !explicitlyRequested) {
     return mk('hidden', ['bot-authored']);
   }
@@ -222,14 +240,6 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (explicitlyRequested) {
     reasons.push('viewer in reviewRequests');
     return mk('review-requested-on-you', reasons);
-  }
-
-  // --- Dependency bots that survived the hide rules go to their own
-  // bucket regardless of CODEOWNERS / FYI signals. A dependabot PR
-  // touching a viewer-owned path is still a dependabot PR.
-  if (isDependencyBot(pr)) {
-    reasons.push('dependency bot');
-    return mk('dependency-bots', reasons);
   }
 
   // --- Priority 3: viewer previously reviewed, author has acted since.
