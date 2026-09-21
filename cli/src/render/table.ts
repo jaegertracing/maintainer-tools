@@ -252,7 +252,7 @@ const TABLE_SCRIPT = `
     author: 'Author login. "you" marks your own PRs.',
     bucket: 'The one attention bucket the classifier placed this PR in; the bucket view groups by it.',
     priorityLabel: 'First matching priority label from the configured tiers.',
-    hideReasons: 'Every reason that would send this PR to "Blocked on author", even when another signal overrode it.',
+    hideReasons: 'Every reason that would send this PR to "Blocked on author" if it were not overridden by another signal (e.g. a review request) or, for a dependency bot, by the Dependency-bots bucket itself.',
     flags: 'Inline row flags, same as the bucket view.',
     copilot: 'Latest GitHub Copilot review verdict: traffic light plus finding counts by severity (H/M/L).',
     priorityAuthor: 'Author is a configured maintainer, intern, or priority author.',

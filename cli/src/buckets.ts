@@ -67,10 +67,20 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
 // own bucket, regardless of draft state, CI status, or merge conflicts, so
 // they never drown out human-authored PRs in CODEOWNERS hits / FYI and
 // never inflate Blocked-on-author with noise nobody needs to triage.
-// None of these carry a `[bot]` suffix: GraphQL's `login` field omits it
-// even for an installed GitHub App, such as Renovate's own App (`renovate`,
-// typename Bot). `renovate-bot` is this org's self-hosted Renovate runner.
-const DEPENDENCY_BOT_LOGINS = new Set<string>(['dependabot', 'renovate', 'renovate-bot']);
+// GraphQL's `login` field omits the `[bot]` suffix even for an installed
+// GitHub App — Renovate's own App reports as plain `renovate` — so the
+// unbracketed forms are what this GraphQL-only CLI actually sees.
+// `renovate-bot` is this org's self-hosted Renovate runner. The bracketed
+// forms are kept too, as defense against any non-GraphQL-sourced PR data
+// (fixtures, hand-written cache rows).
+const DEPENDENCY_BOT_LOGINS = new Set<string>([
+  'dependabot',
+  'dependabot[bot]',
+  'renovate',
+  'renovate[bot]',
+  'renovate-bot',
+  'renovate-bot[bot]',
+]);
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
@@ -274,8 +284,9 @@ function isReviewRequestedOnViewer(pr: PullRequest, viewer: string): boolean {
 function isBotAuthor(pr: PullRequest): boolean {
   if (!pr.author) return false;
   if (pr.author.typename === 'Bot') return true;
-  // Some bots (e.g. renovate, dependabot) sometimes show as User typename.
-  // The conventional `[bot]` suffix is a reliable fallback signal.
+  // GraphQL doesn't emit a `[bot]`-suffixed login in practice; this guards
+  // non-GraphQL-sourced PR data (fixtures, hand-written cache rows) where
+  // typename might be 'User' but the login still carries the suffix.
   return pr.author.login.endsWith('[bot]');
 }
 

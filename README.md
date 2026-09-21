@@ -134,8 +134,9 @@ seeing the full picture in a single report.
 | **Dependency bots**                                 | Author is `dependabot`, `renovate`, or `renovate-bot`. Always lands here, even draft/CI-red/conflicted — Renovate and Dependabot manage their own PRs.                                                                                              | Collapsed     |
 | **Hidden**                                          | Not actionable until the contributor moves. Drafts, non-dependency bots, and any PR a predicate marked as hide-from-triage (DCO missing, CI red, merge conflict, quota-exceeded, stale, empty description). Shown collapsed with a `reason` column. | Collapsed     |
 
-An explicit review request on you **overrides** every hide rule — if a
-maintainer tagged you, you'll see the PR even if it has merge conflicts.
+An explicit review request on you **overrides** every hide rule and the
+Dependency bots bucket alike — if a maintainer tagged you, you'll see the
+PR even if it has merge conflicts, or is from Renovate or Dependabot.
 Set `ignoreReviewRequestedOnYou: true` to turn this bucket off entirely (see
 the schema table above); PRs with an outstanding request on you then get
 classified normally instead of jumping the queue.

@@ -144,3 +144,43 @@ test('dependency bots get their own excluded row and are dropped from the subtot
     'Total must add the subtotal, Blocked-on-author, and Dependency-bots counts back together',
   );
 });
+
+test('subtotal/excluded/Total math lines up per repo when only some repos have bots', () => {
+  const classified = [
+    pullRequest({ number: 1, repo: { owner: 'acme', name: 'widgets' } }), // acme: fyi
+    pullRequest({
+      number: 2,
+      repo: { owner: 'acme', name: 'widgets' },
+      author: { login: 'renovate-bot', typename: 'User' },
+    }), // acme: dependency-bots
+    pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' } }), // other: fyi
+    pullRequest({ number: 4, repo: { owner: 'other', name: 'repo2' }, isDraft: true }), // other: hidden
+  ].map((pr) => classify(pr, context));
+
+  const html = renderHtml(classified, {
+    viewer: 'maintainer-a',
+    now,
+    authorOpenCounts: new Map(),
+  });
+
+  assert.match(
+    html,
+    /<tr class="grand"><th scope="row">subtotal<\/th><td>1<\/td><td>1<\/td><td class="row-total">2<\/td><\/tr>/,
+    'each repo contributes its own fyi PR to the subtotal, in column order',
+  );
+  assert.match(
+    html,
+    /Dependency bots<span class="note"> \(excluded\)<\/span><\/th><td><a[^>]*data-repo="acme\/widgets"[^>]*>1<\/a><\/td><td class="zero">0<\/td><td class="row-total">1<\/td><\/tr>/,
+    'only acme/widgets has a dependency-bot PR',
+  );
+  assert.match(
+    html,
+    /Blocked on author<span class="note"> \(excluded\)<\/span><\/th><td class="zero">0<\/td><td><a[^>]*data-repo="other\/repo2"[^>]*>1<\/a><\/td><td class="row-total">1<\/td><\/tr>/,
+    'only other/repo2 has a hidden PR',
+  );
+  assert.match(
+    html,
+    /<tr class="all-total"><th scope="row">Total<\/th><td>2<\/td><td>2<\/td><td class="row-total">4<\/td><\/tr>/,
+    "each column's Total is that repo's subtotal plus its own excluded counts, not the other repo's",
+  );
+});
