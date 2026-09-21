@@ -67,10 +67,9 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
 // own bucket, regardless of draft state, CI status, or merge conflicts, so
 // they never drown out human-authored PRs in CODEOWNERS hits / FYI and
 // never inflate Blocked-on-author with noise nobody needs to triage.
-// None of these carry a `[bot]` suffix: confirmed against the GitHub API
-// that GraphQL's `login` field drops it even for App-installed bots (the
-// Renovate GitHub App itself reports as plain `renovate`, typename Bot).
-// `dependabot` and `renovate-bot` are this org's actual logins.
+// None of these carry a `[bot]` suffix: GraphQL's `login` field omits it
+// even for an installed GitHub App, such as Renovate's own App (`renovate`,
+// typename Bot). `renovate-bot` is this org's self-hosted Renovate runner.
 const DEPENDENCY_BOT_LOGINS = new Set<string>(['dependabot', 'renovate', 'renovate-bot']);
 
 // High-priority buckets render expanded by default; low-priority collapsed.
@@ -187,9 +186,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // Dependency bots go to their own bucket regardless of draft state, CI
   // status, merge conflicts, or any other hide signal — Renovate and
   // Dependabot manage their own PRs, so none of that is something a
-  // maintainer needs to triage. Checking this first, ahead of the hide
-  // rules below, keeps every dependency-bot PR out of Blocked-on-author
-  // instead of only the ones that happen to pass every hide check.
+  // maintainer needs to triage.
   if (isDependencyBot(pr) && !explicitlyRequested) {
     reasons.push('dependency bot');
     return mk('dependency-bots', reasons);
@@ -278,9 +275,8 @@ function isBotAuthor(pr: PullRequest): boolean {
   if (!pr.author) return false;
   if (pr.author.typename === 'Bot') return true;
   // Some bots (e.g. renovate, dependabot) sometimes show as User typename.
-  // The conventional `[bot]` suffix is a reliable fallback signal, and
-  // isDependencyBot covers this org's renovate-bot, which carries neither.
-  return pr.author.login.endsWith('[bot]') || isDependencyBot(pr);
+  // The conventional `[bot]` suffix is a reliable fallback signal.
+  return pr.author.login.endsWith('[bot]');
 }
 
 function isDependencyBot(pr: PullRequest): boolean {
@@ -387,7 +383,7 @@ function computeFlags(pr: PullRequest, checks: CheckResult[], ctx: ClassifyConte
   const flags: RowFlag[] = [];
   flags.push(...issueFlags(pr, ctx));
   if (pr.isDraft) flags.push('DRAFT');
-  if (isBotAuthor(pr)) flags.push('BOT');
+  if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
   if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
   if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');

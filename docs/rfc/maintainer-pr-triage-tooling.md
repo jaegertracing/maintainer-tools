@@ -165,7 +165,7 @@ Each predicate declares which surface(s) it publishes to (Check = GitHub Checks 
 | `resolved_without_reply` | Author marked a conversation resolved with no reply to the reviewer | — | — | — | flag in triage |
 | `stale_on_author` | PR carries the `stale` label, or author silent for N days | — | — | reads `stale` | yes |
 | `stale_on_you` | You're a requested reviewer, last activity > N days ago, was from author | — | — | — | no (own bucket) |
-| `bot_authored` | Author login is `renovate[bot]`, `dependabot[bot]`, etc. | — | — | — | yes |
+| `bot_authored` | Author is a bot account not recognized as a dependency bot | — | — | — | yes |
 | `waiting_for_author` *(migrated)* | OR of "author must act" predicates; suppressed by `awaiting-maintainer-input` label or the unanswered-author-comment heuristic | — | — | manages `waiting-for-author` | yes (unless suppressed) |
 | `quota_exceeded` *(migrated)* | PR carries `quota-exceeded` label or author has > M open PRs in repo | — | — | manages `quota-exceeded`. Posts a one-shot comment when the cap is first hit. | yes |
 
