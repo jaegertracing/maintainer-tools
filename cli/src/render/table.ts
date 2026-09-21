@@ -298,6 +298,10 @@ const TABLE_SCRIPT = `
   const columns = [
     en('repo', 'repo', {
       frozen: true,
+      // Exact match, not the default 'like': repo names can be substrings of
+      // each other (jaeger vs. jaeger-ui, jaeger-idl), and the enum dropdown
+      // already offers full, correct values, so nothing needs fuzzy typing.
+      headerFilterFunc: '=',
       sorter: (a, b, aRow, bRow) => aRow.getData().repoOrder - bRow.getData().repoOrder,
     }),
     num('PR', 'number', {

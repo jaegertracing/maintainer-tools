@@ -169,23 +169,20 @@ function cellTargets(block: RepoBlock, bucket: Bucket): CellTargets {
 }
 
 // Bucket-by-repo matrix at the top of the report: how much is waiting, and
-// where. The per-repo headings below already say "N / M visible", but nothing
-// showed the shape of the queue across repos in one place.
+// where. The per-repo headings below say "N / M visible" (not-Hidden PRs,
+// including bots); the subtotal here is narrower — buckets that need a
+// maintainer's attention — so the two numbers are expected to differ for a
+// repo with open dependency-bot PRs.
 //
-// The subtotal row counts the buckets that need a maintainer's attention;
-// the headline "waiting on you" count above the table is this subtotal.
-// Blocked-on-author and Dependency bots are each listed below it, still
-// excluded from the subtotal, because neither needs triage the way the
-// buckets above do: one is waiting on the contributor, the other is managed
-// by Renovate/Dependabot rather than a person. Folding either in would make
-// the headline number the size of the whole queue rather than the size of
-// the work. The final Total row adds both back for readers who want the
-// full queue size in one place.
+// Blocked-on-author and Dependency-bots are excluded from the subtotal
+// because neither needs triage: one is waiting on the contributor, the
+// other is managed by Renovate/Dependabot. The Total row adds both back for
+// readers who want the whole queue's size.
 const SUBTOTAL_EXCLUDED_BUCKETS: Bucket[] = ['dependency-bots', 'hidden'];
 
 function renderSummary(blocks: RepoBlock[]): string {
   if (blocks.length === 0) return '';
-  const visibleBuckets = BUCKET_ORDER.filter((b) => !SUBTOTAL_EXCLUDED_BUCKETS.includes(b));
+  const subtotalBuckets = BUCKET_ORDER.filter((b) => !SUBTOTAL_EXCLUDED_BUCKETS.includes(b));
 
   // A cell links to the first section holding its PRs. When the count spans
   // several priority groups the tooltip names the split, so the number a
@@ -204,7 +201,7 @@ function renderSummary(blocks: RepoBlock[]): string {
   const rowTotal = (bucket: Bucket): number =>
     blocks.reduce((a, b) => a + cellTargets(b, bucket).count, 0);
 
-  const rows = visibleBuckets
+  const rows = subtotalBuckets
     .filter((bucket) => rowTotal(bucket) > 0)
     .map(
       (bucket) =>
@@ -214,15 +211,15 @@ function renderSummary(blocks: RepoBlock[]): string {
     )
     .join('\n        ');
 
-  const perRepoVisible = blocks.map((b) =>
-    visibleBuckets.reduce((a, bucket) => a + cellTargets(b, bucket).count, 0),
+  const subtotalPerRepo = blocks.map((b) =>
+    subtotalBuckets.reduce((a, bucket) => a + cellTargets(b, bucket).count, 0),
   );
-  const grandTotal = perRepoVisible.reduce((a, b) => a + b, 0);
+  const grandTotal = subtotalPerRepo.reduce((a, b) => a + b, 0);
   const hiddenPer = blocks.map((b) => cellTargets(b, 'hidden'));
   const hiddenTotal = hiddenPer.reduce((a, h) => a + h.count, 0);
   const botPer = blocks.map((b) => cellTargets(b, 'dependency-bots'));
   const botTotal = botPer.reduce((a, h) => a + h.count, 0);
-  const totalPerRepo = perRepoVisible.map(
+  const totalPerRepo = subtotalPerRepo.map(
     (n, i) => n + (hiddenPer[i]?.count ?? 0) + (botPer[i]?.count ?? 0),
   );
   const totalAll = grandTotal + hiddenTotal + botTotal;
@@ -242,7 +239,7 @@ function renderSummary(blocks: RepoBlock[]): string {
         ${rows}
     </tbody>
     <tfoot>
-      <tr class="grand"><th scope="row">subtotal</th>${perRepoVisible
+      <tr class="grand"><th scope="row">subtotal</th>${subtotalPerRepo
         .map((n) => `<td>${n}</td>`)
         .join('')}<td class="row-total">${grandTotal}</td></tr>
       <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS['dependency-bots'])}<span class="note"> (excluded)</span></th>${blocks

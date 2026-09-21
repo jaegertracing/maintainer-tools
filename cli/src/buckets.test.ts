@@ -233,6 +233,30 @@ test('facets flag non-dependency bots as a hide reason', () => {
   assert.equal(result.facets.dependencyBot, false);
 });
 
+for (const login of ['dependabot', 'renovate-bot']) {
+  test(`dependency bots with an unbracketed login (${login}) get their own bucket`, () => {
+    const result = classify(pullRequest({ author: { login, typename: 'User' } }), context);
+
+    assert.equal(result.bucket, 'dependency-bots');
+    assert.equal(result.facets.dependencyBot, true);
+  });
+}
+
+test('dependency bots land in their own bucket even when draft, conflicted, or CI-red', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    isDraft: true,
+    mergeable: 'CONFLICTING',
+    statusCheckRollup: 'FAILURE',
+    labels: ['waiting-for-author'],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'dependency-bots');
+  assert.deepEqual(result.reasons, ['dependency bot']);
+});
+
 test('facets record every hide reason even though the bucket stops at the first', () => {
   const pr = pullRequest({
     author: { login: 'priority-author', typename: 'User' },
