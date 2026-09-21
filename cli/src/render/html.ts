@@ -72,8 +72,6 @@ export function renderHtml(classified: ClassifiedPR[], opts: RenderOptions): str
   <h1>PR Triage</h1>
   <div class="meta">${escape(date)} UTC &middot; @${escape(opts.viewer)}</div>
   <div class="toolbar">
-    <button type="button" id="expand-all">Expand All</button>
-    <button type="button" id="collapse-all">Collapse All</button>
     <span class="view-switch">
       <button type="button" data-view="buckets" aria-pressed="true">Buckets</button>
       <button type="button" data-view="table" aria-pressed="false">Table</button>
@@ -81,6 +79,10 @@ export function renderHtml(classified: ClassifiedPR[], opts: RenderOptions): str
   </div>
 </header>
 <section id="view-buckets" class="view">
+<div class="toolbar bucket-toolbar">
+  <button type="button" id="expand-all">Expand All</button>
+  <button type="button" id="collapse-all">Collapse All</button>
+</div>
 ${summary}
 ${body}
 </section>
@@ -532,9 +534,9 @@ const CSS = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1200px; margin: 2em auto; padding: 0 1em; color: #1f2328; line-height: 1.4; }
   header h1 { margin: 0 0 0.2em 0; }
   header .meta { color: #57606a; font-size: 0.9em; margin-bottom: 0.8em; }
-  header .toolbar { margin-bottom: 1.5em; }
-  header .toolbar button { font-size: 0.85em; padding: 0.35em 0.8em; margin-right: 0.5em; border: 1px solid #d0d7de; border-radius: 6px; background: white; color: #1f2328; cursor: pointer; }
-  header .toolbar button:hover { background: #f6f8fa; }
+  .toolbar { margin-bottom: 1.5em; }
+  .toolbar button { font-size: 0.85em; padding: 0.35em 0.8em; margin-right: 0.5em; border: 1px solid #d0d7de; border-radius: 6px; background: white; color: #1f2328; cursor: pointer; }
+  .toolbar button:hover { background: #f6f8fa; }
   section.repo { margin: 2em 0; }
   section.repo > h2 { border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
   section.repo .count { font-weight: normal; color: #57606a; font-size: 0.85em; }
