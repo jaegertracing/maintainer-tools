@@ -131,11 +131,12 @@ seeing the full picture in a single report.
 | **First-time contributors awaiting first response** | Author's `authorAssociation` is `FIRST_TIME_*`; no maintainer has engaged yet.                                                                                                                                                                      | Expanded      |
 | **CODEOWNERS hits**                                 | PR touches files matching your configured codeowner globs.                                                                                                                                                                                          | Collapsed     |
 | **FYI**                                             | Catch-all for everything else open.                                                                                                                                                                                                                 | Collapsed     |
-| **Dependency bots**                                 | Author is `dependabot[bot]` / `renovate[bot]` / `renovate-bot[bot]`.                                                                                                                                                                                | Collapsed     |
+| **Dependency bots**                                 | Author is `dependabot`, `renovate`, or `renovate-bot`. Always lands here, even draft/CI-red/conflicted — Renovate and Dependabot manage their own PRs.                                                                                              | Collapsed     |
 | **Hidden**                                          | Not actionable until the contributor moves. Drafts, non-dependency bots, and any PR a predicate marked as hide-from-triage (DCO missing, CI red, merge conflict, quota-exceeded, stale, empty description). Shown collapsed with a `reason` column. | Collapsed     |
 
-An explicit review request on you **overrides** every hide rule — if a
-maintainer tagged you, you'll see the PR even if it has merge conflicts.
+An explicit review request on you **overrides** every hide rule and the
+Dependency bots bucket alike — if a maintainer tagged you, you'll see the
+PR even if it has merge conflicts, or is from Renovate or Dependabot.
 Set `ignoreReviewRequestedOnYou: true` to turn this bucket off entirely (see
 the schema table above); PRs with an outstanding request on you then get
 classified normally instead of jumping the queue.
@@ -393,7 +394,7 @@ it emits a Check Run via
 `pr-nudge`. "Item" means it shows up as a bullet in the weekly digest
 comment.
 
-A bot-author check (`renovate[bot]`, `dependabot[bot]`, etc.) is handled
+A bot-author check (`renovate`, `dependabot`, `renovate-bot`, etc.) is handled
 directly in the triage classifier rather than as a predicate — those PRs
 get their own **Dependency bots** bucket.
 

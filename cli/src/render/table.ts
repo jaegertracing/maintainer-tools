@@ -252,7 +252,7 @@ const TABLE_SCRIPT = `
     author: 'Author login. "you" marks your own PRs.',
     bucket: 'The one attention bucket the classifier placed this PR in; the bucket view groups by it.',
     priorityLabel: 'First matching priority label from the configured tiers.',
-    hideReasons: 'Every reason that would send this PR to "Blocked on author", even when another signal overrode it.',
+    hideReasons: 'Every reason that would send this PR to "Blocked on author" if it were not overridden by another signal (e.g. a review request) or, for a dependency bot, by the Dependency-bots bucket itself.',
     flags: 'Inline row flags, same as the bucket view.',
     copilot: 'Latest GitHub Copilot review verdict: traffic light plus finding counts by severity (H/M/L).',
     priorityAuthor: 'Author is a configured maintainer, intern, or priority author.',
@@ -298,6 +298,10 @@ const TABLE_SCRIPT = `
   const columns = [
     en('repo', 'repo', {
       frozen: true,
+      // Exact match, not the default 'like': repo names can be substrings of
+      // each other (jaeger vs. jaeger-ui, jaeger-idl), and the enum dropdown
+      // already offers full, correct values, so nothing needs fuzzy typing.
+      headerFilterFunc: '=',
       sorter: (a, b, aRow, bRow) => aRow.getData().repoOrder - bRow.getData().repoOrder,
     }),
     num('PR', 'number', {
@@ -312,6 +316,10 @@ const TABLE_SCRIPT = `
       },
     }),
     en('bucket', 'bucket', {
+      // Exact match, like repo above: the summary table sets this filter
+      // from a bucket label, and a future label that happens to be a
+      // substring of another must not silently over-match.
+      headerFilterFunc: '=',
       sorter: (a, b, aRow, bRow) => aRow.getData().bucketOrder - bRow.getData().bucketOrder,
     }),
     HAS_TIERS ? en('priority', 'priorityLabel', {
@@ -438,6 +446,19 @@ const TABLE_SCRIPT = `
     rowCount.textContent = shown + ' of ' + ROWS.length + ' PRs';
   }
   clearBtn.addEventListener('click', () => table.clearHeaderFilter());
+
+  // --- Summary-table links double as filters in Table view: a cell filters
+  // by repo and bucket, a repo header by repo alone. In Buckets view these
+  // same links are plain anchors, handled elsewhere.
+  document.querySelectorAll('.summary-table a[data-repo]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      if (!document.body.classList.contains('table-mode')) return;
+      e.preventDefault();
+      table.clearHeaderFilter();
+      table.setHeaderFilterValue('repo', a.dataset.repo);
+      if (a.dataset.bucket) table.setHeaderFilterValue('bucket', a.dataset.bucket);
+    });
+  });
 
   // --- View switch. The chosen view is kept in the URL hash so a reload or a
   // bookmark lands on the same one.

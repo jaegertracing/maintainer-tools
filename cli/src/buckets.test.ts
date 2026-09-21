@@ -233,6 +233,73 @@ test('facets flag non-dependency bots as a hide reason', () => {
   assert.equal(result.facets.dependencyBot, false);
 });
 
+for (const [login, typename] of [
+  ['dependabot', 'Bot'],
+  ['renovate', 'Bot'],
+  ['renovate-bot', 'User'],
+] as const) {
+  test(`dependency bots with an unbracketed login (${login}) get their own bucket`, () => {
+    const result = classify(pullRequest({ author: { login, typename } }), context);
+
+    assert.equal(result.bucket, 'dependency-bots');
+    assert.equal(result.facets.dependencyBot, true);
+    assert.ok(result.flags.includes('BOT'), 'every dependency bot must carry the BOT row flag');
+  });
+}
+
+test('dependency bots land in their own bucket even when draft, conflicted, or CI-red', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    isDraft: true,
+    mergeable: 'CONFLICTING',
+    statusCheckRollup: 'FAILURE',
+    labels: ['waiting-for-author'],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'dependency-bots');
+  assert.deepEqual(result.reasons, ['dependency bot']);
+});
+
+test('dependency bots still hide-check-trigger PRs land in their own bucket, not hidden', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    labels: ['stale'],
+  });
+
+  const result = classify(pr, context);
+
+  assert.ok(
+    result.facets.hideReasons.includes('hide:stale_on_author'),
+    'the stale label must actually trip a hidesFromTriage predicate for this to test anything',
+  );
+  assert.equal(result.bucket, 'dependency-bots');
+});
+
+test('an explicit review request on a dependency bot PR overrides the bot bucket', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'review-requested-on-you');
+  assert.equal(result.facets.dependencyBot, true);
+});
+
+test('ignoreReviewRequestedOnYou sends a requested dependency bot PR to its own bucket, not to you', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
+  });
+
+  const result = classify(pr, { ...context, ignoreReviewRequestedOnYou: true });
+
+  assert.equal(result.bucket, 'dependency-bots');
+});
+
 test('facets record every hide reason even though the bucket stops at the first', () => {
   const pr = pullRequest({
     author: { login: 'priority-author', typename: 'User' },

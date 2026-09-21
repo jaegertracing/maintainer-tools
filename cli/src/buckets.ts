@@ -63,13 +63,22 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
 };
 
 // Logins treated as "dependency bots" — PRs they open are reviewable
-// merges, just authored by a service account. They follow the same hide
-// rules as humans (draft / merge-conflict / CI red still send them to
-// Hidden) but otherwise get their own section so they don't drown out
-// human-authored PRs in CODEOWNERS hits / FYI.
+// merges, just authored by a service account. They always land in their
+// own bucket, regardless of draft state, CI status, or merge conflicts, so
+// they never drown out human-authored PRs in CODEOWNERS hits / FYI and
+// never inflate Blocked-on-author with noise nobody needs to triage.
+// GraphQL's `login` field omits the `[bot]` suffix even for an installed
+// GitHub App — Renovate's own App reports as plain `renovate` — so the
+// unbracketed forms are what this GraphQL-only CLI actually sees.
+// `renovate-bot` is this org's self-hosted Renovate runner. The bracketed
+// forms are kept too, as defense against any non-GraphQL-sourced PR data
+// (fixtures, hand-written cache rows).
 const DEPENDENCY_BOT_LOGINS = new Set<string>([
+  'dependabot',
   'dependabot[bot]',
+  'renovate',
   'renovate[bot]',
+  'renovate-bot',
   'renovate-bot[bot]',
 ]);
 
@@ -184,6 +193,15 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     copilot,
   });
 
+  // Dependency bots go to their own bucket regardless of draft state, CI
+  // status, merge conflicts, or any other hide signal — Renovate and
+  // Dependabot manage their own PRs, so none of that is something a
+  // maintainer needs to triage.
+  if (isDependencyBot(pr) && !explicitlyRequested) {
+    reasons.push('dependency bot');
+    return mk('dependency-bots', reasons);
+  }
+
   if (pr.isDraft && !explicitlyRequested) {
     return mk('hidden', ['draft']);
   }
@@ -206,8 +224,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('hidden', ['changes-requested']);
   }
   // Non-dependency bots (anything matching __typename=Bot or `*[bot]`
-  // login that we don't know about) → Hidden. Dependency bots get their
-  // own bucket below.
+  // login that we don't know about) → Hidden.
   if (isBotAuthor(pr) && !isDependencyBot(pr) && !explicitlyRequested) {
     return mk('hidden', ['bot-authored']);
   }
@@ -222,14 +239,6 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (explicitlyRequested) {
     reasons.push('viewer in reviewRequests');
     return mk('review-requested-on-you', reasons);
-  }
-
-  // --- Dependency bots that survived the hide rules go to their own
-  // bucket regardless of CODEOWNERS / FYI signals. A dependabot PR
-  // touching a viewer-owned path is still a dependabot PR.
-  if (isDependencyBot(pr)) {
-    reasons.push('dependency bot');
-    return mk('dependency-bots', reasons);
   }
 
   // --- Priority 3: viewer previously reviewed, author has acted since.
@@ -275,8 +284,9 @@ function isReviewRequestedOnViewer(pr: PullRequest, viewer: string): boolean {
 function isBotAuthor(pr: PullRequest): boolean {
   if (!pr.author) return false;
   if (pr.author.typename === 'Bot') return true;
-  // Some bots (e.g. renovate, dependabot) sometimes show as User typename.
-  // The conventional `[bot]` suffix is a reliable fallback signal.
+  // GraphQL doesn't emit a `[bot]`-suffixed login in practice; this guards
+  // non-GraphQL-sourced PR data (fixtures, hand-written cache rows) where
+  // typename might be 'User' but the login still carries the suffix.
   return pr.author.login.endsWith('[bot]');
 }
 
@@ -384,7 +394,7 @@ function computeFlags(pr: PullRequest, checks: CheckResult[], ctx: ClassifyConte
   const flags: RowFlag[] = [];
   flags.push(...issueFlags(pr, ctx));
   if (pr.isDraft) flags.push('DRAFT');
-  if (isBotAuthor(pr)) flags.push('BOT');
+  if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
   if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
   if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');
