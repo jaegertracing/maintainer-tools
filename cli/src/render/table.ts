@@ -172,7 +172,6 @@ export function tabulatorAssets(): { js: string; css: string } {
 export const TABLE_CSS = `
   .view[hidden] { display: none; }
   body.table-mode { max-width: none; margin: 1em 1.5em; }
-  header .toolbar .view-switch { margin-left: 1em; }
   header .toolbar .view-switch button[aria-pressed="true"] { background: #1f2328; color: white; border-color: #1f2328; }
   .table-panels { display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 0.8em; }
   .panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.5em 0.7em; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; font-size: 0.85em; }
