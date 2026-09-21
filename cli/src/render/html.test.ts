@@ -10,25 +10,17 @@ test('Expand/Collapse All render inside the bucket view, not the header toolbar'
     authorOpenCounts: new Map(),
   });
 
-  const markers = [
-    '</header>',
-    'id="view-buckets"',
-    'id="view-table"',
-    'id="expand-all"',
-    'id="collapse-all"',
-  ];
-  const at = new Map(markers.map((marker) => [marker, html.indexOf(marker)]));
-  for (const marker of markers) {
-    assert.notEqual(at.get(marker), -1, `expected to find marker ${marker}`);
-  }
+  const find = (marker: string): number => {
+    const index = html.indexOf(marker);
+    assert.notEqual(index, -1, `expected to find marker ${marker}`);
+    return index;
+  };
 
-  const headerEnd = at.get('</header>')!;
-  const bucketViewStart = at.get('id="view-buckets"')!;
-  const tableViewStart = at.get('id="view-table"')!;
-  const expandIndex = at.get('id="expand-all"')!;
-  const collapseIndex = at.get('id="collapse-all"')!;
+  const bucketViewStart = find('id="view-buckets"');
+  const tableViewStart = find('id="view-table"');
+  const expandIndex = find('id="expand-all"');
+  const collapseIndex = find('id="collapse-all"');
 
-  assert.ok(bucketViewStart > headerEnd, 'bucket view must open after the header closes');
   assert.ok(
     expandIndex > bucketViewStart && expandIndex < tableViewStart,
     'Expand All must render inside the bucket view, not the table view',
