@@ -242,6 +242,33 @@ Per-row fields: per-file-class line counts (`src`, `test`, `fix`, `doc`, `cfg`, 
 (release-blocker label or current milestone), `[RESOLVED-W/O-REPLY: N]`, `[QUESTION]`
 (`awaiting-maintainer-input`), `[POSSIBLE-QUESTION]` (heuristic).
 
+Rows also carry the verdict of GitHub Copilot's code review when one exists: a
+traffic light plus the finding counts by severity (`🟢 1M 2L`), linking to the
+review. Copilot posts an ordinary review whose body starts with the
+`<!-- ccr-overview-v2 -->` marker, so the CLI parses the latest such review
+instead of calling a separate API.
+
+### Table view
+
+The bucket layout answers "what should I look at next", and it does so by
+giving every PR exactly one home. That hides the signals the bucket decision
+overrode: a priority author's PR that is missing a DCO sign-off sits in Hidden,
+and nothing in the bucket view says it came from a priority author.
+
+The same report therefore carries a second view, switched from the header, that
+lists every PR (Hidden included) as one row of a flat table rendered with
+[Tabulator](https://tabulator.info). The classifier records the signals it
+weighed as independent facets on each PR (priority author, review requested,
+first-timer, CODEOWNERS hit, dependency bot, maintainer engaged, and the full
+list of hide reasons), and each facet is a column. Sorting is multi-column:
+shift-click makes a header the primary key with the earlier keys as tiebreakers,
+and a Sort panel shows the active keys as chips that can be dragged into priority
+order or clicked to flip direction.
+Every column has a header filter; list-valued and enumerated columns autocomplete
+from the values in the currently visible rows, and a Filters panel shows the
+active filters as removable chips. Tabulator's script and stylesheet are inlined
+into the file, so the report stays self-contained.
+
 ---
 
 ## Implementation Plan

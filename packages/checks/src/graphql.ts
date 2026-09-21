@@ -81,6 +81,8 @@ interface PullRequestNode {
       author: { login: string } | null;
       state: ReviewState;
       submittedAt: string | null;
+      url: string;
+      body: string;
     }>;
   };
   reviewThreads: {
@@ -165,6 +167,8 @@ const PR_QUERY = `
             author { login }
             state
             submittedAt
+            url
+            body
           }
         }
         reviewThreads(first: 100) {
@@ -578,6 +582,8 @@ export function createGraphqlClient(token: string): GraphqlClient {
             state: r.state,
             // submittedAt is non-null by the filter above.
             submittedAt: r.submittedAt as string,
+            url: r.url,
+            body: r.body,
           })),
         comments: pr.comments.nodes.map((c) => ({
           author: c.author?.login ?? null,

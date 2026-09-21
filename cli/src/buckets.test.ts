@@ -217,8 +217,42 @@ for (const [state, overrides, reason] of hiddenCases) {
 
     assert.equal(result.bucket, 'hidden');
     assert.deepEqual(result.reasons, [reason]);
+    assert.equal(result.facets.priorityAuthor, true);
+    assert.deepEqual(result.facets.hideReasons, [reason]);
   });
 }
+
+test('facets flag non-dependency bots as a hide reason', () => {
+  const result = classify(
+    pullRequest({ author: { login: 'some-helper[bot]', typename: 'Bot' } }),
+    context,
+  );
+
+  assert.equal(result.bucket, 'hidden');
+  assert.deepEqual(result.facets.hideReasons, ['bot-authored']);
+  assert.equal(result.facets.dependencyBot, false);
+});
+
+test('facets record every hide reason even though the bucket stops at the first', () => {
+  const pr = pullRequest({
+    author: { login: 'priority-author', typename: 'User' },
+    isDraft: true,
+    mergeable: 'CONFLICTING',
+    labels: ['waiting-for-author'],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'hidden');
+  assert.deepEqual(result.reasons, ['draft']);
+  assert.deepEqual(result.facets.hideReasons, [
+    'draft',
+    'hide:merge_conflict',
+    'waiting-for-author',
+  ]);
+  assert.equal(result.facets.priorityAuthor, true);
+  assert.equal(result.copilot, null);
+});
 
 test('priority-author quota exemptions are case-insensitive', async () => {
   const prs = [
