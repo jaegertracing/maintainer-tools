@@ -534,9 +534,9 @@ const CSS = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1200px; margin: 2em auto; padding: 0 1em; color: #1f2328; line-height: 1.4; }
   header h1 { margin: 0 0 0.2em 0; }
   header .meta { color: #57606a; font-size: 0.9em; margin-bottom: 0.8em; }
-  .toolbar { margin-bottom: 0.8em; }
   .toolbar button { font-size: 0.85em; padding: 0.35em 0.8em; margin-right: 0.5em; border: 1px solid #d0d7de; border-radius: 6px; background: white; color: #1f2328; cursor: pointer; }
   .toolbar button:hover { background: #f6f8fa; }
+  header .toolbar { margin-bottom: 1.5em; }
   .bucket-toolbar { margin-bottom: 1.5em; }
   section.repo { margin: 2em 0; }
   section.repo > h2 { border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }

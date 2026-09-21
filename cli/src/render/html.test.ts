@@ -10,21 +10,23 @@ test('Expand/Collapse All render inside the bucket view, not the header toolbar'
     authorOpenCounts: new Map(),
   });
 
-  const headerEnd = html.indexOf('</header>');
-  const bucketViewStart = html.indexOf('id="view-buckets"');
-  const tableViewStart = html.indexOf('id="view-table"');
-  const expandIndex = html.indexOf('id="expand-all"');
-  const collapseIndex = html.indexOf('id="collapse-all"');
-
-  for (const [name, index] of [
-    ['</header>', headerEnd],
-    ['id="view-buckets"', bucketViewStart],
-    ['id="view-table"', tableViewStart],
-    ['id="expand-all"', expandIndex],
-    ['id="collapse-all"', collapseIndex],
-  ] as const) {
-    assert.notEqual(index, -1, `expected to find marker ${name}`);
+  const markers = [
+    '</header>',
+    'id="view-buckets"',
+    'id="view-table"',
+    'id="expand-all"',
+    'id="collapse-all"',
+  ];
+  const at = new Map(markers.map((marker) => [marker, html.indexOf(marker)]));
+  for (const marker of markers) {
+    assert.notEqual(at.get(marker), -1, `expected to find marker ${marker}`);
   }
+
+  const headerEnd = at.get('</header>')!;
+  const bucketViewStart = at.get('id="view-buckets"')!;
+  const tableViewStart = at.get('id="view-table"')!;
+  const expandIndex = at.get('id="expand-all"')!;
+  const collapseIndex = at.get('id="collapse-all"')!;
 
   assert.ok(bucketViewStart > headerEnd, 'bucket view must open after the header closes');
   assert.ok(
