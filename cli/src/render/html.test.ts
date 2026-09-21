@@ -110,6 +110,13 @@ test('dependency bots get their own excluded row and are dropped from the subtot
     pullRequest({ number: 2, isDraft: true }), // hidden
     pullRequest({ number: 3, author: { login: 'renovate-bot', typename: 'User' } }), // dependency-bots
   ].map((pr) => classify(pr, context));
+
+  assert.equal(
+    classified[0]?.bucket,
+    'fyi',
+    'PR #1 must land in fyi for the subtotal assertion below to test anything',
+  );
+
   const html = renderHtml(classified, {
     viewer: 'maintainer-a',
     now,
