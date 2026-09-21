@@ -41,7 +41,7 @@ async function promptToCreateConfig(): Promise<boolean> {
   try {
     answer = await rl.question(
       `No config found. Looked at:\n  ${DEFAULT_CONFIG_PATHS.join('\n  ')}\n\n` +
-        'Create one now?\n  1) Generic starter config\n  2) Jaeger org config\n  Anything else) skip\n> ',
+        'Create one now?\n  1) Generic starter config\n  2) Jaeger org config\n  Q) Exit\n> ',
     );
   } finally {
     rl.close();
