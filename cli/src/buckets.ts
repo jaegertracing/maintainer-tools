@@ -67,15 +67,15 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
 // own bucket, regardless of draft state, CI status, or merge conflicts, so
 // they never drown out human-authored PRs in CODEOWNERS hits / FYI and
 // never inflate Blocked-on-author with noise nobody needs to triage.
-// Both bracketed (App-installed) and unbracketed (self-hosted service
-// account) forms are listed: GitHub's own dependabot and this org's
-// self-hosted Renovate runner report their logins as plain `dependabot`
-// and `renovate-bot`, with no `[bot]` suffix and, for Renovate, typename
-// `User` rather than `Bot`.
+// `dependabot` and `renovate-bot` are this org's actual logins, confirmed
+// against the GitHub API: GitHub's own dependabot reports as `dependabot`
+// (typename Bot), and this org's self-hosted Renovate runner as
+// `renovate-bot` (typename User) — neither carries the `[bot]` suffix a
+// GitHub App-installed bot would. The bracketed forms are kept too, for
+// orgs where Renovate/Dependabot run as an installed App instead.
 const DEPENDENCY_BOT_LOGINS = new Set<string>([
   'dependabot',
   'dependabot[bot]',
-  'renovate',
   'renovate[bot]',
   'renovate-bot',
   'renovate-bot[bot]',

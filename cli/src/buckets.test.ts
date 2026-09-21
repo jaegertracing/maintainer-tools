@@ -257,6 +257,29 @@ test('dependency bots land in their own bucket even when draft, conflicted, or C
   assert.deepEqual(result.reasons, ['dependency bot']);
 });
 
+test('dependency bots still hide-check-trigger PRs land in their own bucket, not hidden', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    labels: ['stale'],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'dependency-bots');
+});
+
+test('an explicit review request on a dependency bot PR overrides the bot bucket', () => {
+  const pr = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+    reviewRequests: [{ kind: 'user', login: 'MAINTAINER-A' }],
+  });
+
+  const result = classify(pr, context);
+
+  assert.equal(result.bucket, 'review-requested-on-you');
+  assert.equal(result.facets.dependencyBot, true);
+});
+
 test('facets record every hide reason even though the bucket stops at the first', () => {
   const pr = pullRequest({
     author: { login: 'priority-author', typename: 'User' },

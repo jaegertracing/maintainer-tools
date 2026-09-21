@@ -316,6 +316,10 @@ const TABLE_SCRIPT = `
       },
     }),
     en('bucket', 'bucket', {
+      // Exact match, like repo above: the summary table sets this filter
+      // from a bucket label, and a future label that happens to be a
+      // substring of another must not silently over-match.
+      headerFilterFunc: '=',
       sorter: (a, b, aRow, bRow) => aRow.getData().bucketOrder - bRow.getData().bucketOrder,
     }),
     HAS_TIERS ? en('priority', 'priorityLabel', {
