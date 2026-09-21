@@ -1,7 +1,7 @@
 // Configuration loader for the triage CLI.
 //
-// Lookup order: `--config <path>` > $MAINTAINER_TOOLS_CONFIG >
-// ./.maintainer-tools.json > ~/.config/maintainer-tools/config.json.
+// Lookup order: `--config <path>` > ./.maintainer-tools.json >
+// ~/.config/maintainer-tools/config.json.
 // All fields are optional; missing fields fall back to sensible defaults.
 
 import { readFileSync } from 'node:fs';
@@ -62,21 +62,25 @@ const DEFAULT_CACHE_PATH = join(
   'pr-cache.sqlite',
 );
 
-const DEFAULT_CONFIG_PATHS = [
+// The home-directory path is also where `config-setup.ts` writes a sample
+// config, so it's exported rather than folded anonymously into the list.
+export const HOME_CONFIG_PATH = join(
+  process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'),
+  'maintainer-tools',
+  'config.json',
+);
+
+export const DEFAULT_CONFIG_PATHS = [
   join(process.cwd(), '.maintainer-tools.json'),
-  join(
-    process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'),
-    'maintainer-tools',
-    'config.json',
-  ),
+  HOME_CONFIG_PATH,
 ];
 
 export function loadConfig(explicitPath?: string): TriageConfig {
-  const path = explicitPath ?? process.env.MAINTAINER_TOOLS_CONFIG ?? findFirstExisting();
+  const path = explicitPath ?? findExistingConfigPath();
   if (!path) {
     throw new Error(
       `No config found. Looked at: ${DEFAULT_CONFIG_PATHS.join(', ')}. ` +
-        `Pass --config <path>, set $MAINTAINER_TOOLS_CONFIG, or create one of the default paths. ` +
+        `Pass --config <path> or create one of the default paths. ` +
         `Sample configs: cli/config.example.json (generic) and cli/config.example.jaeger.json (Jaeger org).`,
     );
   }
@@ -124,7 +128,7 @@ function validateBoolean(value: unknown, field: string, configPath: string): boo
   return value;
 }
 
-function findFirstExisting(): string | undefined {
+export function findExistingConfigPath(): string | undefined {
   for (const p of DEFAULT_CONFIG_PATHS) {
     try {
       readFileSync(p, 'utf8');

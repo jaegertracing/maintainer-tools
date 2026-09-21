@@ -12,7 +12,7 @@ import { parseArgs } from 'node:util';
 
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { type ClassifiedPR, BUCKET_ORDER, BUCKET_LABELS } from './buckets.js';
-import { loadConfig } from './config.js';
+import { loadConfigInteractive } from './config-setup.js';
 import { log } from './log.js';
 import { enrichIssueState } from './issues.js';
 import { enrichQuotaState } from './quota.js';
@@ -126,7 +126,7 @@ async function runTriage(argv: string[]): Promise<void> {
   const output = values.output ?? DEFAULT_OUTPUTS[format];
 
   log('loading config');
-  const cfg = loadConfig(values.config);
+  const cfg = await loadConfigInteractive(values.config);
   const policy = buildTriagePolicy(cfg);
   log(
     `config: ${cfg.repos.length} repo(s), ${cfg.maintainers.length} maintainer(s), ${cfg.interns.length} intern(s), ${cfg.priorityAuthors.length} priority author(s)`,
