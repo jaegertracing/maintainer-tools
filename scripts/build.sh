@@ -5,7 +5,7 @@
 # Docker volumes isolate root and workspace dependencies so that Linux
 # binaries and pnpm links do not overwrite the host's dependencies.
 #
-# Run this script with `pnpm run build`.
+# Run this script with `make build`.
 
 set -euo pipefail
 
