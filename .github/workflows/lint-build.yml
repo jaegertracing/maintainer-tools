@@ -34,7 +34,7 @@ jobs:
       - name: Ensure action bundles are in sync with src
         run: |
           if ! git diff --quiet --exit-code -- pr-nudge/dist pr-weekly-digest/dist; then
-            echo "::error::Action bundles are out of date. Run \`pnpm run build\` and commit the result."
+            echo "::error::Action bundles are out of date. Run \`make build\` and commit the result."
             git --no-pager diff -- pr-nudge/dist pr-weekly-digest/dist | head -200
             exit 1
           fi
