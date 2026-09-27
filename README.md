@@ -186,9 +186,13 @@ priority author that is hidden for a missing DCO sign-off is one filter away.
   active keys as chips, primary first; drag them to change priority, click
   one to flip its direction, or remove it with `×`.
 - **Filter**: type in the box under a header. Enumerated and list-valued
-  columns (author, bucket, flags, labels, ...) autocomplete from the values in
+  columns (author, flags, labels, ...) autocomplete from the values in
   the visible rows; numeric columns accept `>= 5`-style expressions. Active
   filters appear as chips in the Filters panel with a **Clear all** button.
+  The bucket dropdown supports multiple selections.
+- **Summary totals**: click a number in the summary's total column to show
+  that bucket across all repositories. The subtotal selects the buckets that
+  need triage; the overall total clears filters to show every PR.
 
 The table is rendered with [Tabulator](https://tabulator.info), inlined into
 the file, so the report remains a single self-contained HTML file.

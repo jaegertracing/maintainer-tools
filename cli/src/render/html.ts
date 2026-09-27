@@ -198,6 +198,11 @@ function renderSummary(blocks: RepoBlock[]): string {
     return `<td><a href="#${first.anchor}" data-repo="${escape(block.repo)}" data-bucket="${escape(BUCKET_LABELS[bucket])}"${tip}>${count}</a></td>`;
   };
 
+  const totalCell = (count: number, buckets: Bucket[] = []): string => {
+    const labels = escape(JSON.stringify(buckets.map((bucket) => BUCKET_LABELS[bucket])));
+    return `<td class="row-total"><span class="categorized-total">${count}</span><a class="table-total" href="#table" data-buckets="${labels}">${count}</a></td>`;
+  };
+
   const rowTotal = (bucket: Bucket): number =>
     blocks.reduce((a, b) => a + cellTargets(b, bucket).count, 0);
 
@@ -207,7 +212,7 @@ function renderSummary(blocks: RepoBlock[]): string {
       (bucket) =>
         `<tr><th scope="row">${escape(BUCKET_LABELS[bucket])}</th>${blocks
           .map((b) => cell(b, bucket))
-          .join('')}<td class="row-total">${rowTotal(bucket)}</td></tr>`,
+          .join('')}${totalCell(rowTotal(bucket), [bucket])}</tr>`,
     )
     .join('\n        ');
 
@@ -241,16 +246,16 @@ function renderSummary(blocks: RepoBlock[]): string {
     <tfoot>
       <tr class="grand"><th scope="row">subtotal</th>${subtotalPerRepo
         .map((n) => `<td>${n}</td>`)
-        .join('')}<td class="row-total">${grandTotal}</td></tr>
+        .join('')}${totalCell(grandTotal, subtotalBuckets)}</tr>
       <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS['dependency-bots'])}<span class="note"> (excluded)</span></th>${blocks
         .map((b) => cell(b, 'dependency-bots'))
-        .join('')}<td class="row-total">${botTotal}</td></tr>
+        .join('')}${totalCell(botTotal, ['dependency-bots'])}</tr>
       <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS.hidden)}<span class="note"> (excluded)</span></th>${blocks
         .map((b) => cell(b, 'hidden'))
-        .join('')}<td class="row-total">${hiddenTotal}</td></tr>
+        .join('')}${totalCell(hiddenTotal, ['hidden'])}</tr>
       <tr class="all-total"><th scope="row">Total</th>${totalPerRepo
         .map((n) => `<td>${n}</td>`)
-        .join('')}<td class="row-total">${totalAll}</td></tr>
+        .join('')}${totalCell(totalAll)}</tr>
     </tfoot>
   </table>
 </section>`;
