@@ -4,5 +4,5 @@ packages:
   - pr-weekly-digest
   - cli
 
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
