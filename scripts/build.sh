@@ -14,12 +14,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # The Node major matches node-version in .github/workflows/lint-build.yml.
 exec docker run --rm \
   -v "${ROOT}:/work" \
-  -v "maintainer-tools-pnpm-node-modules:/work/node_modules" \
-  -v "maintainer-tools-pnpm-store:/work/.pnpm-store" \
+  -v /work/node_modules \
+  -v "maintainer-tools-pnpm-store:/pnpm/store" \
   -v /work/packages/checks/node_modules \
   -v /work/cli/node_modules \
   -v /work/pr-nudge/node_modules \
   -v /work/pr-weekly-digest/node_modules \
   -w /work \
   "node:24.16.0-slim" \
-  sh -c "set -x; corepack enable && pnpm install --frozen-lockfile && pnpm -r --if-present run build"
+  sh -c "set -x; corepack enable && pnpm install --frozen-lockfile --store-dir /pnpm/store && pnpm -r --if-present run build"
