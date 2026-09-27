@@ -30,6 +30,9 @@ jobs:
       - run: make test
       - run: make build
 
+      - name: Ensure the lockfile is unchanged
+        run: git diff --exit-code -- pnpm-lock.yaml
+
       # Committed action bundles must match their source because GitHub runs them directly.
       - name: Ensure action bundles are in sync with src
         run: |
