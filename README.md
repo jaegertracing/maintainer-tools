@@ -35,7 +35,8 @@ Never writes anything back to GitHub.
 
 ### Quickstart
 
-Install the pinned package manager with `npm install --global pnpm@12.6.0`.
+Install pnpm with `npm install --global pnpm`. The `packageManager` field in
+`package.json` selects the version automatically.
 
 ```bash
 git clone https://github.com/jaegertracing/maintainer-tools
