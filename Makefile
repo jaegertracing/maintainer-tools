@@ -1,4 +1,4 @@
-.PHONY: install build fmt lint test triage
+.PHONY: install build fmt lint tsc-lint test triage
 
 build:
 	pnpm run build
@@ -11,6 +11,9 @@ fmt:
 
 lint:
 	pnpm run lint
+
+tsc-lint:
+	pnpm run tsc-lint
 
 test:
 	pnpm run test

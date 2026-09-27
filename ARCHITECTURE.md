@@ -170,7 +170,7 @@ pr-nudge/
 The `dist/index.js` file is committed. That's how GitHub JS actions ship:
 the workflow `uses: jaegertracing/maintainer-tools/pr-nudge@<sha>` clones
 the action subfolder at that ref and runs `dist/index.js` directly — no
-`pnpm install`, no build step on the consumer side. The `lint-build` CI
+`make install`, no build step on the consumer side. The `lint-build` CI
 job rebuilds and fails on `git diff --quiet pr-nudge/dist`, which is what
 guarantees the committed bundle matches its source.
 
