@@ -152,7 +152,10 @@ test('buildTableRows falls back to the no-priority label only when tiers are con
 
 test('summary links replace filters and match multiple buckets exactly', () => {
   const html = renderTableView([], { viewer: 'maintainer-a', now });
-  const script = /<script>([\s\S]*?)<\/script>/.exec(html)![1]!;
+  const script = html.slice(
+    html.indexOf('<script>') + '<script>'.length,
+    html.lastIndexOf('</script>'),
+  );
   const filters = new Map<string, string | string[]>();
   const listeners = new Map<string, () => void>();
   const links = [
