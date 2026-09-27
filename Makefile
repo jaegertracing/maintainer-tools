@@ -1,16 +1,16 @@
 .PHONY: build fmt lint test triage
 
 build:
-	npm run build
+	pnpm run build
 
 fmt:
-	npm run fmt
+	pnpm run fmt
 
 lint:
-	npm run lint
+	pnpm run lint
 
 test:
-	npm run test
+	pnpm run test
 
 triage:
-	npm run triage -- $(ARGS)
+	pnpm run triage $(ARGS)

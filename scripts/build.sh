@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
-# Build all workspaces inside a Linux container so that ncc output is
-# byte-identical regardless of the host OS.
+# The build runs all workspaces inside a Linux container so that ncc output
+# is byte-identical regardless of the host OS.
 #
-# node_modules is shadowed by a named Docker volume so that the Linux
-# container's platform-specific binaries (esbuild, etc.) don't overwrite
-# the host's node_modules after the build completes.
+# Docker volumes isolate root and workspace dependencies so that Linux
+# binaries and pnpm links do not overwrite the host's dependencies.
 #
-# Usage: npm run build
+# Run this script with `pnpm run build`.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Pinned to match the node-version in .github/workflows/lint-build.yml.
-# Update this tag when upgrading Node.
+# The Node major matches node-version in .github/workflows/lint-build.yml.
 exec docker run --rm \
   -v "${ROOT}:/work" \
-  -v "maintainer-tools-node-modules:/work/node_modules" \
+  -v "maintainer-tools-pnpm-node-modules:/work/node_modules" \
+  -v "maintainer-tools-pnpm-store:/work/.pnpm-store" \
+  -v /work/packages/checks/node_modules \
+  -v /work/cli/node_modules \
+  -v /work/pr-nudge/node_modules \
+  -v /work/pr-weekly-digest/node_modules \
   -w /work \
   "node:24.16.0-slim" \
-  sh -c "set -x; npm ci --fund=false --no-update-notifier && npm run --workspaces --if-present build"
+  sh -c "set -x; corepack enable && pnpm install --frozen-lockfile && pnpm -r --if-present run build"

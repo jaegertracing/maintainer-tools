@@ -1,7 +1,7 @@
 node_modules/
 **/dist/
 *.tsbuildinfo
-package-lock.json
+pnpm-lock.yaml
 
 # RFC and other long-form docs aren't reformatted to avoid noisy churn.
 docs/

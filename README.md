@@ -35,15 +35,17 @@ Never writes anything back to GitHub.
 
 ### Quickstart
 
+Install the pinned package manager with `npm install --global pnpm@10.34.5`.
+
 ```bash
 git clone https://github.com/jaegertracing/maintainer-tools
 cd maintainer-tools
-npm ci
+pnpm install --frozen-lockfile
 ```
 
 No build step — the CLI runs straight from TypeScript source via
 [`tsx`](https://github.com/privatenumber/tsx). Edits to the CLI or the
-shared library take effect on the next `npm run triage`.
+shared library take effect on the next `pnpm run triage`.
 
 Make a config file at `~/.config/maintainer-tools/config.json`:
 
@@ -70,7 +72,7 @@ gh auth login
 Then run:
 
 ```bash
-npm run triage
+pnpm run triage
 # → writes ./triage.html (and logs progress to the terminal)
 open triage.html
 ```
@@ -108,7 +110,7 @@ Starter files: [`cli/config.example.json`](cli/config.example.json) (generic tem
 For the available command-line flags, run:
 
 ```bash
-npm run triage -- --help
+pnpm run triage --help
 ```
 
 Token resolution (in order): `$GH_TOKEN`, `$GITHUB_TOKEN`, `gh auth token`.
