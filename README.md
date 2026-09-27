@@ -35,8 +35,8 @@ Never writes anything back to GitHub.
 
 ### Quickstart
 
-Install pnpm with `npm install --global pnpm`. The `packageManager` field in
-`package.json` selects the version automatically.
+Enable pnpm with `corepack enable pnpm`. Corepack downloads and runs the
+version pinned in the `packageManager` field in `package.json`.
 
 ```bash
 git clone https://github.com/jaegertracing/maintainer-tools

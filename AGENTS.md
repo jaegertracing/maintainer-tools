@@ -49,8 +49,8 @@ follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
 - Node.js >= 22.5 (the CLI's SQLite cache uses the built-in `node:sqlite`
   module, added in 22.5.0). Actions still ship on the `node20` runtime —
   they don't touch the cache.
-- pnpm (use the repo root). Install it with `npm install --global pnpm`;
-  `package.json` selects the version automatically.
+- pnpm (use the repo root). Enable it with `corepack enable pnpm`;
+  Corepack downloads and runs the version pinned in `package.json`.
 
 ```bash
 make install
