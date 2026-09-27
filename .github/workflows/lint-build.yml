@@ -25,10 +25,10 @@ jobs:
         with:
           cache: pnpm
           node-version: 24
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
-      - run: pnpm test
-      - run: pnpm run build
+      - run: make install
+      - run: make lint
+      - run: make test
+      - run: make build
 
       # Committed action bundles must match their source because GitHub runs them directly.
       - name: Ensure action bundles are in sync with src
