@@ -191,6 +191,12 @@ export const TABLE_CSS = `
   #triage-table { font-size: 0.85em; border: 1px solid #d0d7de; border-radius: 6px; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
+  #triage-table .tabulator-tableholder { overflow-x: scroll; }
+  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track outside the rows. */
+  #triage-table .tabulator-tableholder::-webkit-scrollbar { width: 14px; height: 14px; }
+  #triage-table .tabulator-tableholder::-webkit-scrollbar-track { background: #f6f8fa; }
+  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
+  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb:hover { background: #57606a; }
   #triage-table .tabulator-cell a { color: #0969da; text-decoration: none; }
   #triage-table .tabulator-cell a:hover { text-decoration: underline; }
   #triage-table .tabulator-row.row-hidden { color: #8c959f; }
