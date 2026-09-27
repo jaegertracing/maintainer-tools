@@ -3,7 +3,7 @@
 // look at next"; this view answers ad-hoc questions such as "all PRs from
 // priority authors, whatever bucket they landed in". Sorting is multi-column
 // (shift-click a header, or arrange the chips in the Sort panel) and every
-// column has a header filter with autocompletion over its current values.
+// column has a header filter. The bucket filter supports multiple selections.
 //
 // Tabulator's JS and CSS are inlined from node_modules so the report stays a
 // single self-contained file.
@@ -144,7 +144,7 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
       <span class="panel-label">Filters</span>
       <span class="chips" id="filter-chips"></span>
       <button type="button" id="clear-filters" hidden>Clear all</button>
-      <span class="panel-hint">type in the boxes under each header; lists autocomplete from the visible rows</span>
+      <span class="panel-hint">filter under each header; the bucket filter supports multiple selections</span>
       <span class="row-count" id="row-count"></span>
     </div>
   </div>
@@ -171,7 +171,10 @@ export function tabulatorAssets(): { js: string; css: string } {
 
 export const TABLE_CSS = `
   .view[hidden] { display: none; }
-  body.table-mode { max-width: none; margin: 1em 1.5em; }
+  body.table-mode { max-width: none; }
+  .table-total { display: none; }
+  body.table-mode .table-total { display: inline; }
+  body.table-mode .categorized-total { display: none; }
   header .toolbar .view-switch button[aria-pressed="true"] { background: #1f2328; color: white; border-color: #1f2328; }
   .table-panels { display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 0.8em; }
   .panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.5em 0.7em; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; font-size: 0.85em; }
@@ -316,10 +319,13 @@ const TABLE_SCRIPT = `
       },
     }),
     en('bucket', 'bucket', {
-      // Exact match, like repo above: the summary table sets this filter
-      // from a bucket label, and a future label that happens to be a
-      // substring of another must not silently over-match.
-      headerFilterFunc: '=',
+      headerFilterParams: {
+        values: ${JSON.stringify(BUCKET_ORDER.map((bucket) => BUCKET_LABELS[bucket]))},
+        multiselect: true, clearable: true, itemFormatter: escapedItem,
+      },
+      headerFilterLiveFilter: false,
+      headerFilterEmptyCheck: (values) => !values || values.length === 0,
+      headerFilterFunc: (values, bucket) => values.includes(bucket),
       sorter: (a, b, aRow, bRow) => aRow.getData().bucketOrder - bRow.getData().bucketOrder,
     }),
     HAS_TIERS ? en('priority', 'priorityLabel', {
@@ -436,7 +442,7 @@ const TABLE_SCRIPT = `
       const chip = document.createElement('span');
       chip.className = 'chip';
       const title = table.getColumn(f.field).getDefinition().title;
-      const shown = f.value === 'true' ? 'yes' : f.value === 'false' ? 'no' : f.value;
+      const shown = Array.isArray(f.value) ? f.value.join(', ') : f.value === 'true' ? 'yes' : f.value === 'false' ? 'no' : f.value;
       chip.innerHTML = esc(title) + ': <b>' + esc(shown) + '</b><span class="x" title="remove">×</span>';
       chip.addEventListener('click', () => table.setHeaderFilterValue(f.field, ''));
       filterChips.appendChild(chip);
@@ -447,16 +453,16 @@ const TABLE_SCRIPT = `
   }
   clearBtn.addEventListener('click', () => table.clearHeaderFilter());
 
-  // --- Summary-table links double as filters in Table view: a cell filters
-  // by repo and bucket, a repo header by repo alone. In Buckets view these
-  // same links are plain anchors, handled elsewhere.
-  document.querySelectorAll('.summary-table a[data-repo]').forEach((a) => {
+  // Summary links filter by repository, buckets, or both in Table view.
+  // Total links clear prior filters so the displayed rows match the summary count.
+  document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets]').forEach((a) => {
     a.addEventListener('click', (e) => {
       if (!document.body.classList.contains('table-mode')) return;
       e.preventDefault();
       table.clearHeaderFilter();
-      table.setHeaderFilterValue('repo', a.dataset.repo);
-      if (a.dataset.bucket) table.setHeaderFilterValue('bucket', a.dataset.bucket);
+      if (a.dataset.repo) table.setHeaderFilterValue('repo', a.dataset.repo);
+      const buckets = a.dataset.buckets ? JSON.parse(a.dataset.buckets) : a.dataset.bucket ? [a.dataset.bucket] : [];
+      if (buckets.length) table.setHeaderFilterValue('bucket', buckets);
     });
   });
 
