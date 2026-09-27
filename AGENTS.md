@@ -13,8 +13,9 @@ and nudges for the Jaeger org. Design: see
 Before declaring a task done, run:
 
 ```bash
-npm run lint    # tsc + prettier --check
-npm run build   # tsc packages + ncc bundle each action
+make lint
+make test
+make build
 ```
 
 If the build modifies any committed `*/dist/index.js`, **commit that change in
@@ -39,7 +40,7 @@ maintainer-tools/
 
 Each top-level `<tool>/` is either a published GitHub Action subfolder
 (`pr-nudge/`, with committed `dist/`) or the local CLI (`cli/`, no
-committed build output — users `npm ci && npm run build`). New actions
+committed build output — users `make install && make build`). New actions
 follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
 `<tool>/dist/`.
 
@@ -48,23 +49,24 @@ follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
 - Node.js >= 22.5 (the CLI's SQLite cache uses the built-in `node:sqlite`
   module, added in 22.5.0). Actions still ship on the `node20` runtime —
   they don't touch the cache.
-- npm (workspaces, so use the repo root)
+- pnpm 10.34.5 (pinned in `package.json`; use the repo root). Install it with
+  `npm install --global pnpm@10.34.5`.
 
 ```bash
-npm ci   # use this, not `npm install`
+make install
 ```
 
 No native build steps — everything pure JS + builtin Node modules.
 
 ## Build, Lint, and Test Commands
 
-| Command            | What it does                                                      |
-| ------------------ | ----------------------------------------------------------------- |
-| `npm run build`    | Build every workspace (`tsc` for packages, `ncc` for each action) |
-| `npm run lint`     | `tsc --noEmit` + prettier `--check`, in parallel                  |
-| `npm run tsc-lint` | TypeScript type-check only                                        |
-| `npm run fmt`      | Prettier `--write`                                                |
-| `npm test`         | Run tests across workspaces (currently CLI classifier tests)      |
+| Command         | What it does                                                      |
+| --------------- | ----------------------------------------------------------------- |
+| `make build`    | Build every workspace (`tsc` for packages, `ncc` for each action) |
+| `make lint`     | `tsc --noEmit` + prettier `--check`, in parallel                  |
+| `make tsc-lint` | TypeScript type-check only                                        |
+| `make fmt`      | Prettier `--write`                                                |
+| `make test`     | Run tests across workspaces (currently CLI classifier tests)      |
 
 ## Action Bundles
 
@@ -76,10 +78,10 @@ run the bundle directly.
 Workflow:
 
 1. Edit `<tool>/src/` or shared `packages/checks/src/`.
-2. Run `npm run build` from the repo root.
+2. Run `make build` from the repo root.
 3. Commit both the source change _and_ the regenerated `dist/index.js`.
 
-The CI `lint-build` job runs `npm run build` and fails if `git diff` on any
+The CI `lint-build` job runs `make build` and fails if `git diff` on any
 action's `dist/` is non-empty — this is what guarantees the committed bundle
 matches its source.
 
@@ -98,7 +100,7 @@ matches its source.
 
 - Prettier with the config in `.prettierrc.json` (single quotes, trailing
   commas, 100-col print width, semicolons).
-- Run `npm run fmt` before committing.
+- Run `make fmt` before committing.
 
 ### Predicate Library Conventions
 

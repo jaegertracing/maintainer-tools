@@ -1,16 +1,22 @@
-.PHONY: build fmt lint test triage
+.PHONY: install build fmt lint tsc-lint test triage
 
 build:
-	npm run build
+	pnpm run build
+
+install:
+	pnpm install --frozen-lockfile
 
 fmt:
-	npm run fmt
+	pnpm run fmt
 
 lint:
-	npm run lint
+	pnpm run lint
+
+tsc-lint:
+	pnpm run tsc-lint
 
 test:
-	npm run test
+	pnpm run test
 
 triage:
-	npm run triage -- $(ARGS)
+	pnpm run triage $(ARGS)

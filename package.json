@@ -11,12 +11,6 @@
   "engines": {
     "node": ">=22.5.0"
   },
-  "workspaces": [
-    "packages/*",
-    "pr-nudge",
-    "pr-weekly-digest",
-    "cli"
-  ],
   "scripts": {
     "build": "bash scripts/build.sh",
     "lint": "npm-run-all -ln --parallel tsc-lint prettier-check",
@@ -24,7 +18,7 @@
     "prettier-check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "tsc-lint": "tsc -p tsconfig.json --noEmit",
     "triage": "tsx cli/src/index.ts triage",
-    "test": "npm run --workspaces --if-present test"
+    "test": "pnpm -r --if-present run test"
   },
   "devDependencies": {
     "@types/node": "24.19.0",
@@ -33,5 +27,6 @@
     "prettier": "3.9.4",
     "tsx": "4.23.0",
     "typescript": "6.0.3"
-  }
+  },
+  "packageManager": "pnpm@10.34.5"
 }
