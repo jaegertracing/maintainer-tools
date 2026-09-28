@@ -114,7 +114,7 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       additions: pr.additions,
       deletions: pr.deletions,
       changedFiles: pr.changedFiles,
-      ageDays: Math.floor(ageInDays(pr, opts.now)),
+      ageDays: ageInDays(pr, opts.now),
       ageLabel: formatAge(pr, opts.now),
       updatedAt: pr.updatedAt.slice(0, 10),
       createdAt: pr.createdAt.slice(0, 10),
@@ -329,6 +329,7 @@ const TABLE_SCRIPT = `
     num('Last Chg', 'ageDays', {
       width: 64,
       formatter: (cell) => cell.getRow().getData().ageLabel,
+      headerFilterFunc: (needle, value) => numFilter(needle, Math.floor(value)),
     }),
     text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('bucket', 'bucket', {
