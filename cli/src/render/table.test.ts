@@ -88,10 +88,29 @@ test('buildTableRows keeps the overridden signals next to the bucket', () => {
   assert.equal(row.priorityLabel, 'priority:high');
   assert.equal(row.codeownersHit, true);
   assert.equal(row.openThreads, 1);
-  assert.equal(row.ageDays, 2);
+  assert.equal(row.ageDays, 2 + 4 / 24);
+  assert.equal(row.ageLabel, '2d');
   assert.equal(row.updatedAt, '2026-09-18');
   assert.deepEqual(row.issues, ['#3', 'other/repo#9']);
   assert.equal(row.copilot, '');
+});
+
+test('buildTableRows preserves hourly ages for sorting and display', () => {
+  const rows = buildTableRows(
+    ['2026-09-20T10:00:00Z', '2026-09-20T02:00:00Z', '2026-09-19T12:00:00Z'].map((updatedAt) =>
+      classify(pullRequest({ updatedAt }), context),
+    ),
+    { viewer: 'maintainer-a', now },
+  );
+
+  assert.deepEqual(
+    rows.map((row) => ({ days: row.ageDays, label: row.ageLabel })),
+    [
+      { days: 2 / 24, label: '2h' },
+      { days: 10 / 24, label: '10h' },
+      { days: 1, label: '1d' },
+    ],
+  );
 });
 
 test('buildTableRows carries the Copilot verdict and marks the viewer as author', () => {

@@ -16,7 +16,7 @@ import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
-import { ageInDays, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
+import { ageInDays, formatAge, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
 
 export interface TableOptions {
   viewer: string;
@@ -59,6 +59,7 @@ export interface TableRow {
   deletions: number;
   changedFiles: number;
   ageDays: number;
+  ageLabel: string;
   updatedAt: string;
   createdAt: string;
   labels: string[];
@@ -113,7 +114,8 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       additions: pr.additions,
       deletions: pr.deletions,
       changedFiles: pr.changedFiles,
-      ageDays: Math.floor(ageInDays(pr, opts.now)),
+      ageDays: ageInDays(pr, opts.now),
+      ageLabel: formatAge(pr, opts.now),
       updatedAt: pr.updatedAt.slice(0, 10),
       createdAt: pr.createdAt.slice(0, 10),
       labels: pr.labels,
@@ -279,7 +281,7 @@ const TABLE_SCRIPT = `
     additions: 'Lines added across the whole PR.',
     deletions: 'Lines deleted across the whole PR.',
     changedFiles: 'Number of changed files.',
-    ageDays: 'Days since the last update.',
+    ageDays: 'Time since the last activity, as of report generation. Values show days (d), or hours (h) under one day. Filter in whole days.',
     updatedAt: 'Date of the last update.',
     createdAt: 'Date the PR was opened.',
     labels: 'GitHub labels on the PR.',
@@ -306,7 +308,7 @@ const TABLE_SCRIPT = `
   const HAS_TIERS = ROWS.some((r) => r.priorityLabel);
   const columns = [
     en('repo', 'repo', {
-      frozen: true,
+      frozen: true, maxInitialWidth: 210, tooltip: (e, cell) => esc(cell.getValue()),
       // Exact match, not the default 'like': repo names can be substrings of
       // each other (jaeger vs. jaeger-ui, jaeger-idl), and the enum dropdown
       // already offers full, correct values, so nothing needs fuzzy typing.
@@ -314,17 +316,24 @@ const TABLE_SCRIPT = `
       sorter: (a, b, aRow, bRow) => aRow.getData().repoOrder - bRow.getData().repoOrder,
     }),
     num('PR', 'number', {
-      frozen: true, width: 80, headerFilterPlaceholder: '#',
+      frozen: true, width: 70, headerFilterPlaceholder: '#',
       formatter: (cell) => '<a href="' + esc(cell.getRow().getData().url) + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>',
     }),
-    text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('author', 'author', {
+      maxInitialWidth: 160, tooltip: (e, cell) => esc(cell.getValue()),
       formatter: (cell) => {
         const r = cell.getRow().getData();
         return '<a href="' + esc(r.authorUrl) + '" target="_blank" rel="noopener noreferrer">@' + esc(r.author) + '</a>' + (r.isViewer ? ' <span class="role-tag">you</span>' : '');
       },
     }),
+    num('Last Chg', 'ageDays', {
+      width: 64,
+      formatter: (cell) => cell.getRow().getData().ageLabel,
+      headerFilterFunc: (needle, value) => numFilter(needle, Math.floor(value)),
+    }),
+    text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('bucket', 'bucket', {
+      maxInitialWidth: 200, tooltip: (e, cell) => esc(cell.getValue()),
       headerFilterParams: {
         values: ${JSON.stringify(BUCKET_ORDER.map((bucket) => BUCKET_LABELS[bucket]))},
         multiselect: true, clearable: true, itemFormatter: escapedItem,
@@ -363,7 +372,6 @@ const TABLE_SCRIPT = `
     num('LOC+', 'additions'),
     num('LOC-', 'deletions'),
     num('files', 'changedFiles'),
-    num('age (d)', 'ageDays'),
     en('updated', 'updatedAt', { width: 110 }),
     en('created', 'createdAt', { width: 110 }),
     list('labels', 'labels', () => 'flag-LABEL'),
