@@ -11,6 +11,6 @@
     "@jaegertracing/maintainer-tools-checks": "workspace:*",
     "@octokit/graphql": "9.0.3",
     "exceljs": "4.4.0",
-    "tabulator-tables": "6.5.3"
+    "tabulator-tables": "6.6.1"
   }
 }
