@@ -30,7 +30,8 @@ import {
   hideReasonLabel,
   hideReasonsOf,
 } from './shared.js';
-import { escape, renderDiff } from './diff.js';
+import { renderDiff } from './diff.js';
+import { escape } from './escape.js';
 import { renderTableView, TABLE_CSS, tabulatorAssets } from './table.js';
 
 // All outbound links (repo, PR, author) open in a new tab so following one

@@ -16,7 +16,7 @@ import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
-import { renderDiff } from './diff.js';
+import { diffSummary, renderDiff } from './diff.js';
 import { ageInDays, formatAge, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
 
 export interface TableOptions {
@@ -58,6 +58,7 @@ export interface TableRow {
   // Pre-rendered HTML of the per-class line-count breakdown, the same cell the
   // bucket view shows.
   diff: string;
+  diffTip: string;
   srcLines: number;
   additions: number;
   deletions: number;
@@ -115,6 +116,7 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       copilotUrl: review?.url ?? '',
       copilotTip: review ? copilotTooltip(review) : '',
       diff: renderDiff(pr),
+      diffTip: diffSummary(pr),
       srcLines: computeComposition(pr).sourceLines,
       additions: pr.additions,
       deletions: pr.deletions,
@@ -199,6 +201,8 @@ export const TABLE_CSS = `
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
   #triage-table .cell-diff { white-space: normal; }
+  #triage-table .cell-diff [data-tip] { cursor: default; }
+  #triage-table .cell-diff [data-tip]:hover::after { display: none; }
   #triage-table .tabulator-tableholder { overflow-x: scroll; }
   /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track outside the rows. */
   #triage-table .tabulator-tableholder::-webkit-scrollbar { width: 14px; height: 14px; }
@@ -339,8 +343,11 @@ const TABLE_SCRIPT = `
       headerFilterFunc: (needle, value) => numFilter(needle, Math.floor(value)),
     }),
     {
-      title: 'diff', field: 'diff', cssClass: 'cell-diff', headerSort: false, variableHeight: true, width: 110,
+      title: 'diff', field: 'diff', cssClass: 'cell-diff', headerSort: false, variableHeight: true, minWidth: 110,
       formatter: (cell) => cell.getValue(),
+      // Tabulator cells clip the CSS tooltip the labels carry, so the file
+      // counts come through Tabulator's own tooltip instead.
+      tooltip: (e, cell) => cell.getRow().getData().diffTip,
     },
     text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('bucket', 'bucket', {

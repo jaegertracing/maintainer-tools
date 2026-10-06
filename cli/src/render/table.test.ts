@@ -112,6 +112,38 @@ test('buildTableRows carries the per-class diff breakdown as rendered HTML', () 
   assert.match(row.diff, /dc-source[^>]*>src<\/span><span class="dc-nums">.*\+12.*-3/);
   assert.match(row.diff, /dc-tests[^>]*>test<\/span><span class="dc-nums">.*\+40.*-0/);
   assert.doesNotMatch(row.diff, /dc-docs/);
+  assert.equal(row.diffTip, '1 source file: +12 / -3\n1 tests file: +40 / -0');
+});
+
+test('buildTableRows falls back to the whole-PR total without per-file stats', () => {
+  const classified = classify(
+    pullRequest({ fileStats: undefined, additions: 7, deletions: 2 }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.doesNotMatch(row.diff, /dc-label/);
+  assert.match(row.diff, /\+7.*-2/);
+  assert.equal(row.diffTip, '2 files: +7 / -2');
+});
+
+test('buildTableRows marks a breakdown that covers only the first 100 files', () => {
+  const fileStats = Array.from({ length: 100 }, (_, i) => ({
+    path: `src/f${i}.ts`,
+    additions: 1,
+    deletions: 0,
+    changeType: 'MODIFIED',
+  }));
+  const classified = classify(
+    pullRequest({ files: fileStats.map((f) => f.path), fileStats, changedFiles: 120 }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.match(row.diff, /dc-trunc/);
+  assert.match(row.diffTip, /^100 source files: \+100 \/ -0\nMore than 100 files changed/);
 });
 
 test('buildTableRows preserves hourly ages for sorting and display', () => {
