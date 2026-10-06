@@ -1,7 +1,7 @@
-// Per-class line-count breakdown of a PR, shared by the bucket view and the
-// table view so the two render the same cell. Only non-zero classes render, so
-// a pure source change stays short while a fixture drop is visibly a fixture
-// drop. Source leads because it is the sort key.
+// This module renders a PR's line counts per file class for both the bucket
+// view and the table view, so the two show the same cell. Only non-zero
+// classes render, so a pure source change stays short while a fixture drop is
+// visibly a fixture drop. Source leads because it is the sort key.
 
 import {
   computeComposition,

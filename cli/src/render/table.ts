@@ -56,8 +56,8 @@ export interface TableRow {
   copilotLight: string;
   copilotUrl: string;
   copilotTip: string;
-  // Pre-rendered HTML of the per-class line-count breakdown, the same cell the
-  // bucket view shows.
+  // `diff` holds the pre-rendered HTML of the per-class line-count breakdown,
+  // the same cell the bucket view shows.
   diff: string;
   diffTip: string;
   srcLines: number;
