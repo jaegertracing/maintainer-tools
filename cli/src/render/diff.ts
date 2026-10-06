@@ -6,6 +6,8 @@
 import {
   computeComposition,
   FILE_CLASSES,
+  type ClassTotals,
+  type Composition,
   type FileClass,
   type PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
@@ -21,8 +23,6 @@ const CLASS_ABBREV: Record<FileClass, string> = {
   generated: 'gen',
 };
 
-// Plain-text version of the per-label tooltips, for hosts such as Tabulator
-// whose cells clip the CSS tooltip and render their own instead.
 const CLASS_NOUN: Record<FileClass, string> = {
   source: 'source',
   tests: 'test',
@@ -32,6 +32,8 @@ const CLASS_NOUN: Record<FileClass, string> = {
   generated: 'generated',
 };
 
+// Plain-text version of the per-label tooltips, for hosts such as Tabulator
+// whose cells clip the CSS tooltip and render their own instead.
 export function diffSummary(pr: PullRequest): string {
   const comp = computeComposition(pr);
   if (!comp.exact)
@@ -44,10 +46,7 @@ export function diffSummary(pr: PullRequest): string {
 
 const TRUNCATED_TIP = 'More than 100 files changed; this split covers the first 100 only.';
 
-function fileCountTip(
-  cls: FileClass,
-  t: { files: number; additions: number; deletions: number },
-): string {
+function fileCountTip(cls: FileClass, t: ClassTotals): string {
   return `${pluralize(t.files, `${CLASS_NOUN[cls]} file`)}: +${t.additions} / -${t.deletions}`;
 }
 
@@ -78,7 +77,7 @@ export function renderDiff(pr: PullRequest): string {
   return `<div class="diff dcs">${rows.join('')}</div>`;
 }
 
-function nonZeroClasses(comp: ReturnType<typeof computeComposition>): FileClass[] {
+function nonZeroClasses(comp: Composition): FileClass[] {
   return FILE_CLASSES.filter((cls) => {
     const t = comp.byClass[cls];
     return t.additions + t.deletions > 0;
