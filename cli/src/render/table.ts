@@ -16,6 +16,7 @@ import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
+import { renderDiff } from './diff.js';
 import { ageInDays, formatAge, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
 
 export interface TableOptions {
@@ -54,6 +55,9 @@ export interface TableRow {
   copilotLight: string;
   copilotUrl: string;
   copilotTip: string;
+  // Pre-rendered HTML of the per-class line-count breakdown, the same cell the
+  // bucket view shows.
+  diff: string;
   srcLines: number;
   additions: number;
   deletions: number;
@@ -110,6 +114,7 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       copilotLight: review?.light ?? '',
       copilotUrl: review?.url ?? '',
       copilotTip: review ? copilotTooltip(review) : '',
+      diff: renderDiff(pr),
       srcLines: computeComposition(pr).sourceLines,
       additions: pr.additions,
       deletions: pr.deletions,
@@ -193,6 +198,7 @@ export const TABLE_CSS = `
   #triage-table { font-size: 0.85em; border: 1px solid #d0d7de; border-radius: 6px; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
+  #triage-table .cell-diff { white-space: normal; }
   #triage-table .tabulator-tableholder { overflow-x: scroll; }
   /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track outside the rows. */
   #triage-table .tabulator-tableholder::-webkit-scrollbar { width: 14px; height: 14px; }
@@ -277,6 +283,7 @@ const TABLE_SCRIPT = `
     ci: 'Status check rollup on the head commit.',
     mergeable: 'GitHub mergeability: mergeable, conflicting, or unknown.',
     openThreads: 'Unresolved review threads.',
+    diff: 'Lines added and deleted per file class (src, test, fix, doc, cfg, gen). Hover a label for the file count.',
     srcLines: 'Lines added plus deleted in source files, ignoring tests, fixtures, docs, config and generated files. The bucket view sorts by this.',
     additions: 'Lines added across the whole PR.',
     deletions: 'Lines deleted across the whole PR.',
@@ -331,6 +338,10 @@ const TABLE_SCRIPT = `
       formatter: (cell) => cell.getRow().getData().ageLabel,
       headerFilterFunc: (needle, value) => numFilter(needle, Math.floor(value)),
     }),
+    {
+      title: 'diff', field: 'diff', cssClass: 'cell-diff', headerSort: false, variableHeight: true, width: 110,
+      formatter: (cell) => cell.getValue(),
+    },
     text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('bucket', 'bucket', {
       maxInitialWidth: 200, tooltip: (e, cell) => esc(cell.getValue()),

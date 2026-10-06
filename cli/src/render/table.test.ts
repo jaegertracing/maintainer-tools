@@ -95,6 +95,25 @@ test('buildTableRows keeps the overridden signals next to the bucket', () => {
   assert.equal(row.copilot, '');
 });
 
+test('buildTableRows carries the per-class diff breakdown as rendered HTML', () => {
+  const classified = classify(
+    pullRequest({
+      files: ['src/a.ts', 'src/a.test.ts'],
+      fileStats: [
+        { path: 'src/a.ts', additions: 12, deletions: 3, changeType: 'MODIFIED' },
+        { path: 'src/a.test.ts', additions: 40, deletions: 0, changeType: 'ADDED' },
+      ],
+    }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.match(row.diff, /dc-source[^>]*>src<\/span><span class="dc-nums">.*\+12.*-3/);
+  assert.match(row.diff, /dc-tests[^>]*>test<\/span><span class="dc-nums">.*\+40.*-0/);
+  assert.doesNotMatch(row.diff, /dc-docs/);
+});
+
 test('buildTableRows preserves hourly ages for sorting and display', () => {
   const rows = buildTableRows(
     ['2026-09-20T10:00:00Z', '2026-09-20T02:00:00Z', '2026-09-19T12:00:00Z'].map((updatedAt) =>
