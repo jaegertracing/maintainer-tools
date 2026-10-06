@@ -351,6 +351,7 @@ const TABLE_SCRIPT = `
       // a string tooltip as HTML, which would collapse the line breaks, so the
       // text goes into an element that keeps them.
       tooltip: (e, cell) => {
+        if (!cell.getRow().getData().diffTip) return '';
         const el = document.createElement('div');
         el.style.whiteSpace = 'pre-line';
         el.textContent = cell.getRow().getData().diffTip;

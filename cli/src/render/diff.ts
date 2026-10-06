@@ -1,5 +1,7 @@
 // Per-class line-count breakdown of a PR, shared by the bucket view and the
-// table view so the two render the same cell.
+// table view so the two render the same cell. Only non-zero classes render, so
+// a pure source change stays short while a fixture drop is visibly a fixture
+// drop. Source leads because it is the sort key.
 
 import {
   computeComposition,
@@ -10,9 +12,6 @@ import {
 
 import { escape } from './escape.js';
 
-// Per-class breakdown instead of one total. Only non-zero classes render, so a
-// pure source change stays as short as it was before, while a fixture drop is
-// visibly a fixture drop. Source leads because it is the sort key.
 const CLASS_ABBREV: Record<FileClass, string> = {
   source: 'src',
   tests: 'test',
@@ -27,14 +26,18 @@ const CLASS_ABBREV: Record<FileClass, string> = {
 export function diffSummary(pr: PullRequest): string {
   const comp = computeComposition(pr);
   if (!comp.exact) return `${pr.changedFiles} files: +${pr.additions} / -${pr.deletions}`;
-  const parts = nonZeroClasses(comp).map(([cls, t]) => fileCountTip(cls, t));
+  const parts = nonZeroClasses(comp).map((cls) => fileCountTip(cls, comp.byClass[cls]));
+  if (parts.length === 0) return '';
   if (comp.truncated) parts.push(TRUNCATED_TIP);
   return parts.join('\n');
 }
 
 const TRUNCATED_TIP = 'More than 100 files changed; this split covers the first 100 only.';
 
-function fileCountTip(cls: FileClass, t: ClassTotals): string {
+function fileCountTip(
+  cls: FileClass,
+  t: { files: number; additions: number; deletions: number },
+): string {
   return `${t.files} ${cls} file${t.files === 1 ? '' : 's'}: +${t.additions} / -${t.deletions}`;
 }
 
@@ -45,7 +48,8 @@ export function renderDiff(pr: PullRequest): string {
     // total rather than a breakdown we cannot stand behind.
     return `<span class="diff">${addDel(pr.additions, pr.deletions)}</span>`;
   }
-  const rows = nonZeroClasses(comp).map(([cls, t]) => {
+  const rows = nonZeroClasses(comp).map((cls) => {
+    const t = comp.byClass[cls];
     return (
       `<span class="dc-label dc-${cls}" data-tip="${escape(fileCountTip(cls, t))}">${CLASS_ABBREV[cls]}</span>` +
       `<span class="dc-nums">${addDel(t.additions, t.deletions)}</span>`
@@ -60,13 +64,11 @@ export function renderDiff(pr: PullRequest): string {
   return `<div class="diff dcs">${rows.join('')}</div>`;
 }
 
-type Composition = ReturnType<typeof computeComposition>;
-type ClassTotals = Composition['byClass'][FileClass];
-
-function nonZeroClasses(comp: Composition): Array<[FileClass, ClassTotals]> {
-  return FILE_CLASSES.map((cls): [FileClass, ClassTotals] => [cls, comp.byClass[cls]]).filter(
-    ([, t]) => t.additions + t.deletions > 0,
-  );
+function nonZeroClasses(comp: ReturnType<typeof computeComposition>): FileClass[] {
+  return FILE_CLASSES.filter((cls) => {
+    const t = comp.byClass[cls];
+    return t.additions + t.deletions > 0;
+  });
 }
 
 function addDel(additions: number, deletions: number): string {
