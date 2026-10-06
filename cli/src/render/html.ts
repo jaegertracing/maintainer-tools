@@ -6,12 +6,9 @@
 // dependency bots, and Hidden default collapsed. Empty buckets are omitted.
 
 import {
-  computeComposition,
-  FILE_CLASSES,
   issueUrl,
   parseRefKey,
   refKey,
-  type FileClass,
   type PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
 import {
@@ -33,6 +30,8 @@ import {
   hideReasonLabel,
   hideReasonsOf,
 } from './shared.js';
+import { renderDiff } from './diff.js';
+import { escape } from './escape.js';
 import { renderTableView, TABLE_CSS, tabulatorAssets } from './table.js';
 
 // All outbound links (repo, PR, author) open in a new tab so following one
@@ -370,49 +369,6 @@ function renderRow(
       </tr>`;
 }
 
-// Per-class breakdown instead of one total. Only non-zero classes render, so a
-// pure source change stays as short as it was before, while a fixture drop is
-// visibly a fixture drop. Source leads because it is the sort key.
-const CLASS_ABBREV: Record<FileClass, string> = {
-  source: 'src',
-  tests: 'test',
-  fixtures: 'fix',
-  docs: 'doc',
-  config: 'cfg',
-  generated: 'gen',
-};
-
-function renderDiff(pr: PullRequest): string {
-  const comp = computeComposition(pr);
-  if (!comp.exact) {
-    // No per-file data (cached before fileStats existed). Show the whole-PR
-    // total rather than a breakdown we cannot stand behind.
-    return `<span class="diff">${addDel(pr.additions, pr.deletions)}</span>`;
-  }
-  const rows = FILE_CLASSES.filter((cls) => {
-    const t = comp.byClass[cls];
-    return t.additions + t.deletions > 0;
-  }).map((cls) => {
-    const t = comp.byClass[cls];
-    const tip = `${t.files} ${cls} file${t.files === 1 ? '' : 's'}: +${t.additions} / -${t.deletions}`;
-    return (
-      `<span class="dc-label dc-${cls}" data-tip="${escape(tip)}">${CLASS_ABBREV[cls]}</span>` +
-      `<span class="dc-nums">${addDel(t.additions, t.deletions)}</span>`
-    );
-  });
-  if (rows.length === 0) return '<span class="dim">—</span>';
-  if (comp.truncated) {
-    rows.push(
-      `<span class="dc-label dc-trunc" data-tip="More than 100 files changed; this split covers the first 100 only.">+…</span><span class="dc-nums"></span>`,
-    );
-  }
-  return `<div class="diff dcs">${rows.join('')}</div>`;
-}
-
-function addDel(additions: number, deletions: number): string {
-  return `<span class="add">+${additions}</span>/<span class="del">-${deletions}</span>`;
-}
-
 // The issues this PR claims to close, plus the other open PRs claiming the
 // same ones. Naming those PRs rather than only counting them is what makes the
 // row actionable: three separate contributors each fixed jaeger#8780, and
@@ -685,15 +641,3 @@ const CSS = `
   td a .flag-COPILOT:hover { text-decoration: underline; }
   footer { margin-top: 4em; color: #8b949e; font-size: 0.8em; border-top: 1px solid #eaeef2; padding-top: 1em; }
 `;
-
-const ESCAPE_MAP: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-};
-
-function escape(s: string): string {
-  return String(s).replace(/[&<>"']/g, (c) => ESCAPE_MAP[c] ?? c);
-}

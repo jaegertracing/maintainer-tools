@@ -95,6 +95,62 @@ test('buildTableRows keeps the overridden signals next to the bucket', () => {
   assert.equal(row.copilot, '');
 });
 
+test('buildTableRows carries the per-class diff breakdown as rendered HTML', () => {
+  const classified = classify(
+    pullRequest({
+      files: ['src/a.ts', 'src/a.test.ts'],
+      fileStats: [
+        { path: 'src/a.ts', additions: 12, deletions: 3, changeType: 'MODIFIED' },
+        { path: 'src/a.test.ts', additions: 40, deletions: 0, changeType: 'ADDED' },
+      ],
+    }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.match(row.diff, /dc-source[^>]*>src<\/span><span class="dc-nums">.*\+12.*-3/);
+  assert.match(row.diff, /dc-tests[^>]*>test<\/span><span class="dc-nums">.*\+40.*-0/);
+  assert.doesNotMatch(row.diff, /dc-docs/);
+  assert.equal(row.diffTip, '1 source file: +12 / -3\n1 test file: +40 / -0');
+});
+
+test('buildTableRows falls back to the whole-PR total without per-file stats', () => {
+  const classified = classify(
+    pullRequest({ fileStats: undefined, additions: 7, deletions: 2, changedFiles: 2 }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.doesNotMatch(row.diff, /dc-label/);
+  assert.match(row.diff, /\+7.*-2/);
+  assert.equal(row.diffTip, '2 files: +7 / -2');
+});
+
+test('buildTableRows marks a breakdown that covers only the first 100 files', () => {
+  // computeComposition flags truncation whenever changedFiles exceeds the
+  // per-file stats it was given, so a small shortfall exercises the branch.
+  const fileStats = Array.from({ length: 3 }, (_, i) => ({
+    path: `src/f${i}.ts`,
+    additions: 1,
+    deletions: 0,
+    changeType: 'MODIFIED',
+  }));
+  const classified = classify(
+    pullRequest({ files: fileStats.map((f) => f.path), fileStats, changedFiles: 5 }),
+    context,
+  );
+  const [row] = buildTableRows([classified], { viewer: 'maintainer-a', now });
+
+  assert.ok(row);
+  assert.match(row.diff, /dc-trunc/);
+  assert.equal(
+    row.diffTip,
+    '3 source files: +3 / -0\nMore than 100 files changed; this split covers the first 100 only.',
+  );
+});
+
 test('buildTableRows preserves hourly ages for sorting and display', () => {
   const rows = buildTableRows(
     ['2026-09-20T10:00:00Z', '2026-09-20T02:00:00Z', '2026-09-19T12:00:00Z'].map((updatedAt) =>
