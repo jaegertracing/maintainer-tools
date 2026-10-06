@@ -3,7 +3,8 @@
 // look at next"; this view answers ad-hoc questions such as "all PRs from
 // priority authors, whatever bucket they landed in". Sorting is multi-column
 // (shift-click a header, or arrange the chips in the Sort panel) and every
-// column has a header filter. The bucket filter supports multiple selections.
+// column but the per-class diff breakdown has a header filter; the LOC columns
+// cover numeric filtering. The bucket filter supports multiple selections.
 //
 // Tabulator's JS and CSS are inlined from node_modules so the report stays a
 // single self-contained file.
@@ -287,7 +288,7 @@ const TABLE_SCRIPT = `
     ci: 'Status check rollup on the head commit.',
     mergeable: 'GitHub mergeability: mergeable, conflicting, or unknown.',
     openThreads: 'Unresolved review threads.',
-    diff: 'Lines added and deleted per file class (src, test, fix, doc, cfg, gen). Hover a label for the file count.',
+    diff: 'Lines added and deleted per file class (src, test, fix, doc, cfg, gen). Hover the cell for file counts.',
     srcLines: 'Lines added plus deleted in source files, ignoring tests, fixtures, docs, config and generated files. The bucket view sorts by this.',
     additions: 'Lines added across the whole PR.',
     deletions: 'Lines deleted across the whole PR.',
@@ -346,8 +347,15 @@ const TABLE_SCRIPT = `
       title: 'diff', field: 'diff', cssClass: 'cell-diff', headerSort: false, variableHeight: true, minWidth: 110,
       formatter: (cell) => cell.getValue(),
       // Tabulator cells clip the CSS tooltip the labels carry, so the file
-      // counts come through Tabulator's own tooltip instead.
-      tooltip: (e, cell) => cell.getRow().getData().diffTip,
+      // counts come through Tabulator's own tooltip instead. Tabulator inserts
+      // a string tooltip as HTML, which would collapse the line breaks, so the
+      // text goes into an element that keeps them.
+      tooltip: (e, cell) => {
+        const el = document.createElement('div');
+        el.style.whiteSpace = 'pre-line';
+        el.textContent = cell.getRow().getData().diffTip;
+        return el;
+      },
     },
     text('title', 'title', { minWidth: 260, widthGrow: 3, tooltip: (e, cell) => esc(cell.getValue()) }),
     en('bucket', 'bucket', {

@@ -264,7 +264,8 @@ list of hide reasons), and each facet is a column. Sorting is multi-column:
 shift-click makes a header the primary key with the earlier keys as tiebreakers,
 and a Sort panel shows the active keys as chips that can be dragged into priority
 order or clicked to flip direction.
-Every column has a header filter; list-valued and enumerated columns autocomplete
+Every column except the per-class diff breakdown has a header filter (the LOC
+columns cover numeric filtering); list-valued and enumerated columns autocomplete
 from the values in the currently visible rows, and a Filters panel shows the
 active filters as removable chips. Tabulator's script and stylesheet are inlined
 into the file, so the report stays self-contained.

@@ -27,20 +27,14 @@ const CLASS_ABBREV: Record<FileClass, string> = {
 export function diffSummary(pr: PullRequest): string {
   const comp = computeComposition(pr);
   if (!comp.exact) return `${pr.changedFiles} files: +${pr.additions} / -${pr.deletions}`;
-  const parts = FILE_CLASSES.filter((cls) => {
-    const t = comp.byClass[cls];
-    return t.additions + t.deletions > 0;
-  }).map((cls) => fileCountTip(cls, comp.byClass[cls]));
+  const parts = nonZeroClasses(comp).map(([cls, t]) => fileCountTip(cls, t));
   if (comp.truncated) parts.push(TRUNCATED_TIP);
   return parts.join('\n');
 }
 
 const TRUNCATED_TIP = 'More than 100 files changed; this split covers the first 100 only.';
 
-function fileCountTip(
-  cls: FileClass,
-  t: { files: number; additions: number; deletions: number },
-): string {
+function fileCountTip(cls: FileClass, t: ClassTotals): string {
   return `${t.files} ${cls} file${t.files === 1 ? '' : 's'}: +${t.additions} / -${t.deletions}`;
 }
 
@@ -51,11 +45,7 @@ export function renderDiff(pr: PullRequest): string {
     // total rather than a breakdown we cannot stand behind.
     return `<span class="diff">${addDel(pr.additions, pr.deletions)}</span>`;
   }
-  const rows = FILE_CLASSES.filter((cls) => {
-    const t = comp.byClass[cls];
-    return t.additions + t.deletions > 0;
-  }).map((cls) => {
-    const t = comp.byClass[cls];
+  const rows = nonZeroClasses(comp).map(([cls, t]) => {
     return (
       `<span class="dc-label dc-${cls}" data-tip="${escape(fileCountTip(cls, t))}">${CLASS_ABBREV[cls]}</span>` +
       `<span class="dc-nums">${addDel(t.additions, t.deletions)}</span>`
@@ -68,6 +58,15 @@ export function renderDiff(pr: PullRequest): string {
     );
   }
   return `<div class="diff dcs">${rows.join('')}</div>`;
+}
+
+type Composition = ReturnType<typeof computeComposition>;
+type ClassTotals = Composition['byClass'][FileClass];
+
+function nonZeroClasses(comp: Composition): Array<[FileClass, ClassTotals]> {
+  return FILE_CLASSES.map((cls): [FileClass, ClassTotals] => [cls, comp.byClass[cls]]).filter(
+    ([, t]) => t.additions + t.deletions > 0,
+  );
 }
 
 function addDel(additions: number, deletions: number): string {
