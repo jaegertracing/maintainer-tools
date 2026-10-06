@@ -112,7 +112,7 @@ test('buildTableRows carries the per-class diff breakdown as rendered HTML', () 
   assert.match(row.diff, /dc-source[^>]*>src<\/span><span class="dc-nums">.*\+12.*-3/);
   assert.match(row.diff, /dc-tests[^>]*>test<\/span><span class="dc-nums">.*\+40.*-0/);
   assert.doesNotMatch(row.diff, /dc-docs/);
-  assert.equal(row.diffTip, '1 source file: +12 / -3\n1 tests file: +40 / -0');
+  assert.equal(row.diffTip, '1 source file: +12 / -3\n1 test file: +40 / -0');
 });
 
 test('buildTableRows falls back to the whole-PR total without per-file stats', () => {
@@ -129,6 +129,8 @@ test('buildTableRows falls back to the whole-PR total without per-file stats', (
 });
 
 test('buildTableRows marks a breakdown that covers only the first 100 files', () => {
+  // computeComposition flags truncation whenever changedFiles exceeds the
+  // per-file stats it was given, so a small shortfall exercises the branch.
   const fileStats = Array.from({ length: 3 }, (_, i) => ({
     path: `src/f${i}.ts`,
     additions: 1,

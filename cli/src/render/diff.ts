@@ -23,9 +23,19 @@ const CLASS_ABBREV: Record<FileClass, string> = {
 
 // Plain-text version of the per-label tooltips, for hosts such as Tabulator
 // whose cells clip the CSS tooltip and render their own instead.
+const CLASS_NOUN: Record<FileClass, string> = {
+  source: 'source',
+  tests: 'test',
+  fixtures: 'fixture',
+  docs: 'doc',
+  config: 'config',
+  generated: 'generated',
+};
+
 export function diffSummary(pr: PullRequest): string {
   const comp = computeComposition(pr);
-  if (!comp.exact) return `${pr.changedFiles} files: +${pr.additions} / -${pr.deletions}`;
+  if (!comp.exact)
+    return `${pluralize(pr.changedFiles, 'file')}: +${pr.additions} / -${pr.deletions}`;
   const parts = nonZeroClasses(comp).map((cls) => fileCountTip(cls, comp.byClass[cls]));
   if (parts.length === 0) return '';
   if (comp.truncated) parts.push(TRUNCATED_TIP);
@@ -38,7 +48,11 @@ function fileCountTip(
   cls: FileClass,
   t: { files: number; additions: number; deletions: number },
 ): string {
-  return `${t.files} ${cls} file${t.files === 1 ? '' : 's'}: +${t.additions} / -${t.deletions}`;
+  return `${pluralize(t.files, `${CLASS_NOUN[cls]} file`)}: +${t.additions} / -${t.deletions}`;
+}
+
+function pluralize(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
 
 export function renderDiff(pr: PullRequest): string {
