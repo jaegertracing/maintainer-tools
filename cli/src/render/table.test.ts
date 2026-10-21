@@ -364,10 +364,17 @@ test('summary links replace filters and match multiple buckets exactly', () => {
 test('renderLabelLinks lists every label once per repo, in one wrapping line', () => {
   const rows = buildTableRows(
     [
-      pullRequest({ number: 1, labels: ['enhancement', 'bug'] }),
+      pullRequest({
+        number: 1,
+        labels: ['enhancement', 'bug', 'changelog:bugfix-or-minor-feature'],
+      }),
       pullRequest({ number: 2, labels: ['bug'] }),
       pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['docs'] }),
-      pullRequest({ number: 4, repo: { owner: 'other', name: 'empty' }, labels: [] }),
+      pullRequest({
+        number: 4,
+        repo: { owner: 'other', name: 'empty' },
+        labels: ['changelog:skip'],
+      }),
     ].map((pr) => classify(pr, context)),
     { viewer: 'maintainer-a', now },
   );
@@ -382,7 +389,8 @@ test('renderLabelLinks lists every label once per repo, in one wrapping line', (
     ],
   );
   assert.ok(html.includes('<b>repo:</b>'));
-  assert.ok(!html.includes('empty'), 'a repo without labels is omitted');
+  assert.ok(!html.includes('changelog:'), 'changelog labels are left out');
+  assert.ok(!html.includes('empty'), 'a repo with only changelog labels is omitted');
   assert.equal(renderLabelLinks([]), '');
 });
 

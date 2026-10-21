@@ -169,12 +169,13 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
 
 // Every label in use, grouped by repo on one wrapping line. Clicking one
 // filters the table to that repo and label, the same as picking both values in
-// the header filters.
+// the header filters. The changelog labels only classify the release notes, so
+// they are left out.
 export function renderLabelLinks(rows: TableRow[]): string {
   const byRepo = new Map<string, Set<string>>();
   for (const r of rows) {
     const set = byRepo.get(r.repo) ?? new Set<string>();
-    for (const l of r.labels) set.add(l);
+    for (const l of r.labels) if (!l.startsWith('changelog:')) set.add(l);
     byRepo.set(r.repo, set);
   }
   const repos = [...byRepo.keys()].filter((repo) => byRepo.get(repo)!.size > 0);
