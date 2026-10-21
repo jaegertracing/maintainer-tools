@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
-import { classify, type ClassifyContext } from '../buckets.js';
+import { BUCKET_ORDER, classify, type ClassifyContext } from '../buckets.js';
 import { renderHtml } from './html.js';
 
 const now = new Date('2026-09-20T12:00:00Z');
@@ -125,8 +125,8 @@ test('dependency bots get their own excluded row and are dropped from the subtot
 
   assert.match(
     html,
-    /<tr class="grand"><th scope="row">subtotal<\/th><td><a[^>]*data-repo="acme\/widgets"[^>]*data-buckets="[^"]*"[^>]*>1<\/a><\/td><td class="row-total"><span[^>]*>1<\/span><a[^>]*>1<\/a><\/td><\/tr>/,
-    'subtotal must count only the fyi PR',
+    /<tr class="grand"><th scope="row">subtotal<\/th><td><a[^>]*data-repo="acme\/widgets"[^>]*data-buckets="([^"]*)"[^>]*>1<\/a><\/td><td class="row-total"><span[^>]*>1<\/span><a[^>]*data-buckets="\1"[^>]*>1<\/a><\/td><\/tr>/,
+    'subtotal must count only the fyi PR, and its repo cell selects the same buckets as the row total',
   );
   assert.match(
     html,
@@ -229,6 +229,16 @@ test('summary label columns count actionable PRs across repos and open the Table
     summary,
     /<th scope="row">Total<\/th><td><a href="#repo-acme-widgets" data-repo="acme\/widgets" data-buckets="\[\]">3<\/a><\/td><td><a href="#repo-other-repo2" data-repo="other\/repo2" data-buckets="\[\]">1<\/a><\/td>/,
     'per-repo totals link to the repo heading and select the repo with no bucket filter',
+  );
+  const totalBug =
+    /<th scope="row">Total<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="bug">3<\/a>/.exec(
+      summary,
+    );
+  assert.ok(totalBug, 'the Total row counts the label over every bucket, hidden included');
+  assert.equal(
+    JSON.parse(totalBug![1]!.replaceAll('&quot;', '"')).length,
+    BUCKET_ORDER.length,
+    'a Total label cell selects every bucket so the filtered rows match the count',
   );
 });
 

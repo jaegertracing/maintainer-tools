@@ -593,8 +593,9 @@ const TABLE_SCRIPT = `
   // match the number clicked, then scrolls the Sort panel to the top so the
   // filtered rows are in view. A label count has no section in the
   // Categorized view, so clicking one there switches to the Table view first.
-  // Tabulator builds its columns on a timer after construction, so on that
-  // first open the filters wait for tableBuilt or they would be dropped.
+  // Tabulator builds its columns on a timer after construction, so until it
+  // reports itself initialized the filters wait for tableBuilt or they would
+  // be dropped. Handlers run in registration order, so the last click wins.
   const sortPanel = document.getElementById('sort-panel');
   document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets]').forEach((a) => {
     a.addEventListener('click', (e) => {
@@ -607,9 +608,8 @@ const TABLE_SCRIPT = `
       };
       if (!document.body.classList.contains('table-mode')) {
         if (!a.dataset.label) return;
-        const firstOpen = !table;
         show('table');
-        if (firstOpen) table.on('tableBuilt', applyFilters); else applyFilters();
+        if (table.initialized) applyFilters(); else table.on('tableBuilt', applyFilters);
       } else {
         applyFilters();
       }

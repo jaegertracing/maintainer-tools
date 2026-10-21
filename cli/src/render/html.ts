@@ -193,42 +193,59 @@ function prsInBucket(block: RepoBlock, bucket: Bucket): ClassifiedPR[] {
   return sections.filter((s) => s.bucket === bucket).flatMap((s) => s.prs);
 }
 
-// How many PRs in the given buckets, across all repos, carry each topic
-// label. Labels are keyed case-insensitively, the same way the Table view's
-// label filter matches them, so `Bug` in one repo and `bug` in another count
-// as one column; the first spelling seen names it.
-function labelCounts(
+// How many PRs in each bucket, across all repos, carry each topic label.
+// Labels are keyed case-insensitively, the same way the Table view's label
+// filter matches them, so `Bug` in one repo and `bug` in another count as
+// one column; the first spelling seen names it. The skipped labels match
+// exactly, as the classifier and the priority grouping read them.
+type LabelCounts = Map<string, { label: string; count: number }>;
+
+function labelCountsByBucket(
   blocks: RepoBlock[],
-  buckets: Bucket[],
   priorityLabels: string[],
-): Map<string, { label: string; count: number }> {
-  const skip = new Set([...FLAG_LABELS, ...priorityLabels].map((l) => l.toLowerCase()));
-  const counts = new Map<string, { label: string; count: number }>();
-  for (const block of blocks) {
-    for (const bucket of buckets) {
+): Map<Bucket, LabelCounts> {
+  const skip = new Set([...FLAG_LABELS, ...priorityLabels]);
+  const byBucket = new Map<Bucket, LabelCounts>();
+  for (const bucket of BUCKET_ORDER) {
+    const counts: LabelCounts = new Map();
+    for (const block of blocks) {
       for (const c of prsInBucket(block, bucket)) {
         for (const l of c.pr.labels) {
+          if (skip.has(l) || l.startsWith('changelog:')) continue;
           const key = l.toLowerCase();
-          if (skip.has(key) || key.startsWith('changelog:')) continue;
           const entry = counts.get(key) ?? { label: l, count: 0 };
           entry.count += 1;
           counts.set(key, entry);
         }
       }
     }
+    byBucket.set(bucket, counts);
   }
-  return counts;
+  return byBucket;
+}
+
+function sumLabelCounts(byBucket: Map<Bucket, LabelCounts>, buckets: Bucket[]): LabelCounts {
+  const total: LabelCounts = new Map();
+  for (const bucket of buckets) {
+    for (const [key, { label, count }] of byBucket.get(bucket)!) {
+      const entry = total.get(key) ?? { label, count: 0 };
+      entry.count += count;
+      total.set(key, entry);
+    }
+  }
+  return total;
 }
 
 function renderSummary(blocks: RepoBlock[], priorityLabels: string[]): string {
   if (blocks.length === 0) return '';
   const subtotalBuckets = BUCKET_ORDER.filter((b) => !SUBTOTAL_EXCLUDED_BUCKETS.includes(b));
+  const labelsByBucket = labelCountsByBucket(blocks, priorityLabels);
 
   // Label columns of the summary table. Only labels carried by at least one
   // PR in the subtotal buckets qualify, so a label that only marks bot or
   // blocked PRs (Dependabot's `dependencies`) is left out, and the columns
   // are ordered by how much actionable work each label marks.
-  const labels = [...labelCounts(blocks, subtotalBuckets, priorityLabels).entries()]
+  const labels = [...sumLabelCounts(labelsByBucket, subtotalBuckets).entries()]
     .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
     .map(([key, { label }]) => ({ key, label }));
 
@@ -261,12 +278,13 @@ function renderSummary(blocks: RepoBlock[], priorityLabels: string[]): string {
   // in the Categorized view; it opens the Table view filtered to the summed
   // buckets and the label instead.
   const labelCells = (buckets: Bucket[]): string => {
-    const counts = labelCounts(blocks, buckets, priorityLabels);
+    const counts = sumLabelCounts(labelsByBucket, buckets);
     return labels
       .map(({ key, label }, i) => {
-        const cls = i === 0 ? ' class="labels"' : '';
         const count = counts.get(key)?.count ?? 0;
-        if (count === 0) return `<td class="zero${i === 0 ? ' labels' : ''}">0</td>`;
+        const classes = [...(count === 0 ? ['zero'] : []), ...(i === 0 ? ['labels'] : [])];
+        const cls = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
+        if (count === 0) return `<td${cls}>0</td>`;
         return `<td${cls}><a href="#table" data-buckets="${bucketsAttr(buckets)}" data-label="${escape(label)}">${count}</a></td>`;
       })
       .join('');
@@ -657,15 +675,16 @@ const CSS = `
   .summary-scroll { overflow-x: auto; }
   table.summary-table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
   table.summary-table th, table.summary-table td { padding: 0.35em 0.9em 0.35em 0; text-align: right; white-space: nowrap; }
-  table.summary-table th[scope="row"], table.summary-table thead th.bucket { position: sticky; left: 0; background: white; }
+  table.summary-table th[scope="row"], table.summary-table thead th.bucket { position: sticky; left: 0; z-index: 1; background: white; }
   table.summary-table tbody tr:hover th[scope="row"] { background: #f6f8fa; }
   table.summary-table th[scope="row"] { text-align: left; font-weight: normal; padding-right: 1.6em; }
   table.summary-table thead .groups th { text-align: left; border-bottom: none; padding-bottom: 0; }
   table.summary-table thead .groups th.bucket { vertical-align: bottom; padding-bottom: 0.35em; border-bottom: 1px solid #d0d7de; }
   table.summary-table .labels { border-left: 1px solid #d0d7de; padding-left: 0.9em; }
   /* The scroll wrapper clips anything above the table, so a tooltip in the
-     first row opens below its cell instead. */
-  table.summary-table [data-tip]:hover::after { bottom: auto; top: 125%; }
+     first row opens below its cell instead. Lower rows have the header above
+     them and the last rows have nothing below, so they keep the default. */
+  table.summary-table tbody tr:first-child [data-tip]:hover::after { bottom: auto; top: 125%; }
   /* Column headers carry the same size as the rows they label; the hierarchy
      comes from colour, not from shrinking the text. The first header names the
      row labels below it, so it is left-aligned with them rather than following

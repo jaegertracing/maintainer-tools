@@ -262,6 +262,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   let labelFilter: (needle: string, labels: string[]) => boolean = () => false;
   const built: Array<() => void> = [];
   const table = {
+    initialized: false,
     on: (event: string, handler: () => void) => {
       if (event === 'tableBuilt') built.push(handler);
     },
@@ -321,9 +322,16 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   assert.equal(tableMode, true, 'a label count opens the Table view from the Categorized view');
   assert.equal(filters.size, 0, 'the filters wait until Tabulator has built its columns');
   // The table's own tableBuilt handler wires panels the stub does not model;
-  // the click registers its filter handler after it.
+  // each click registers its filter handler after it.
   assert.equal(built.length, 2);
-  built[1]!();
+  tableMode = false;
+  listeners.get('3')!();
+  assert.equal(built.length, 2, 'a repo cell clicked before the build does nothing');
+  tableMode = false;
+  listeners.get('5')!();
+  assert.equal(built.length, 3, 'a second label click before the build also waits');
+  for (const handler of built.slice(1)) handler();
+  table.initialized = true;
   assert.deepEqual(
     [...filters],
     [
@@ -331,7 +339,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
       ['labels', '"bug"'],
     ],
   );
-  assert.deepEqual(scrolled, ['sort-panel']);
+  assert.deepEqual(scrolled, ['sort-panel', 'sort-panel']);
   scrolled.length = 0;
 
   filters.set('repo', 'other/repo');
@@ -371,6 +379,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   assert.equal(labelFilter('"bug"', ['bug']), true);
   assert.equal(labelFilter('"bug"', ['bugfix']), false, 'a quoted value matches exactly');
   assert.equal(labelFilter('"BUG"', ['bug']), true, 'exact matching ignores case');
+  assert.equal(labelFilter('"bug"', ['Bug']), true, 'a summary column spelling matches the rest');
   assert.equal(labelFilter('bug', ['bugfix']), true, 'plain text matches as a substring');
   assert.equal(labelFilter('""', []), true, 'an empty quoted needle is no filter');
   tableMode = false;
