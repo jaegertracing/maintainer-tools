@@ -177,24 +177,24 @@ export function renderLabelLinks(rows: TableRow[]): string {
     for (const l of r.labels) set.add(l);
     byRepo.set(r.repo, set);
   }
-  const repos = [...byRepo.keys()];
-  const shortNames = repos.map((repo) => repo.split('/')[1] ?? repo);
-  const displayName = (repo: string, i: number) =>
-    shortNames.indexOf(shortNames[i]!) === shortNames.lastIndexOf(shortNames[i]!)
-      ? shortNames[i]!
-      : repo;
-  const groups = repos
-    .filter((repo) => byRepo.get(repo)!.size > 0)
-    .map((repo) => {
-      const links = [...byRepo.get(repo)!]
-        .sort((a, b) => a.localeCompare(b))
-        .map(
-          (l) =>
-            `<a href="#table" data-repo="${escape(repo)}" data-label="${escape(l)}">${escape(l)}</a>`,
-        )
-        .join(', ');
-      return `<span class="label-group"><b>${escape(displayName(repo, repos.indexOf(repo)))}:</b> ${links}</span>`;
-    });
+  const repos = [...byRepo.keys()].filter((repo) => byRepo.get(repo)!.size > 0);
+  const shortName = (repo: string) => repo.split('/')[1] ?? repo;
+  const shortNameCount = new Map<string, number>();
+  for (const repo of repos) {
+    shortNameCount.set(shortName(repo), (shortNameCount.get(shortName(repo)) ?? 0) + 1);
+  }
+  const displayName = (repo: string) =>
+    (shortNameCount.get(shortName(repo)) ?? 0) > 1 ? repo : shortName(repo);
+  const groups = repos.map((repo) => {
+    const links = [...byRepo.get(repo)!]
+      .sort((a, b) => a.localeCompare(b))
+      .map(
+        (l) =>
+          `<a href="#table" data-repo="${escape(repo)}" data-label="${escape(l)}">${escape(l)}</a>`,
+      )
+      .join(', ');
+    return `<span class="label-group"><b>${escape(displayName(repo))}:</b> ${links}</span>`;
+  });
   if (groups.length === 0) return '';
   return `<p class="label-links" id="label-links"><span class="panel-label">Labels</span> ${groups.join(' &middot; ')}</p>`;
 }
@@ -242,6 +242,7 @@ export const TABLE_CSS = `
      overflow: hidden would otherwise make the table box the scrollport the
      header sticks to. */
   #triage-table.tabulator { overflow: visible; }
+  #triage-table .tabulator-header { border-radius: 5px 5px 0 0; }
   #triage-table .tabulator-header { position: sticky; top: 0; z-index: 12; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
@@ -500,11 +501,14 @@ const TABLE_SCRIPT = `
   // --- Sticky horizontal scrollbar, mirroring the table holder's scroll range.
   const hscroll = document.getElementById('hscroll');
   const holder = () => table.element.querySelector('.tabulator-tableholder');
+  // The holder sits inside the table border, so the two elements differ in
+  // width; sizing the spacer by the holder's overflow gives both the same
+  // scroll range.
   function syncHscroll() {
     const h = holder();
     if (!h) return;
-    hscroll.firstElementChild.style.width = h.scrollWidth + 'px';
     hscroll.hidden = h.scrollWidth <= h.clientWidth;
+    hscroll.firstElementChild.style.width = h.scrollWidth - h.clientWidth + hscroll.clientWidth + 'px';
     hscroll.scrollLeft = h.scrollLeft;
   }
   function bindHscroll() {

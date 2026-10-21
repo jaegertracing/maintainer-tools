@@ -401,3 +401,67 @@ test('renderLabelLinks escapes label text and disambiguates repos sharing a name
   assert.ok(html.includes('<b>other/docs:</b>'));
   assert.ok(html.includes('<b>repo2:</b>'), 'a unique short name is kept');
 });
+
+test('the bottom scrollbar mirrors the table holder with the same scroll range', () => {
+  const html = renderTableView([], { viewer: 'maintainer-a', now });
+  const script = html.slice(
+    html.indexOf('<script>') + '<script>'.length,
+    html.lastIndexOf('</script>'),
+  );
+  const handlers = new Map<string, () => void>();
+  const holder = {
+    scrollWidth: 3000,
+    clientWidth: 998,
+    scrollLeft: 0,
+    listeners: new Map<string, () => void>(),
+    addEventListener(event: string, fn: () => void) {
+      this.listeners.set(event, fn);
+    },
+  };
+  const hscroll = {
+    hidden: true,
+    clientWidth: 1000,
+    scrollLeft: 0,
+    firstElementChild: { style: { width: '' } },
+    listeners: new Map<string, () => void>(),
+    addEventListener(event: string, fn: () => void) {
+      this.listeners.set(event, fn);
+    },
+  };
+  runInNewContext(script, {
+    document: {
+      getElementById: (id: string) =>
+        id === 'hscroll'
+          ? hscroll
+          : { textContent: '[]', innerHTML: '', hidden: false, addEventListener() {} },
+      querySelectorAll: () => [],
+      body: { classList: { toggle() {}, contains: () => true } },
+    },
+    location: { hash: '#table' },
+    history: { replaceState() {} },
+    window: { addEventListener() {} },
+    Tabulator: function () {
+      return {
+        on: (event: string, fn: () => void) => handlers.set(event, fn),
+        element: { querySelector: () => holder },
+        getSorters: () => [],
+        getHeaderFilters: () => [],
+        getDataCount: () => 0,
+      };
+    },
+  });
+
+  handlers.get('tableBuilt')!();
+  assert.equal(hscroll.hidden, false);
+  assert.equal(hscroll.firstElementChild.style.width, '3002px');
+  holder.scrollLeft = 2002;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 2002, 'the mirror follows the holder to its far end');
+  hscroll.scrollLeft = 700;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 700, 'the holder follows the mirror');
+
+  holder.scrollWidth = 998;
+  handlers.get('renderComplete')!();
+  assert.equal(hscroll.hidden, true, 'no overflow hides the mirror');
+});
