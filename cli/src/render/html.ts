@@ -179,9 +179,47 @@ function cellTargets(block: RepoBlock, bucket: Bucket): CellTargets {
 // readers who want the whole queue's size.
 const SUBTOTAL_EXCLUDED_BUCKETS: Bucket[] = ['dependency-bots', 'hidden'];
 
+// Labels the classifier already turns into a flag or a bucket, so a column
+// for them would repeat what the rows and the flags column say. The
+// `changelog:` labels only classify the release notes.
+const FLAG_LABELS = new Set(['stale', 'waiting-for-author', 'pr-quota-reached']);
+
+function isTopicLabel(label: string): boolean {
+  return !FLAG_LABELS.has(label) && !label.startsWith('changelog:');
+}
+
+function prsInBucket(block: RepoBlock, bucket: Bucket): ClassifiedPR[] {
+  const sections =
+    block.priorityGroups.length > 0
+      ? block.priorityGroups.flatMap((g) => g.sections)
+      : block.sections;
+  return sections.filter((s) => s.bucket === bucket).flatMap((s) => s.prs);
+}
+
+// Label columns of the summary table, across all repos. Only labels carried
+// by at least one PR in the subtotal buckets qualify, so a label that only
+// marks bot or blocked PRs (Dependabot's `dependencies`) is left out, and the
+// columns are ordered by how much actionable work each label marks.
+function labelColumns(blocks: RepoBlock[], subtotalBuckets: Bucket[]): string[] {
+  const counts = new Map<string, number>();
+  for (const block of blocks) {
+    for (const bucket of subtotalBuckets) {
+      for (const c of prsInBucket(block, bucket)) {
+        for (const l of c.pr.labels) {
+          if (isTopicLabel(l)) counts.set(l, (counts.get(l) ?? 0) + 1);
+        }
+      }
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([l]) => l);
+}
+
 function renderSummary(blocks: RepoBlock[]): string {
   if (blocks.length === 0) return '';
   const subtotalBuckets = BUCKET_ORDER.filter((b) => !SUBTOTAL_EXCLUDED_BUCKETS.includes(b));
+  const labels = labelColumns(blocks, subtotalBuckets);
 
   // A cell links to the first section holding its PRs. When the count spans
   // several priority groups the tooltip names the split, so the number a
@@ -197,10 +235,34 @@ function renderSummary(blocks: RepoBlock[]): string {
     return `<td><a href="#${first.anchor}" data-repo="${escape(block.repo)}" data-bucket="${escape(BUCKET_LABELS[bucket])}"${tip}>${count}</a></td>`;
   };
 
-  const totalCell = (count: number, buckets: Bucket[] = []): string => {
-    const labels = escape(JSON.stringify(buckets.map((bucket) => BUCKET_LABELS[bucket])));
-    return `<td class="row-total"><span class="categorized-total">${count}</span><a class="table-total" href="#table" data-buckets="${labels}">${count}</a></td>`;
-  };
+  const bucketsAttr = (buckets: Bucket[]): string =>
+    escape(JSON.stringify(buckets.map((bucket) => BUCKET_LABELS[bucket])));
+
+  // A repo's subtotal or total links to the repo heading in the Categorized
+  // view and selects the repo plus the summed buckets in the Table view.
+  const repoTotalCell = (block: RepoBlock, count: number, buckets: Bucket[]): string =>
+    `<td><a href="#${repoAnchor(block.repo)}" data-repo="${escape(block.repo)}" data-buckets="${bucketsAttr(buckets)}">${count}</a></td>`;
+
+  const totalCell = (count: number, buckets: Bucket[] = []): string =>
+    `<td class="row-total"><span class="categorized-total">${count}</span><a class="table-total" href="#table" data-buckets="${bucketsAttr(buckets)}">${count}</a></td>`;
+
+  // Label counts span repos, so a label cell has no single section to jump to
+  // in the Categorized view; it opens the Table view filtered to the summed
+  // buckets and the label instead.
+  const labelCells = (buckets: Bucket[]): string =>
+    labels
+      .map((l, i) => {
+        const cls = i === 0 ? ' class="labels"' : '';
+        let count = 0;
+        for (const block of blocks) {
+          for (const bucket of buckets) {
+            count += prsInBucket(block, bucket).filter((c) => c.pr.labels.includes(l)).length;
+          }
+        }
+        if (count === 0) return `<td class="zero${i === 0 ? ' labels' : ''}">0</td>`;
+        return `<td${cls}><a href="#table" data-buckets="${bucketsAttr(buckets)}" data-label="${escape(l)}">${count}</a></td>`;
+      })
+      .join('');
 
   const rowTotal = (bucket: Bucket): number =>
     blocks.reduce((a, b) => a + cellTargets(b, bucket).count, 0);
@@ -211,7 +273,7 @@ function renderSummary(blocks: RepoBlock[]): string {
       (bucket) =>
         `<tr><th scope="row">${escape(BUCKET_LABELS[bucket])}</th>${blocks
           .map((b) => cell(b, bucket))
-          .join('')}${totalCell(rowTotal(bucket), [bucket])}</tr>`,
+          .join('')}${totalCell(rowTotal(bucket), [bucket])}${labelCells([bucket])}</tr>`,
     )
     .join('\n        ');
 
@@ -228,35 +290,46 @@ function renderSummary(blocks: RepoBlock[]): string {
   );
   const totalAll = grandTotal + hiddenTotal + botTotal;
 
+  const groupHead =
+    labels.length > 0
+      ? `<tr class="groups"><th class="bucket" rowspan="2">bucket</th><th scope="colgroup" colspan="${blocks.length + 1}">repository</th><th scope="colgroup" colspan="${labels.length}" class="labels">label</th></tr>
+      <tr>`
+      : '<tr><th class="bucket" scope="col">bucket</th>';
+  const labelNames = labels
+    .map((l, i) => `<th scope="col"${i === 0 ? ' class="labels"' : ''}>${escape(l)}</th>`)
+    .join('');
+
   return `<section class="summary">
   <h2>Waiting on you <span class="count">${grandTotal} across ${blocks.length} repo${blocks.length === 1 ? '' : 's'}</span></h2>
+  <div class="summary-scroll">
   <table class="summary-table">
     <thead>
-      <tr><th scope="col">bucket</th>${blocks
+      ${groupHead}${blocks
         .map(
           (b) =>
             `<th scope="col"><a href="#${repoAnchor(b.repo)}" data-repo="${escape(b.repo)}">${escape(b.repo.split('/')[1] ?? b.repo)}</a></th>`,
         )
-        .join('')}<th scope="col">total</th></tr>
+        .join('')}<th scope="col">total</th>${labelNames}</tr>
     </thead>
     <tbody>
         ${rows}
     </tbody>
     <tfoot>
-      <tr class="grand"><th scope="row">subtotal</th>${subtotalPerRepo
-        .map((n) => `<td>${n}</td>`)
-        .join('')}${totalCell(grandTotal, subtotalBuckets)}</tr>
+      <tr class="grand"><th scope="row">subtotal</th>${blocks
+        .map((b, i) => repoTotalCell(b, subtotalPerRepo[i]!, subtotalBuckets))
+        .join('')}${totalCell(grandTotal, subtotalBuckets)}${labelCells(subtotalBuckets)}</tr>
       <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS['dependency-bots'])}<span class="note"> (excluded)</span></th>${blocks
         .map((b) => cell(b, 'dependency-bots'))
-        .join('')}${totalCell(botTotal, ['dependency-bots'])}</tr>
+        .join('')}${totalCell(botTotal, ['dependency-bots'])}${labelCells(['dependency-bots'])}</tr>
       <tr class="excluded"><th scope="row">${escape(BUCKET_LABELS.hidden)}<span class="note"> (excluded)</span></th>${blocks
         .map((b) => cell(b, 'hidden'))
-        .join('')}${totalCell(hiddenTotal, ['hidden'])}</tr>
-      <tr class="all-total"><th scope="row">Total</th>${totalPerRepo
-        .map((n) => `<td>${n}</td>`)
-        .join('')}${totalCell(totalAll)}</tr>
+        .join('')}${totalCell(hiddenTotal, ['hidden'])}${labelCells(['hidden'])}</tr>
+      <tr class="all-total"><th scope="row">Total</th>${blocks
+        .map((b, i) => repoTotalCell(b, totalPerRepo[i]!, BUCKET_ORDER))
+        .join('')}${totalCell(totalAll)}${labelCells(BUCKET_ORDER)}</tr>
     </tfoot>
   </table>
+  </div>
 </section>`;
 }
 
@@ -568,15 +641,24 @@ const CSS = `
   /* Top-of-report bucket-by-repo matrix. */
   section.summary { margin: 0 0 1.6em 0; }
   section.summary h2 { font-size: 1.05em; margin: 0 0 0.5em 0; border: none; padding: 0; }
+  /* The label columns can outgrow the window. The wrapper scrolls them, and
+     the bucket column sticks to the left edge so every count keeps its row
+     name while the repo block scrolls away. */
+  .summary-scroll { overflow-x: auto; }
   table.summary-table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  table.summary-table th, table.summary-table td { padding: 0.35em 0.9em 0.35em 0; text-align: right; }
+  table.summary-table th, table.summary-table td { padding: 0.35em 0.9em 0.35em 0; text-align: right; white-space: nowrap; }
+  table.summary-table th[scope="row"], table.summary-table thead th.bucket { position: sticky; left: 0; background: white; }
+  table.summary-table tbody tr:hover th[scope="row"] { background: #f6f8fa; }
   table.summary-table th[scope="row"] { text-align: left; font-weight: normal; padding-right: 1.6em; }
+  table.summary-table thead .groups th { text-align: left; border-bottom: none; padding-bottom: 0; }
+  table.summary-table thead .groups th.bucket { vertical-align: bottom; padding-bottom: 0.35em; border-bottom: 1px solid #d0d7de; }
+  table.summary-table .labels { border-left: 1px solid #d0d7de; padding-left: 0.9em; }
   /* Column headers carry the same size as the rows they label; the hierarchy
      comes from colour, not from shrinking the text. The first header names the
      row labels below it, so it is left-aligned with them rather than following
      the numeric columns to the right. */
   table.summary-table thead th { color: #57606a; font-weight: normal; border-bottom: 1px solid #d0d7de; }
-  table.summary-table thead th:first-child { text-align: left; }
+  table.summary-table thead th.bucket { text-align: left; }
   table.summary-table tbody tr:hover { background: #f6f8fa; }
   table.summary-table .row-total { font-weight: 600; }
   table.summary-table tfoot .grand th, table.summary-table tfoot .grand td { border-top: 1px solid #d0d7de; font-weight: 600; }

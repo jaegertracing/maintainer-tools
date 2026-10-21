@@ -6,7 +6,7 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifyContext } from '../buckets.js';
 import { NO_PRIORITY_LABEL } from './shared.js';
-import { buildTableRows, renderLabelLinks, renderTableView } from './table.js';
+import { buildTableRows, renderTableView } from './table.js';
 
 const now = new Date('2026-09-20T12:00:00Z');
 
@@ -250,7 +250,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
     { dataset: { buckets: '[]' } },
     { dataset: { repo: 'example/repo', bucket: 'Needs triage' } },
     { dataset: { repo: 'example/repo' } },
-    { dataset: { repo: 'example/repo', label: 'bug' } },
+    { dataset: { buckets: '["Needs triage"]', label: 'bug' } },
   ].map((link, index) => ({
     ...link,
     addEventListener: (_event: string, handler: (event: { preventDefault(): void }) => void) => {
@@ -262,6 +262,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   let labelFilter: (needle: string, labels: string[]) => boolean = () => false;
   const table = {
     on() {},
+    redraw() {},
     clearHeaderFilter: () => filters.clear(),
     setHeaderFilterValue: (field: string, value: string | string[]) => {
       filters.set(field, Array.isArray(value) ? [...value] : value);
@@ -272,18 +273,15 @@ test('summary links replace filters and match multiple buckets exactly', () => {
       getElementById: (id: string) => ({
         textContent: id === 'table-rows' ? rowsJson : '',
         addEventListener() {},
-        ...(id === 'sort-panel' || id === 'label-links'
-          ? { scrollIntoView: () => scrolled.push(id) }
-          : {}),
+        ...(id === 'sort-panel' ? { scrollIntoView: () => scrolled.push(id) } : {}),
       }),
       querySelector: () => ({ offsetHeight: 0 }),
       querySelectorAll: (selector: string) => {
         if (!selector.startsWith('.summary-table')) return [];
-        return links.filter((link) =>
-          link.dataset.label !== undefined
-            ? selector.includes('a[data-label]')
-            : (selector.includes('a[data-repo]') && link.dataset.repo !== undefined) ||
-              (selector.includes('a[data-buckets]') && link.dataset.buckets !== undefined),
+        return links.filter(
+          (link) =>
+            (selector.includes('a[data-repo]') && link.dataset.repo !== undefined) ||
+            (selector.includes('a[data-buckets]') && link.dataset.buckets !== undefined),
         );
       },
       body: {
@@ -335,14 +333,14 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   assert.deepEqual(
     [...filters],
     [
-      ['repo', 'example/repo'],
+      ['bucket', ['Needs triage']],
       ['labels', '"bug"'],
     ],
   );
   assert.deepEqual(
     scrolled,
-    ['sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'label-links'],
-    'summary clicks scroll to the Sort panel, label clicks to the label line',
+    ['sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'sort-panel'],
+    'every summary click scrolls the Sort panel into view',
   );
   assert.equal(labelFilter('"bug"', ['bug']), true);
   assert.equal(labelFilter('"bug"', ['bugfix']), false, 'a quoted value matches exactly');
@@ -354,62 +352,22 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   assert.deepEqual(
     [...filters],
     [
-      ['repo', 'example/repo'],
+      ['bucket', ['Needs triage']],
       ['labels', '"bug"'],
     ],
-    'outside Table view the links leave the filters alone',
+    'outside Table view the repo and bucket links leave the filters alone',
   );
-  assert.equal(scrolled.length, 6, 'outside Table view the links do not scroll');
-});
-
-test('renderLabelLinks lists every label once per repo, in one wrapping line', () => {
-  const rows = buildTableRows(
-    [
-      pullRequest({
-        number: 1,
-        labels: ['enhancement', 'bug', 'changelog:bugfix-or-minor-feature'],
-      }),
-      pullRequest({ number: 2, labels: ['bug'] }),
-      pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['docs'] }),
-      pullRequest({
-        number: 4,
-        repo: { owner: 'other', name: 'empty' },
-        labels: ['changelog:skip'],
-      }),
-    ].map((pr) => classify(pr, context)),
-    { viewer: 'maintainer-a', now },
-  );
-  const html = renderLabelLinks(rows);
-  assert.equal(html.split('<p ').length - 1, 1);
+  assert.equal(scrolled.length, 6, 'outside Table view the repo and bucket links do not scroll');
+  listeners.get('5')!();
+  assert.equal(tableMode, true, 'a label count opens the Table view from the Categorized view');
   assert.deepEqual(
-    [...html.matchAll(/data-repo="([^"]+)" data-label="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [...filters],
     [
-      ['example/repo', 'bug'],
-      ['example/repo', 'enhancement'],
-      ['other/repo2', 'docs'],
+      ['bucket', ['Needs triage']],
+      ['labels', '"bug"'],
     ],
   );
-  assert.ok(html.includes('<b>repo:</b>'));
-  assert.ok(!html.includes('changelog:'), 'changelog labels are left out');
-  assert.ok(!html.includes('empty'), 'a repo with only changelog labels is omitted');
-  assert.equal(renderLabelLinks([]), '');
-});
-
-test('renderLabelLinks escapes label text and disambiguates repos sharing a name', () => {
-  const rows = buildTableRows(
-    [
-      pullRequest({ number: 1, repo: { owner: 'acme', name: 'docs' }, labels: ['a<b>"c"'] }),
-      pullRequest({ number: 2, repo: { owner: 'other', name: 'docs' }, labels: ['x'] }),
-      pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['y'] }),
-    ].map((pr) => classify(pr, context)),
-    { viewer: 'maintainer-a', now },
-  );
-  const html = renderLabelLinks(rows);
-  assert.ok(html.includes('data-label="a&lt;b&gt;&quot;c&quot;">a&lt;b&gt;&quot;c&quot;</a>'));
-  assert.ok(!html.includes('<b>docs:'), 'a shared short name is not used');
-  assert.ok(html.includes('<b>acme/docs:</b>'));
-  assert.ok(html.includes('<b>other/docs:</b>'));
-  assert.ok(html.includes('<b>repo2:</b>'), 'a unique short name is kept');
+  assert.equal(scrolled.length, 7);
 });
 
 test('the bottom scrollbar mirrors the table holder with the same scroll range', () => {

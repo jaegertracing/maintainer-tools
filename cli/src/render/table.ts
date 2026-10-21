@@ -145,7 +145,6 @@ function issueLabel(ref: { owner: string; repo: string; number: number }, pr: Pu
 export function renderTableView(classified: ClassifiedPR[], opts: TableOptions): string {
   const rows = buildTableRows(classified, opts);
   return `<section id="view-table" class="view" hidden>
-  ${renderLabelLinks(rows)}
   <div class="table-panels">
     <div class="panel" id="sort-panel">
       <span class="panel-label">Sort</span>
@@ -165,39 +164,6 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
 </section>
 <script type="application/json" id="table-rows">${jsonForScript(rows)}</script>
 <script>${TABLE_SCRIPT}</script>`;
-}
-
-// Every label in use, grouped by repo on one wrapping line. Clicking one
-// filters the table to that repo and label, the same as picking both values in
-// the header filters. The changelog labels only classify the release notes, so
-// they are left out.
-export function renderLabelLinks(rows: TableRow[]): string {
-  const byRepo = new Map<string, Set<string>>();
-  for (const r of rows) {
-    const set = byRepo.get(r.repo) ?? new Set<string>();
-    for (const l of r.labels) if (!l.startsWith('changelog:')) set.add(l);
-    byRepo.set(r.repo, set);
-  }
-  const repos = [...byRepo.keys()].filter((repo) => byRepo.get(repo)!.size > 0);
-  const shortName = (repo: string) => repo.split('/')[1] ?? repo;
-  const shortNameCount = new Map<string, number>();
-  for (const repo of repos) {
-    shortNameCount.set(shortName(repo), (shortNameCount.get(shortName(repo)) ?? 0) + 1);
-  }
-  const displayName = (repo: string) =>
-    (shortNameCount.get(shortName(repo)) ?? 0) > 1 ? repo : shortName(repo);
-  const groups = repos.map((repo) => {
-    const links = [...byRepo.get(repo)!]
-      .sort((a, b) => a.localeCompare(b))
-      .map(
-        (l) =>
-          `<a href="#table" data-repo="${escape(repo)}" data-label="${escape(l)}">${escape(l)}</a>`,
-      )
-      .join(', ');
-    return `<span class="label-group"><b>${escape(displayName(repo))}:</b> ${links}</span>`;
-  });
-  if (groups.length === 0) return '';
-  return `<p class="label-links" id="label-links"><span class="panel-label">Labels</span> ${groups.join(' &middot; ')}</p>`;
 }
 
 // `</script>` inside a JSON string literal would end the element early.
@@ -234,9 +200,6 @@ export const TABLE_CSS = `
   .chip .x:hover { color: #cf222e; }
   .chip .dir { color: #57606a; }
   #clear-filters { font-size: 1em; padding: 0.15em 0.6em; border: 1px solid #d0d7de; border-radius: 12px; background: white; cursor: pointer; }
-  .label-links { margin: -0.4em 0 1em 0; font-size: 0.85em; line-height: 1.7; }
-  .label-links a { color: #0969da; text-decoration: none; }
-  .label-links a:hover { text-decoration: underline; }
   #triage-table { font-size: 0.85em; border: 1px solid #d0d7de; border-radius: 6px; }
   /* The page is the only vertical scroller: the table takes its full height,
      and the header sticks to the top of the viewport. Tabulator's own
@@ -625,23 +588,25 @@ const TABLE_SCRIPT = `
   }
   clearBtn.addEventListener('click', () => table.clearHeaderFilter());
 
-  // Summary and label links filter by repository, buckets, label, or a
-  // combination in Table view. Each click replaces the prior filters so the
-  // displayed rows match the number clicked, then scrolls so the filtered rows
-  // are in view: a summary click brings the Sort panel to the top, a label
-  // click brings the label line, so the next label is still on screen.
+  // Summary links filter by repository, buckets, label, or a combination in
+  // Table view. Each click replaces the prior filters so the displayed rows
+  // match the number clicked, then scrolls the Sort panel to the top so the
+  // filtered rows are in view. A label count has no section in the
+  // Categorized view, so clicking one there switches to the Table view first.
   const sortPanel = document.getElementById('sort-panel');
-  const labelLine = document.getElementById('label-links');
-  document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets], .label-links a[data-label]').forEach((a) => {
+  document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets]').forEach((a) => {
     a.addEventListener('click', (e) => {
-      if (!document.body.classList.contains('table-mode')) return;
+      if (!document.body.classList.contains('table-mode')) {
+        if (!a.dataset.label) return;
+        show('table');
+      }
       e.preventDefault();
       table.clearHeaderFilter();
       if (a.dataset.repo) table.setHeaderFilterValue('repo', a.dataset.repo);
       const buckets = a.dataset.buckets ? JSON.parse(a.dataset.buckets) : a.dataset.bucket ? [a.dataset.bucket] : [];
       if (buckets.length) table.setHeaderFilterValue('bucket', buckets);
       if (a.dataset.label) table.setHeaderFilterValue('labels', '"' + a.dataset.label + '"');
-      (a.dataset.label ? labelLine : sortPanel).scrollIntoView({ block: 'start', behavior: 'smooth' });
+      sortPanel.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   });
 

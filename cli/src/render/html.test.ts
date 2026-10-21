@@ -125,7 +125,7 @@ test('dependency bots get their own excluded row and are dropped from the subtot
 
   assert.match(
     html,
-    /<tr class="grand"><th scope="row">subtotal<\/th><td>1<\/td><td class="row-total"><span[^>]*>1<\/span><a[^>]*>1<\/a><\/td><\/tr>/,
+    /<tr class="grand"><th scope="row">subtotal<\/th><td><a[^>]*data-repo="acme\/widgets"[^>]*data-buckets="[^"]*"[^>]*>1<\/a><\/td><td class="row-total"><span[^>]*>1<\/span><a[^>]*>1<\/a><\/td><\/tr>/,
     'subtotal must count only the fyi PR',
   );
   assert.match(
@@ -140,7 +140,7 @@ test('dependency bots get their own excluded row and are dropped from the subtot
   );
   assert.match(
     html,
-    /<tr class="all-total"><th scope="row">Total<\/th><td>3<\/td><td class="row-total"><span[^>]*>3<\/span><a[^>]*>3<\/a><\/td><\/tr>/,
+    /<tr class="all-total"><th scope="row">Total<\/th><td><a[^>]*>3<\/a><\/td><td class="row-total"><span[^>]*>3<\/span><a[^>]*>3<\/a><\/td><\/tr>/,
     'Total must add the subtotal, Blocked-on-author, and Dependency-bots counts back together',
   );
 });
@@ -165,7 +165,7 @@ test('subtotal/excluded/Total math lines up per repo when only some repos have b
 
   assert.match(
     html,
-    /<tr class="grand"><th scope="row">subtotal<\/th><td>1<\/td><td>1<\/td><td class="row-total"><span[^>]*>2<\/span><a[^>]*>2<\/a><\/td><\/tr>/,
+    /<tr class="grand"><th scope="row">subtotal<\/th><td><a[^>]*>1<\/a><\/td><td><a[^>]*>1<\/a><\/td><td class="row-total"><span[^>]*>2<\/span><a[^>]*>2<\/a><\/td><\/tr>/,
     'each repo contributes its own fyi PR to the subtotal, in column order',
   );
   assert.match(
@@ -180,9 +180,71 @@ test('subtotal/excluded/Total math lines up per repo when only some repos have b
   );
   assert.match(
     html,
-    /<tr class="all-total"><th scope="row">Total<\/th><td>2<\/td><td>2<\/td><td class="row-total"><span[^>]*>4<\/span><a[^>]*>4<\/a><\/td><\/tr>/,
+    /<tr class="all-total"><th scope="row">Total<\/th><td><a[^>]*>2<\/a><\/td><td><a[^>]*>2<\/a><\/td><td class="row-total"><span[^>]*>4<\/span><a[^>]*>4<\/a><\/td><\/tr>/,
     "each column's Total is that repo's subtotal plus its own excluded counts, not the other repo's",
   );
+});
+
+test('summary label columns count actionable PRs across repos and open the Table view', () => {
+  const classified = [
+    pullRequest({
+      number: 1,
+      labels: ['bug', 'area/storage', 'changelog:bugfix-or-minor-feature'],
+    }),
+    pullRequest({ number: 2, repo: { owner: 'other', name: 'repo2' }, labels: ['bug'] }),
+    pullRequest({ number: 3, isDraft: true, labels: ['bug', 'stale'] }), // hidden
+    pullRequest({
+      number: 4,
+      author: { login: 'renovate-bot', typename: 'User' },
+      labels: ['dependencies'],
+    }), // dependency-bots
+  ].map((pr) => classify(pr, context));
+  const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
+  const summary = html.slice(
+    html.indexOf('<table class="summary-table">'),
+    html.indexOf('</table>'),
+  );
+
+  assert.match(
+    summary,
+    /<tr class="groups"><th class="bucket" rowspan="2">bucket<\/th><th scope="colgroup" colspan="3">repository<\/th><th scope="colgroup" colspan="2" class="labels">label<\/th><\/tr>/,
+    'the header groups the repo columns plus total apart from the label columns',
+  );
+  assert.match(
+    summary,
+    /<th scope="col">total<\/th><th scope="col" class="labels">bug<\/th><th scope="col">area\/storage<\/th><\/tr>/,
+    'label columns follow the total, most-used first; changelog, stale and bot-only labels are left out',
+  );
+  assert.match(
+    summary,
+    /<th scope="row">subtotal<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="bug">2<\/a><\/td><td><a href="#table" data-buckets="\1" data-label="area\/storage">1<\/a><\/td><\/tr>/,
+    'a subtotal label cell counts the label across repos in the actionable buckets only',
+  );
+  assert.match(
+    summary,
+    /Blocked on author<span class="note"> \(excluded\)<\/span><\/th>.*<td class="labels"><a href="#table" data-buckets="\[&quot;Blocked on author&quot;\]" data-label="bug">1<\/a><\/td><td class="zero">0<\/td><\/tr>/,
+    'an excluded row still counts its own labelled PRs',
+  );
+  assert.match(
+    summary,
+    /<th scope="row">Total<\/th><td><a href="#repo-acme-widgets" data-repo="acme\/widgets" data-buckets="[^"]*">3<\/a><\/td><td><a href="#repo-other-repo2" data-repo="other\/repo2" data-buckets="[^"]*">1<\/a><\/td>/,
+    'per-repo totals link to the repo heading and carry the repo and bucket selection',
+  );
+});
+
+test('the summary has no label columns when no actionable PR carries a topic label', () => {
+  const classified = [
+    pullRequest({ number: 1, labels: ['changelog:skip', 'waiting-for-author'] }),
+    pullRequest({ number: 2, isDraft: true, labels: ['bug'] }),
+  ].map((pr) => classify(pr, context));
+  const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
+  const summary = html.slice(
+    html.indexOf('<table class="summary-table">'),
+    html.indexOf('</table>'),
+  );
+  assert.match(summary, /<thead>\s*<tr><th class="bucket" scope="col">bucket<\/th>/);
+  assert.ok(!summary.includes('class="labels"'));
+  assert.ok(!summary.includes('data-label='));
 });
 
 test('summary totals select matching buckets across repositories in Table view', () => {
