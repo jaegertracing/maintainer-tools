@@ -191,7 +191,7 @@ test('summary label columns count actionable PRs across repos and open the Table
       number: 1,
       labels: ['bug', 'area/storage', 'changelog:bugfix-or-minor-feature'],
     }),
-    pullRequest({ number: 2, repo: { owner: 'other', name: 'repo2' }, labels: ['bug'] }),
+    pullRequest({ number: 2, repo: { owner: 'other', name: 'repo2' }, labels: ['Bug'] }),
     pullRequest({ number: 3, isDraft: true, labels: ['bug', 'stale'] }), // hidden
     pullRequest({
       number: 4,
@@ -202,12 +202,12 @@ test('summary label columns count actionable PRs across repos and open the Table
   const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
   const summary = html.slice(
     html.indexOf('<table class="summary-table">'),
-    html.indexOf('</table>'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
   );
 
   assert.match(
     summary,
-    /<tr class="groups"><th class="bucket" rowspan="2">bucket<\/th><th scope="colgroup" colspan="3">repository<\/th><th scope="colgroup" colspan="2" class="labels">label<\/th><\/tr>/,
+    /<tr class="groups"><th class="bucket" scope="col" rowspan="2">bucket<\/th><th scope="colgroup" colspan="3">repository<\/th><th scope="colgroup" colspan="2" class="labels">label<\/th><\/tr>/,
     'the header groups the repo columns plus total apart from the label columns',
   );
   assert.match(
@@ -218,7 +218,7 @@ test('summary label columns count actionable PRs across repos and open the Table
   assert.match(
     summary,
     /<th scope="row">subtotal<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="bug">2<\/a><\/td><td><a href="#table" data-buckets="\1" data-label="area\/storage">1<\/a><\/td><\/tr>/,
-    'a subtotal label cell counts the label across repos in the actionable buckets only',
+    'a subtotal label cell counts the label across repos and spellings in the actionable buckets only',
   );
   assert.match(
     summary,
@@ -227,8 +227,41 @@ test('summary label columns count actionable PRs across repos and open the Table
   );
   assert.match(
     summary,
-    /<th scope="row">Total<\/th><td><a href="#repo-acme-widgets" data-repo="acme\/widgets" data-buckets="[^"]*">3<\/a><\/td><td><a href="#repo-other-repo2" data-repo="other\/repo2" data-buckets="[^"]*">1<\/a><\/td>/,
-    'per-repo totals link to the repo heading and carry the repo and bucket selection',
+    /<th scope="row">Total<\/th><td><a href="#repo-acme-widgets" data-repo="acme\/widgets" data-buckets="\[\]">3<\/a><\/td><td><a href="#repo-other-repo2" data-repo="other\/repo2" data-buckets="\[\]">1<\/a><\/td>/,
+    'per-repo totals link to the repo heading and select the repo with no bucket filter',
+  );
+});
+
+test('summary label columns skip priority labels and count across priority groups', () => {
+  const classified = [
+    pullRequest({ number: 1, labels: ['priority:high', 'a<b>"c"'] }),
+    pullRequest({ number: 2, labels: ['a<b>"c"'] }),
+    pullRequest({ number: 3, labels: ['priority:low', 'docs'] }),
+  ].map((pr) => classify(pr, context));
+  const html = renderHtml(classified, {
+    viewer: 'maintainer-a',
+    now,
+    authorOpenCounts: new Map(),
+    priorityLabels: ['priority:high', 'priority:low'],
+  });
+  const summary = html.slice(
+    html.indexOf('<table class="summary-table">'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
+  );
+  assert.doesNotMatch(
+    summary,
+    /<th scope="col"[^>]*>priority:|data-label="priority:/,
+    'priority labels already group the Categorized view',
+  );
+  assert.match(
+    summary,
+    /<th scope="col" class="labels">a&lt;b&gt;&quot;c&quot;<\/th><th scope="col">docs<\/th><\/tr>/,
+    'label names are escaped in the header',
+  );
+  assert.match(
+    summary,
+    /<th scope="row">subtotal<\/th>.*data-label="a&lt;b&gt;&quot;c&quot;">2<\/a><\/td><td><a[^>]*data-label="docs">1<\/a><\/td><\/tr>/,
+    'a label is counted across the priority groups it is spread over',
   );
 });
 
@@ -240,7 +273,7 @@ test('the summary has no label columns when no actionable PR carries a topic lab
   const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
   const summary = html.slice(
     html.indexOf('<table class="summary-table">'),
-    html.indexOf('</table>'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
   );
   assert.match(summary, /<thead>\s*<tr><th class="bucket" scope="col">bucket<\/th>/);
   assert.ok(!summary.includes('class="labels"'));
@@ -257,7 +290,7 @@ test('summary totals select matching buckets across repositories in Table view',
   const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
   const summary = html.slice(
     html.indexOf('<table class="summary-table">'),
-    html.indexOf('</table>'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
   );
   const links = [
     ...summary.matchAll(/<a class="table-total" href="#table" data-buckets="([^"]*)">(\d+)<\/a>/g),
