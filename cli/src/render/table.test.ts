@@ -347,6 +347,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   assert.equal(labelFilter('"bug"', ['bugfix']), false, 'a quoted value matches exactly');
   assert.equal(labelFilter('"BUG"', ['bug']), true, 'exact matching ignores case');
   assert.equal(labelFilter('bug', ['bugfix']), true, 'plain text matches as a substring');
+  assert.equal(labelFilter('""', []), true, 'an empty quoted needle is no filter');
   tableMode = false;
   listeners.get('0')!();
   assert.deepEqual(
@@ -396,7 +397,7 @@ test('renderLabelLinks escapes label text and disambiguates repos sharing a name
   );
   const html = renderLabelLinks(rows);
   assert.ok(html.includes('data-label="a&lt;b&gt;&quot;c&quot;">a&lt;b&gt;&quot;c&quot;</a>'));
-  assert.ok(!html.includes('<b>'.repeat(1) + 'docs:'), 'a shared short name is not used');
+  assert.ok(!html.includes('<b>docs:'), 'a shared short name is not used');
   assert.ok(html.includes('<b>acme/docs:</b>'));
   assert.ok(html.includes('<b>other/docs:</b>'));
   assert.ok(html.includes('<b>repo2:</b>'), 'a unique short name is kept');
@@ -457,11 +458,25 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   holder.scrollLeft = 2002;
   holder.listeners.get('scroll')!();
   assert.equal(hscroll.scrollLeft, 2002, 'the mirror follows the holder to its far end');
+  holder.scrollLeft = 2010;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(
+    holder.scrollLeft,
+    2010,
+    "the mirror's echo of 2002 does not undo a later wheel move",
+  );
   hscroll.scrollLeft = 700;
   hscroll.listeners.get('scroll')!();
   assert.equal(holder.scrollLeft, 700, 'the holder follows the mirror');
+  hscroll.scrollLeft = 690;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 690, "the holder's echo of 700 does not undo a later drag");
 
   holder.scrollWidth = 998;
   handlers.get('renderComplete')!();
   assert.equal(hscroll.hidden, true, 'no overflow hides the mirror');
+  holder.scrollWidth = 1998;
+  handlers.get('renderComplete')!();
+  assert.equal(hscroll.hidden, false);
+  assert.equal(hscroll.firstElementChild.style.width, '2000px', 'the spacer is resized on re-show');
 });

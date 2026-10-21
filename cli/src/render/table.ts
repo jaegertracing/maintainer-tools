@@ -242,8 +242,7 @@ export const TABLE_CSS = `
      overflow: hidden would otherwise make the table box the scrollport the
      header sticks to. */
   #triage-table.tabulator { overflow: visible; }
-  #triage-table .tabulator-header { border-radius: 5px 5px 0 0; }
-  #triage-table .tabulator-header { position: sticky; top: 0; z-index: 12; }
+  #triage-table .tabulator-header { position: sticky; top: 0; z-index: 12; border-radius: 5px 5px 0 0; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
   #triage-table .cell-diff { white-space: normal; }
@@ -299,6 +298,7 @@ const TABLE_SCRIPT = `
   const exactNeedle = (needle) => /^"(.*)"$/.exec(String(needle))?.[1];
   const listFilter = (needle, values) => {
     const exact = exactNeedle(needle);
+    if (exact === '') return true;
     if (exact !== undefined) return values.some((v) => String(v).toLowerCase() === exact.toLowerCase());
     const n = String(needle).toLowerCase();
     return values.some((v) => String(v).toLowerCase().includes(n));
@@ -511,10 +511,23 @@ const TABLE_SCRIPT = `
     hscroll.firstElementChild.style.width = h.scrollWidth - h.clientWidth + hscroll.clientWidth + 'px';
     hscroll.scrollLeft = h.scrollLeft;
   }
+  // A programmatic scroll fires its event a frame later, so each side ignores
+  // the echo of the value it wrote; otherwise a stale echo would undo a wheel
+  // movement made in between.
   function bindHscroll() {
     const h = holder();
-    h.addEventListener('scroll', () => { hscroll.scrollLeft = h.scrollLeft; });
-    hscroll.addEventListener('scroll', () => { h.scrollLeft = hscroll.scrollLeft; });
+    let wroteToMirror = -1;
+    let wroteToHolder = -1;
+    h.addEventListener('scroll', () => {
+      if (h.scrollLeft === wroteToHolder) return;
+      wroteToMirror = h.scrollLeft;
+      hscroll.scrollLeft = wroteToMirror;
+    });
+    hscroll.addEventListener('scroll', () => {
+      if (hscroll.scrollLeft === wroteToMirror) return;
+      wroteToHolder = hscroll.scrollLeft;
+      h.scrollLeft = wroteToHolder;
+    });
     syncHscroll();
   }
 
