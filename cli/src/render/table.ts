@@ -512,21 +512,26 @@ const TABLE_SCRIPT = `
     hscroll.scrollLeft = h.scrollLeft;
   }
   // A programmatic scroll fires its event a frame later, so each side ignores
-  // the echo of the value it wrote; otherwise a stale echo would undo a wheel
-  // movement made in between.
+  // the one echo of the value it wrote; otherwise a stale echo would undo a
+  // wheel movement made in between. The marker is cleared once the echo has
+  // arrived, so a later genuine scroll to the same offset still propagates.
   function bindHscroll() {
     const h = holder();
     let wroteToMirror = -1;
     let wroteToHolder = -1;
+    const follow = (from, to, pending, setPending) => {
+      if (from.scrollLeft === pending) return -1;
+      if (to.scrollLeft !== from.scrollLeft) {
+        setPending(from.scrollLeft);
+        to.scrollLeft = from.scrollLeft;
+      }
+      return pending;
+    };
     h.addEventListener('scroll', () => {
-      if (h.scrollLeft === wroteToHolder) return;
-      wroteToMirror = h.scrollLeft;
-      hscroll.scrollLeft = wroteToMirror;
+      wroteToHolder = follow(h, hscroll, wroteToHolder, (v) => { wroteToMirror = v; });
     });
     hscroll.addEventListener('scroll', () => {
-      if (hscroll.scrollLeft === wroteToMirror) return;
-      wroteToHolder = hscroll.scrollLeft;
-      h.scrollLeft = wroteToHolder;
+      wroteToMirror = follow(hscroll, h, wroteToMirror, (v) => { wroteToHolder = v; });
     });
     syncHscroll();
   }

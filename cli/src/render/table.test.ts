@@ -471,6 +471,23 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   hscroll.scrollLeft = 690;
   holder.listeners.get('scroll')!();
   assert.equal(hscroll.scrollLeft, 690, "the holder's echo of 700 does not undo a later drag");
+  // Drag the mirror to 300, scroll the holder to 500 and back to 300: each
+  // echo is consumed once, so the return to 300 still reaches the mirror.
+  hscroll.scrollLeft = 300;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 300);
+  holder.listeners.get('scroll')!();
+  holder.scrollLeft = 500;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 500);
+  hscroll.listeners.get('scroll')!();
+  holder.scrollLeft = 300;
+  holder.listeners.get('scroll')!();
+  assert.equal(
+    hscroll.scrollLeft,
+    300,
+    'a genuine return to an old offset is not treated as an echo',
+  );
 
   holder.scrollWidth = 998;
   handlers.get('renderComplete')!();
