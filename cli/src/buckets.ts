@@ -139,7 +139,7 @@ export interface Facets {
 export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
-  const checks = runAll(pr);
+  const checks = runAll(pr, undefined, { now: ctx.now });
   const flags = computeFlags(pr, checks, ctx);
   const reasons: string[] = [];
 

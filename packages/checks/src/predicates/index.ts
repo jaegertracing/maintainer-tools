@@ -21,11 +21,21 @@ import { noTestsForCodeChange } from './no_tests_for_code_change.js';
 import { unresolvedFromReviewer } from './unresolved_from_reviewer.js';
 import { resolvedWithoutReply } from './resolved_without_reply.js';
 
+// Predicates are pure functions of the PR, so a predicate that compares
+// against the current time takes it from here instead of the wall clock. A
+// caller that passes no clock gets the real one.
+export interface PredicateOptions {
+  now?: Date;
+}
+
 // Renamed from P0_PREDICATES — the registry no longer reflects a single
 // phase. All in-tree predicates live here; callers pass an explicit
 // `ids` list if they want a subset (the pr-nudge action does this via
 // its `rules` input).
-export const ALL_PREDICATES: Record<CheckId, (pr: PullRequest) => CheckResult> = {
+export const ALL_PREDICATES: Record<
+  CheckId,
+  (pr: PullRequest, opts?: PredicateOptions) => CheckResult
+> = {
   dco_missing: dcoMissing,
   ci_failing: ciFailing,
   merge_conflict: mergeConflict,
@@ -41,7 +51,11 @@ export const ALL_PREDICATES: Record<CheckId, (pr: PullRequest) => CheckResult> =
 // Back-compat alias for existing imports.
 export const P0_PREDICATES = ALL_PREDICATES;
 
-export function runAll(pr: PullRequest, ids?: readonly CheckId[]): CheckResult[] {
+export function runAll(
+  pr: PullRequest,
+  ids?: readonly CheckId[],
+  opts: PredicateOptions = {},
+): CheckResult[] {
   const selected = ids ?? (Object.keys(ALL_PREDICATES) as CheckId[]);
-  return selected.map((id) => ALL_PREDICATES[id](pr));
+  return selected.map((id) => ALL_PREDICATES[id](pr, opts));
 }

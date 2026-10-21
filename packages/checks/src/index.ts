@@ -22,6 +22,7 @@ export { extractIssueRefs, hasIssueRef, issueUrl, parseRefKey, refKey } from './
 export {
   P0_PREDICATES,
   runAll,
+  type PredicateOptions,
   dcoMissing,
   ciFailing,
   mergeConflict,
