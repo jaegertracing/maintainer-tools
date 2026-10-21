@@ -295,6 +295,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
       },
     },
     location: { hash: '#table' },
+    window: { addEventListener() {} },
     history: { replaceState() {} },
     Tabulator: function (
       _selector: string,

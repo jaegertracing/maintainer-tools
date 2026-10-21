@@ -161,6 +161,7 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
     </div>
   </div>
   <div id="triage-table"></div>
+  <div id="hscroll" hidden><div></div></div>
 </section>
 <script type="application/json" id="table-rows">${jsonForScript(rows)}</script>
 <script>${TABLE_SCRIPT}</script>`;
@@ -241,12 +242,20 @@ export const TABLE_CSS = `
   #triage-table .cell-diff { white-space: normal; }
   #triage-table .cell-diff [data-tip] { cursor: default; }
   #triage-table .cell-diff [data-tip]:hover::after { display: none; }
-  #triage-table .tabulator-tableholder { overflow-x: scroll; }
-  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track outside the rows. */
-  #triage-table .tabulator-tableholder::-webkit-scrollbar { width: 14px; height: 14px; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-track { background: #f6f8fa; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb:hover { background: #57606a; }
+  /* The table's own horizontal scrollbar would sit below the last row, out of
+     reach in a long report, so it is hidden and #hscroll stands in for it at
+     the bottom of the viewport. Trackpad gestures over the rows still scroll
+     the hidden one; the script keeps the two in step. */
+  #triage-table .tabulator-tableholder { overflow-x: auto; scrollbar-width: none; }
+  #triage-table .tabulator-tableholder::-webkit-scrollbar { display: none; }
+  #hscroll { position: sticky; bottom: 0; overflow-x: scroll; overflow-y: hidden; height: 14px; background: #f6f8fa; border-top: 1px solid #d0d7de; }
+  #hscroll[hidden] { display: none; }
+  #hscroll > div { height: 1px; }
+  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track. */
+  #hscroll::-webkit-scrollbar { width: 14px; height: 14px; }
+  #hscroll::-webkit-scrollbar-track { background: #f6f8fa; }
+  #hscroll::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
+  #hscroll::-webkit-scrollbar-thumb:hover { background: #57606a; }
   #triage-table .tabulator-cell a { color: #0969da; text-decoration: none; }
   #triage-table .tabulator-cell a:hover { text-decoration: underline; }
   #triage-table .tabulator-row.row-hidden { color: #8c959f; }
@@ -482,7 +491,27 @@ const TABLE_SCRIPT = `
     });
     table.on('dataSorted', renderSortChips);
     table.on('dataFiltered', renderFilterChips);
-    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); });
+    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); bindHscroll(); });
+    table.on('renderComplete', syncHscroll);
+    table.on('columnResized', syncHscroll);
+    window.addEventListener('resize', syncHscroll);
+  }
+
+  // --- Sticky horizontal scrollbar, mirroring the table holder's scroll range.
+  const hscroll = document.getElementById('hscroll');
+  const holder = () => table.element.querySelector('.tabulator-tableholder');
+  function syncHscroll() {
+    const h = holder();
+    if (!h) return;
+    hscroll.firstElementChild.style.width = h.scrollWidth + 'px';
+    hscroll.hidden = h.scrollWidth <= h.clientWidth;
+    hscroll.scrollLeft = h.scrollLeft;
+  }
+  function bindHscroll() {
+    const h = holder();
+    h.addEventListener('scroll', () => { hscroll.scrollLeft = h.scrollLeft; });
+    hscroll.addEventListener('scroll', () => { h.scrollLeft = hscroll.scrollLeft; });
+    syncHscroll();
   }
 
   // --- Sort panel: chips in priority order (primary first). Tabulator keeps
