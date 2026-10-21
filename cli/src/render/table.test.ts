@@ -243,7 +243,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   );
   const filters = new Map<string, string | string[]>();
   const listeners = new Map<string, () => void>();
-  let scrolled = 0;
+  const scrolled: string[] = [];
   const links = [
     { dataset: { buckets: '["Needs triage"]' } },
     { dataset: { buckets: '["Needs triage","Review requested"]' } },
@@ -272,9 +272,9 @@ test('summary links replace filters and match multiple buckets exactly', () => {
       getElementById: (id: string) => ({
         textContent: id === 'table-rows' ? rowsJson : '',
         addEventListener() {},
-        scrollIntoView: () => {
-          scrolled += 1;
-        },
+        ...(id === 'sort-panel' || id === 'label-links'
+          ? { scrollIntoView: () => scrolled.push(id) }
+          : {}),
       }),
       querySelectorAll: (selector: string) => {
         if (!selector.startsWith('.summary-table')) return [];
@@ -335,23 +335,29 @@ test('summary links replace filters and match multiple buckets exactly', () => {
     [...filters],
     [
       ['repo', 'example/repo'],
-      ['labels', 'bug'],
+      ['labels', '"bug"'],
     ],
   );
-  assert.equal(scrolled, 6, 'every Table-view click scrolls to the Sort panel');
-  assert.equal(labelFilter('bug', ['bug']), true);
-  assert.equal(labelFilter('bug', ['bugfix']), false, 'a complete value matches exactly');
-  assert.equal(labelFilter('fix', ['bugfix']), true, 'partial text matches as a substring');
+  assert.deepEqual(
+    scrolled,
+    ['sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'label-links'],
+    'summary clicks scroll to the Sort panel, label clicks to the label line',
+  );
+  assert.equal(labelFilter('"bug"', ['bug']), true);
+  assert.equal(labelFilter('"bug"', ['bugfix']), false, 'a quoted value matches exactly');
+  assert.equal(labelFilter('"BUG"', ['bug']), true, 'exact matching ignores case');
+  assert.equal(labelFilter('bug', ['bugfix']), true, 'plain text matches as a substring');
   tableMode = false;
   listeners.get('0')!();
   assert.deepEqual(
     [...filters],
     [
       ['repo', 'example/repo'],
-      ['labels', 'bug'],
+      ['labels', '"bug"'],
     ],
     'outside Table view the links leave the filters alone',
   );
+  assert.equal(scrolled.length, 6, 'outside Table view the links do not scroll');
 });
 
 test('renderLabelLinks lists every label once per repo, in one wrapping line', () => {
@@ -377,4 +383,21 @@ test('renderLabelLinks lists every label once per repo, in one wrapping line', (
   assert.ok(html.includes('<b>repo:</b>'));
   assert.ok(!html.includes('empty'), 'a repo without labels is omitted');
   assert.equal(renderLabelLinks([]), '');
+});
+
+test('renderLabelLinks escapes label text and disambiguates repos sharing a name', () => {
+  const rows = buildTableRows(
+    [
+      pullRequest({ number: 1, repo: { owner: 'acme', name: 'docs' }, labels: ['a<b>"c"'] }),
+      pullRequest({ number: 2, repo: { owner: 'other', name: 'docs' }, labels: ['x'] }),
+      pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['y'] }),
+    ].map((pr) => classify(pr, context)),
+    { viewer: 'maintainer-a', now },
+  );
+  const html = renderLabelLinks(rows);
+  assert.ok(html.includes('data-label="a&lt;b&gt;&quot;c&quot;">a&lt;b&gt;&quot;c&quot;</a>'));
+  assert.ok(!html.includes('<b>'.repeat(1) + 'docs:'), 'a shared short name is not used');
+  assert.ok(html.includes('<b>acme/docs:</b>'));
+  assert.ok(html.includes('<b>other/docs:</b>'));
+  assert.ok(html.includes('<b>repo2:</b>'), 'a unique short name is kept');
 });

@@ -177,20 +177,26 @@ export function renderLabelLinks(rows: TableRow[]): string {
     for (const l of r.labels) set.add(l);
     byRepo.set(r.repo, set);
   }
-  const groups = [...byRepo]
-    .filter(([, labels]) => labels.size > 0)
-    .map(([repo, labels]) => {
-      const links = [...labels]
+  const repos = [...byRepo.keys()];
+  const shortNames = repos.map((repo) => repo.split('/')[1] ?? repo);
+  const displayName = (repo: string, i: number) =>
+    shortNames.indexOf(shortNames[i]!) === shortNames.lastIndexOf(shortNames[i]!)
+      ? shortNames[i]!
+      : repo;
+  const groups = repos
+    .filter((repo) => byRepo.get(repo)!.size > 0)
+    .map((repo) => {
+      const links = [...byRepo.get(repo)!]
         .sort((a, b) => a.localeCompare(b))
         .map(
           (l) =>
             `<a href="#table" data-repo="${escape(repo)}" data-label="${escape(l)}">${escape(l)}</a>`,
         )
         .join(', ');
-      return `<span class="label-group"><b>${escape(repo.split('/')[1] ?? repo)}:</b> ${links}</span>`;
+      return `<span class="label-group"><b>${escape(displayName(repo, repos.indexOf(repo)))}:</b> ${links}</span>`;
     });
   if (groups.length === 0) return '';
-  return `<p class="label-links"><span class="panel-label">Labels</span> ${groups.join(' &middot; ')}</p>`;
+  return `<p class="label-links" id="label-links"><span class="panel-label">Labels</span> ${groups.join(' &middot; ')}</p>`;
 }
 
 // `</script>` inside a JSON string literal would end the element early.
@@ -228,14 +234,14 @@ export const TABLE_CSS = `
   .chip .dir { color: #57606a; }
   #clear-filters { font-size: 1em; padding: 0.15em 0.6em; border: 1px solid #d0d7de; border-radius: 12px; background: white; cursor: pointer; }
   .label-links { margin: -0.4em 0 1em 0; font-size: 0.85em; line-height: 1.7; }
-  .label-links .label-group { white-space: normal; }
   .label-links a { color: #0969da; text-decoration: none; }
   .label-links a:hover { text-decoration: underline; }
   #triage-table { font-size: 0.85em; border: 1px solid #d0d7de; border-radius: 6px; }
-  /* The page is the only scroller: the table takes its full height, and the
-     header sticks to the top of the viewport. Tabulator's own overflow and
-     transform would otherwise anchor the sticky header to the table box. */
-  #triage-table.tabulator { overflow: visible; transform: none; }
+  /* The page is the only vertical scroller: the table takes its full height,
+     and the header sticks to the top of the viewport. Tabulator's own
+     overflow: hidden would otherwise make the table box the scrollport the
+     header sticks to. */
+  #triage-table.tabulator { overflow: visible; }
   #triage-table .tabulator-header { position: sticky; top: 0; z-index: 12; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
@@ -286,21 +292,15 @@ const TABLE_SCRIPT = `
     itemFormatter: escapedItem,
     autocomplete: true, clearable: true, listOnEmpty: true, freetext: true,
   });
-  // A needle that is itself a complete value matches only that value, so a
-  // label link or a dropdown pick for "bug" does not also show "bugfix"; any
-  // other text matches as a substring, as typed input is expected to.
-  const knownValues = (field) => {
-    const seen = new Set();
-    for (const row of ROWS) for (const v of row[field]) seen.add(String(v).toLowerCase());
-    return seen;
-  };
-  const listFilter = (field) => {
-    const known = knownValues(field);
-    return (needle, values) => {
-      const n = String(needle).toLowerCase();
-      if (known.has(n)) return values.some((v) => String(v).toLowerCase() === n);
-      return values.some((v) => String(v).toLowerCase().includes(n));
-    };
+  // Typed text matches as a substring. A needle wrapped in double quotes
+  // matches a whole value, which is how a label link selects "bug" without
+  // also showing "bugfix".
+  const exactNeedle = (needle) => /^"(.*)"$/.exec(String(needle))?.[1];
+  const listFilter = (needle, values) => {
+    const exact = exactNeedle(needle);
+    if (exact !== undefined) return values.some((v) => String(v).toLowerCase() === exact.toLowerCase());
+    const n = String(needle).toLowerCase();
+    return values.some((v) => String(v).toLowerCase().includes(n));
   };
   const enumParams = { valuesLookup: 'active', itemFormatter: escapedItem, autocomplete: true, clearable: true, listOnEmpty: true, freetext: true };
   const boolParams = { values: [{ label: 'yes', value: 'true' }, { label: 'no', value: 'false' }], clearable: true };
@@ -367,7 +367,7 @@ const TABLE_SCRIPT = `
   const list = (title, field, cls, extra) => Object.assign({
     title, field, cssClass: 'cell-flags',
     formatter: (cell) => chips(cell.getValue(), cls),
-    headerFilter: 'list', headerFilterParams: listParams(field), headerFilterFunc: listFilter(field),
+    headerFilter: 'list', headerFilterParams: listParams(field), headerFilterFunc: listFilter,
     sorter: (a, b) => a.join(' ').localeCompare(b.join(' ')),
   }, extra);
   const num = (title, field, extra) => Object.assign({
@@ -574,9 +574,11 @@ const TABLE_SCRIPT = `
 
   // Summary and label links filter by repository, buckets, label, or a
   // combination in Table view. Each click replaces the prior filters so the
-  // displayed rows match the number clicked, then scrolls the Sort panel to the
-  // top so the filtered rows are in view.
+  // displayed rows match the number clicked, then scrolls so the filtered rows
+  // are in view: a summary click brings the Sort panel to the top, a label
+  // click brings the label line, so the next label is still on screen.
   const sortPanel = document.getElementById('sort-panel');
+  const labelLine = document.getElementById('label-links');
   document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets], .label-links a[data-label]').forEach((a) => {
     a.addEventListener('click', (e) => {
       if (!document.body.classList.contains('table-mode')) return;
@@ -585,8 +587,8 @@ const TABLE_SCRIPT = `
       if (a.dataset.repo) table.setHeaderFilterValue('repo', a.dataset.repo);
       const buckets = a.dataset.buckets ? JSON.parse(a.dataset.buckets) : a.dataset.bucket ? [a.dataset.bucket] : [];
       if (buckets.length) table.setHeaderFilterValue('bucket', buckets);
-      if (a.dataset.label) table.setHeaderFilterValue('labels', a.dataset.label);
-      sortPanel.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      if (a.dataset.label) table.setHeaderFilterValue('labels', '"' + a.dataset.label + '"');
+      (a.dataset.label ? labelLine : sortPanel).scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   });
 
