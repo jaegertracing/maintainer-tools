@@ -222,7 +222,7 @@ export const TABLE_CSS = `
   body.table-mode .table-total { display: inline; }
   body.table-mode .categorized-total { display: none; }
   header .toolbar .view-switch button[aria-pressed="true"] { background: #1f2328; color: white; border-color: #1f2328; }
-  .table-panels { display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 0.8em; }
+  .table-panels { display: flex; flex-direction: column; gap: 0.5em; padding-bottom: 0.8em; position: sticky; top: 0; z-index: 13; background: white; }
   .panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.5em 0.7em; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; font-size: 0.85em; }
   .panel-label { font-weight: 600; margin-right: 0.4em; }
   .panel-hint { color: #8c959f; margin-left: auto; }
@@ -243,7 +243,7 @@ export const TABLE_CSS = `
      overflow: hidden would otherwise make the table box the scrollport the
      header sticks to. */
   #triage-table.tabulator { overflow: visible; }
-  #triage-table .tabulator-header { position: sticky; top: 0; z-index: 12; border-radius: 5px 5px 0 0; }
+  #triage-table .tabulator-header { position: sticky; top: var(--panels-height, 0px); z-index: 12; border-radius: 5px 5px 0 0; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
   #triage-table .cell-diff { white-space: normal; }
@@ -493,10 +493,22 @@ const TABLE_SCRIPT = `
     });
     table.on('dataSorted', renderSortChips);
     table.on('dataFiltered', renderFilterChips);
-    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); bindHscroll(); });
+    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); bindHscroll(); bindStickyPanels(); });
     table.on('renderComplete', syncHscroll);
     table.on('columnResized', syncHscroll);
     window.addEventListener('resize', syncHscroll);
+  }
+
+  // The panels stick to the top of the viewport and the table header sticks
+  // right under them, so the header's offset follows the panels' height as
+  // their chips wrap.
+  const panels = document.querySelector('.table-panels');
+  function syncStickyTop() {
+    table.element.style.setProperty('--panels-height', panels.offsetHeight + 'px');
+  }
+  function bindStickyPanels() {
+    syncStickyTop();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncStickyTop).observe(panels);
   }
 
   // --- Sticky horizontal scrollbar, mirroring the table holder's scroll range.

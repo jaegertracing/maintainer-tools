@@ -276,6 +276,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
           ? { scrollIntoView: () => scrolled.push(id) }
           : {}),
       }),
+      querySelector: () => ({ offsetHeight: 0 }),
       querySelectorAll: (selector: string) => {
         if (!selector.startsWith('.summary-table')) return [];
         return links.filter((link) =>
@@ -453,12 +454,15 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
       this.listeners.set(event, fn);
     },
   };
+  const panels = { offsetHeight: 72 };
+  const cssVars = new Map<string, string>();
   runInNewContext(script, {
     document: {
       getElementById: (id: string) =>
         id === 'hscroll'
           ? hscroll
           : { textContent: '[]', innerHTML: '', hidden: false, addEventListener() {} },
+      querySelector: () => panels,
       querySelectorAll: () => [],
       body: { classList: { toggle() {}, contains: () => true } },
     },
@@ -468,7 +472,12 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
     Tabulator: function () {
       return {
         on: (event: string, fn: () => void) => handlers.set(event, fn),
-        element: { querySelector: () => holder },
+        element: {
+          querySelector: () => holder,
+          style: {
+            setProperty: (name: string, value: string) => cssVars.set(name, value),
+          },
+        },
         getSorters: () => [],
         getHeaderFilters: () => [],
         getDataCount: () => 0,
@@ -477,6 +486,7 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   });
 
   handlers.get('tableBuilt')!();
+  assert.equal(cssVars.get('--panels-height'), '72px', 'the header sticks under the panels');
   assert.equal(hscroll.hidden, false);
   assert.equal(hscroll.firstElementChild.style.width, '3002px');
   holder.scrollLeft = 2002;
