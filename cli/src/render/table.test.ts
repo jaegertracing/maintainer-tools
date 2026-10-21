@@ -6,7 +6,7 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifyContext } from '../buckets.js';
 import { NO_PRIORITY_LABEL } from './shared.js';
-import { buildTableRows, renderTableView } from './table.js';
+import { buildTableRows, renderLabelLinks, renderTableView } from './table.js';
 
 const now = new Date('2026-09-20T12:00:00Z');
 
@@ -226,19 +226,31 @@ test('buildTableRows falls back to the no-priority label only when tiers are con
 });
 
 test('summary links replace filters and match multiple buckets exactly', () => {
-  const html = renderTableView([], { viewer: 'maintainer-a', now });
+  const html = renderTableView(
+    [
+      pullRequest({ number: 1, labels: ['bug'] }),
+      pullRequest({ number: 2, labels: ['bugfix', 'docs'] }),
+    ].map((pr) => classify(pr, context)),
+    { viewer: 'maintainer-a', now },
+  );
   const script = html.slice(
     html.indexOf('<script>') + '<script>'.length,
     html.lastIndexOf('</script>'),
   );
+  const rowsJson = html.slice(
+    html.indexOf('id="table-rows">') + 'id="table-rows">'.length,
+    html.indexOf('</script>'),
+  );
   const filters = new Map<string, string | string[]>();
   const listeners = new Map<string, () => void>();
+  let scrolled = 0;
   const links = [
     { dataset: { buckets: '["Needs triage"]' } },
     { dataset: { buckets: '["Needs triage","Review requested"]' } },
     { dataset: { buckets: '[]' } },
     { dataset: { repo: 'example/repo', bucket: 'Needs triage' } },
     { dataset: { repo: 'example/repo' } },
+    { dataset: { repo: 'example/repo', label: 'bug' } },
   ].map((link, index) => ({
     ...link,
     addEventListener: (_event: string, handler: (event: { preventDefault(): void }) => void) => {
@@ -247,6 +259,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   }));
   let tableMode = false;
   let bucketFilter: (values: string[], bucket: string) => boolean = () => false;
+  let labelFilter: (needle: string, labels: string[]) => boolean = () => false;
   const table = {
     on() {},
     clearHeaderFilter: () => filters.clear(),
@@ -256,13 +269,20 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   };
   runInNewContext(script, {
     document: {
-      getElementById: () => ({ textContent: '[]', addEventListener() {} }),
+      getElementById: (id: string) => ({
+        textContent: id === 'table-rows' ? rowsJson : '',
+        addEventListener() {},
+        scrollIntoView: () => {
+          scrolled += 1;
+        },
+      }),
       querySelectorAll: (selector: string) => {
         if (!selector.startsWith('.summary-table')) return [];
-        return links.filter(
-          (link) =>
-            (selector.includes('a[data-repo]') && link.dataset.repo !== undefined) ||
-            (selector.includes('a[data-buckets]') && link.dataset.buckets !== undefined),
+        return links.filter((link) =>
+          link.dataset.label !== undefined
+            ? selector.includes('a[data-label]')
+            : (selector.includes('a[data-repo]') && link.dataset.repo !== undefined) ||
+              (selector.includes('a[data-buckets]') && link.dataset.buckets !== undefined),
         );
       },
       body: {
@@ -281,6 +301,8 @@ test('summary links replace filters and match multiple buckets exactly', () => {
       options: { columns: Array<{ field: string; headerFilterFunc: typeof bucketFilter }> },
     ) {
       bucketFilter = options.columns.find((column) => column.field === 'bucket')!.headerFilterFunc;
+      labelFilter = options.columns.find((column) => column.field === 'labels')!
+        .headerFilterFunc as unknown as typeof labelFilter;
       return table;
     },
   });
@@ -307,7 +329,51 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   );
   listeners.get('4')!();
   assert.deepEqual([...filters], [['repo', 'example/repo']]);
+  listeners.get('5')!();
+  assert.deepEqual(
+    [...filters],
+    [
+      ['repo', 'example/repo'],
+      ['labels', 'bug'],
+    ],
+  );
+  assert.equal(scrolled, 6, 'every Table-view click scrolls to the Sort panel');
+  assert.equal(labelFilter('bug', ['bug']), true);
+  assert.equal(labelFilter('bug', ['bugfix']), false, 'a complete value matches exactly');
+  assert.equal(labelFilter('fix', ['bugfix']), true, 'partial text matches as a substring');
   tableMode = false;
   listeners.get('0')!();
-  assert.deepEqual([...filters], [['repo', 'example/repo']]);
+  assert.deepEqual(
+    [...filters],
+    [
+      ['repo', 'example/repo'],
+      ['labels', 'bug'],
+    ],
+    'outside Table view the links leave the filters alone',
+  );
+});
+
+test('renderLabelLinks lists every label once per repo, in one wrapping line', () => {
+  const rows = buildTableRows(
+    [
+      pullRequest({ number: 1, labels: ['enhancement', 'bug'] }),
+      pullRequest({ number: 2, labels: ['bug'] }),
+      pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['docs'] }),
+      pullRequest({ number: 4, repo: { owner: 'other', name: 'empty' }, labels: [] }),
+    ].map((pr) => classify(pr, context)),
+    { viewer: 'maintainer-a', now },
+  );
+  const html = renderLabelLinks(rows);
+  assert.equal(html.split('<p ').length - 1, 1);
+  assert.deepEqual(
+    [...html.matchAll(/data-repo="([^"]+)" data-label="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['example/repo', 'bug'],
+      ['example/repo', 'enhancement'],
+      ['other/repo2', 'docs'],
+    ],
+  );
+  assert.ok(html.includes('<b>repo:</b>'));
+  assert.ok(!html.includes('empty'), 'a repo without labels is omitted');
+  assert.equal(renderLabelLinks([]), '');
 });
