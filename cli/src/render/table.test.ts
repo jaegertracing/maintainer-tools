@@ -6,7 +6,7 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifyContext } from '../buckets.js';
 import { NO_PRIORITY_LABEL } from './shared.js';
-import { buildTableRows, renderTableView } from './table.js';
+import { buildTableRows, renderLabelLinks, renderTableView } from './table.js';
 
 const now = new Date('2026-09-20T12:00:00Z');
 
@@ -226,19 +226,31 @@ test('buildTableRows falls back to the no-priority label only when tiers are con
 });
 
 test('summary links replace filters and match multiple buckets exactly', () => {
-  const html = renderTableView([], { viewer: 'maintainer-a', now });
+  const html = renderTableView(
+    [
+      pullRequest({ number: 1, labels: ['bug'] }),
+      pullRequest({ number: 2, labels: ['bugfix', 'docs'] }),
+    ].map((pr) => classify(pr, context)),
+    { viewer: 'maintainer-a', now },
+  );
   const script = html.slice(
     html.indexOf('<script>') + '<script>'.length,
     html.lastIndexOf('</script>'),
   );
+  const rowsJson = html.slice(
+    html.indexOf('id="table-rows">') + 'id="table-rows">'.length,
+    html.indexOf('</script>'),
+  );
   const filters = new Map<string, string | string[]>();
   const listeners = new Map<string, () => void>();
+  const scrolled: string[] = [];
   const links = [
     { dataset: { buckets: '["Needs triage"]' } },
     { dataset: { buckets: '["Needs triage","Review requested"]' } },
     { dataset: { buckets: '[]' } },
     { dataset: { repo: 'example/repo', bucket: 'Needs triage' } },
     { dataset: { repo: 'example/repo' } },
+    { dataset: { repo: 'example/repo', label: 'bug' } },
   ].map((link, index) => ({
     ...link,
     addEventListener: (_event: string, handler: (event: { preventDefault(): void }) => void) => {
@@ -247,6 +259,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   }));
   let tableMode = false;
   let bucketFilter: (values: string[], bucket: string) => boolean = () => false;
+  let labelFilter: (needle: string, labels: string[]) => boolean = () => false;
   const table = {
     on() {},
     clearHeaderFilter: () => filters.clear(),
@@ -256,13 +269,21 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   };
   runInNewContext(script, {
     document: {
-      getElementById: () => ({ textContent: '[]', addEventListener() {} }),
+      getElementById: (id: string) => ({
+        textContent: id === 'table-rows' ? rowsJson : '',
+        addEventListener() {},
+        ...(id === 'sort-panel' || id === 'label-links'
+          ? { scrollIntoView: () => scrolled.push(id) }
+          : {}),
+      }),
+      querySelector: () => ({ offsetHeight: 0 }),
       querySelectorAll: (selector: string) => {
         if (!selector.startsWith('.summary-table')) return [];
-        return links.filter(
-          (link) =>
-            (selector.includes('a[data-repo]') && link.dataset.repo !== undefined) ||
-            (selector.includes('a[data-buckets]') && link.dataset.buckets !== undefined),
+        return links.filter((link) =>
+          link.dataset.label !== undefined
+            ? selector.includes('a[data-label]')
+            : (selector.includes('a[data-repo]') && link.dataset.repo !== undefined) ||
+              (selector.includes('a[data-buckets]') && link.dataset.buckets !== undefined),
         );
       },
       body: {
@@ -275,12 +296,15 @@ test('summary links replace filters and match multiple buckets exactly', () => {
       },
     },
     location: { hash: '#table' },
+    window: { addEventListener() {} },
     history: { replaceState() {} },
     Tabulator: function (
       _selector: string,
       options: { columns: Array<{ field: string; headerFilterFunc: typeof bucketFilter }> },
     ) {
       bucketFilter = options.columns.find((column) => column.field === 'bucket')!.headerFilterFunc;
+      labelFilter = options.columns.find((column) => column.field === 'labels')!
+        .headerFilterFunc as unknown as typeof labelFilter;
       return table;
     },
   });
@@ -307,7 +331,254 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   );
   listeners.get('4')!();
   assert.deepEqual([...filters], [['repo', 'example/repo']]);
+  listeners.get('5')!();
+  assert.deepEqual(
+    [...filters],
+    [
+      ['repo', 'example/repo'],
+      ['labels', '"bug"'],
+    ],
+  );
+  assert.deepEqual(
+    scrolled,
+    ['sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'sort-panel', 'label-links'],
+    'summary clicks scroll to the Sort panel, label clicks to the label line',
+  );
+  assert.equal(labelFilter('"bug"', ['bug']), true);
+  assert.equal(labelFilter('"bug"', ['bugfix']), false, 'a quoted value matches exactly');
+  assert.equal(labelFilter('"BUG"', ['bug']), true, 'exact matching ignores case');
+  assert.equal(labelFilter('bug', ['bugfix']), true, 'plain text matches as a substring');
+  assert.equal(labelFilter('""', []), true, 'an empty quoted needle is no filter');
   tableMode = false;
   listeners.get('0')!();
-  assert.deepEqual([...filters], [['repo', 'example/repo']]);
+  assert.deepEqual(
+    [...filters],
+    [
+      ['repo', 'example/repo'],
+      ['labels', '"bug"'],
+    ],
+    'outside Table view the links leave the filters alone',
+  );
+  assert.equal(scrolled.length, 6, 'outside Table view the links do not scroll');
+});
+
+test('renderLabelLinks lists every label once per repo, in one wrapping line', () => {
+  const rows = buildTableRows(
+    [
+      pullRequest({
+        number: 1,
+        labels: ['enhancement', 'bug', 'changelog:bugfix-or-minor-feature'],
+      }),
+      pullRequest({ number: 2, labels: ['bug'] }),
+      pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['docs'] }),
+      pullRequest({
+        number: 4,
+        repo: { owner: 'other', name: 'empty' },
+        labels: ['changelog:skip'],
+      }),
+    ].map((pr) => classify(pr, context)),
+    { viewer: 'maintainer-a', now },
+  );
+  const html = renderLabelLinks(rows);
+  assert.equal(html.split('<p ').length - 1, 1);
+  assert.deepEqual(
+    [...html.matchAll(/data-repo="([^"]+)" data-label="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['example/repo', 'bug'],
+      ['example/repo', 'enhancement'],
+      ['other/repo2', 'docs'],
+    ],
+  );
+  assert.ok(html.includes('<b>repo:</b>'));
+  assert.ok(!html.includes('changelog:'), 'changelog labels are left out');
+  assert.ok(!html.includes('empty'), 'a repo with only changelog labels is omitted');
+  assert.equal(renderLabelLinks([]), '');
+});
+
+test('renderLabelLinks escapes label text and disambiguates repos sharing a name', () => {
+  const rows = buildTableRows(
+    [
+      pullRequest({ number: 1, repo: { owner: 'acme', name: 'docs' }, labels: ['a<b>"c"'] }),
+      pullRequest({ number: 2, repo: { owner: 'other', name: 'docs' }, labels: ['x'] }),
+      pullRequest({ number: 3, repo: { owner: 'other', name: 'repo2' }, labels: ['y'] }),
+    ].map((pr) => classify(pr, context)),
+    { viewer: 'maintainer-a', now },
+  );
+  const html = renderLabelLinks(rows);
+  assert.ok(html.includes('data-label="a&lt;b&gt;&quot;c&quot;">a&lt;b&gt;&quot;c&quot;</a>'));
+  assert.ok(!html.includes('<b>docs:'), 'a shared short name is not used');
+  assert.ok(html.includes('<b>acme/docs:</b>'));
+  assert.ok(html.includes('<b>other/docs:</b>'));
+  assert.ok(html.includes('<b>repo2:</b>'), 'a unique short name is kept');
+});
+
+test('the bottom scrollbar mirrors the table holder with the same scroll range', () => {
+  const html = renderTableView([], { viewer: 'maintainer-a', now });
+  const script = html.slice(
+    html.indexOf('<script>') + '<script>'.length,
+    html.lastIndexOf('</script>'),
+  );
+  const handlers = new Map<string, () => void>();
+  // Both fakes clamp scrollLeft to their range, as a browser does.
+  const holder = {
+    scrollWidth: 3000,
+    clientWidth: 998,
+    left: 0,
+    get scrollLeft() {
+      return Math.min(this.left, this.scrollWidth - this.clientWidth);
+    },
+    set scrollLeft(v: number) {
+      this.left = Math.max(0, Math.min(v, this.scrollWidth - this.clientWidth));
+    },
+    listeners: new Map<string, () => void>(),
+    addEventListener(event: string, fn: () => void) {
+      this.listeners.set(event, fn);
+    },
+  };
+  const hscroll = {
+    hidden: true,
+    clientWidth: 1000,
+    get scrollWidth() {
+      return parseInt(this.firstElementChild.style.width, 10) || 0;
+    },
+    left: 0,
+    get scrollLeft() {
+      return Math.min(this.left, this.scrollWidth - this.clientWidth);
+    },
+    set scrollLeft(v: number) {
+      this.left = Math.max(0, Math.min(v, this.scrollWidth - this.clientWidth));
+    },
+    firstElementChild: { style: { width: '' } },
+    listeners: new Map<string, () => void>(),
+    addEventListener(event: string, fn: () => void) {
+      this.listeners.set(event, fn);
+    },
+  };
+  const panels = { height: 72.6, getBoundingClientRect: () => ({ height: panels.height }) };
+  const cssVars = new Map<string, string>();
+  let onPanelsResize: (() => void) | undefined;
+  runInNewContext(script, {
+    document: {
+      getElementById: (id: string) =>
+        id === 'hscroll'
+          ? hscroll
+          : { textContent: '[]', innerHTML: '', hidden: false, addEventListener() {} },
+      querySelector: (selector: string) => (selector === '.table-panels' ? panels : null),
+      querySelectorAll: () => [],
+      body: { classList: { toggle() {}, contains: () => true } },
+    },
+    location: { hash: '#table' },
+    history: { replaceState() {} },
+    window: { addEventListener() {} },
+    ResizeObserver: class {
+      constructor(fn: () => void) {
+        onPanelsResize = fn;
+      }
+      observe() {}
+    },
+    Tabulator: function () {
+      return {
+        on: (event: string, fn: () => void) => handlers.set(event, fn),
+        element: {
+          querySelector: () => holder,
+          style: {
+            setProperty: (name: string, value: string) => cssVars.set(name, value),
+          },
+        },
+        getSorters: () => [],
+        getHeaderFilters: () => [],
+        getDataCount: () => 0,
+      };
+    },
+  });
+
+  handlers.get('tableBuilt')!();
+  assert.equal(cssVars.get('--panels-height'), '72px', 'the header tucks under the panels');
+  panels.height = 101.2;
+  onPanelsResize!();
+  assert.equal(cssVars.get('--panels-height'), '101px', 'the offset follows the panel height');
+  assert.equal(hscroll.hidden, false);
+  assert.equal(hscroll.firstElementChild.style.width, '3002px');
+  holder.scrollLeft = 2002;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 2002, 'the mirror follows the holder to its far end');
+  hscroll.listeners.get('scroll')!();
+  holder.scrollLeft = 1500;
+  holder.listeners.get('scroll')!();
+  holder.scrollLeft = 1510;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(
+    holder.scrollLeft,
+    1510,
+    "the mirror's echo of 1500 does not undo a later wheel move",
+  );
+  hscroll.scrollLeft = 700;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 700, 'the holder follows the mirror');
+  hscroll.scrollLeft = 690;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 690, "the holder's echo of 700 does not undo a later drag");
+  // Drag the mirror to 300, scroll the holder to 500 and back to 300: each
+  // echo is consumed once, so the return to 300 still reaches the mirror.
+  hscroll.scrollLeft = 300;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 300);
+  holder.listeners.get('scroll')!();
+  holder.scrollLeft = 500;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 500);
+  hscroll.listeners.get('scroll')!();
+  holder.scrollLeft = 300;
+  holder.listeners.get('scroll')!();
+  assert.equal(
+    hscroll.scrollLeft,
+    300,
+    'a genuine return to an old offset is not treated as an echo',
+  );
+  hscroll.listeners.get('scroll')!();
+  hscroll.scrollLeft = 0;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 0, 'a drag to the left edge is not mistaken for an echo');
+  holder.listeners.get('scroll')!();
+
+  // A column drag widens the holder before any Tabulator event resizes the
+  // mirror; the holder's own scroll handler notices the range mismatch.
+  holder.scrollWidth = 3500;
+  holder.scrollLeft = 2400;
+  holder.listeners.get('scroll')!();
+  assert.equal(
+    hscroll.firstElementChild.style.width,
+    '3502px',
+    'the spacer follows a wider holder',
+  );
+  assert.equal(hscroll.scrollLeft, 2400);
+  hscroll.listeners.get('scroll')!();
+
+  // The table narrows so the mirror's range is the wider one: a drag past the
+  // holder's end clamps, the clamped echo resizes the mirror, and the marker
+  // does not swallow a later genuine pass through the dragged offset.
+  holder.scrollWidth = 2000;
+  hscroll.scrollLeft = 2400;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 1002, 'the holder clamps');
+  holder.listeners.get('scroll')!();
+  assert.equal(
+    hscroll.firstElementChild.style.width,
+    '2002px',
+    'the clamped echo resizes the mirror',
+  );
+  assert.equal(hscroll.scrollLeft, 1002);
+  holder.scrollWidth = 3500;
+  holder.scrollLeft = 2400;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 2400, 'the old drag offset is no longer treated as an echo');
+  hscroll.listeners.get('scroll')!();
+
+  holder.scrollWidth = 998;
+  handlers.get('renderComplete')!();
+  assert.equal(hscroll.hidden, true, 'no overflow hides the mirror');
+  holder.scrollWidth = 1998;
+  handlers.get('renderComplete')!();
+  assert.equal(hscroll.hidden, false);
+  assert.equal(hscroll.firstElementChild.style.width, '2000px', 'the spacer is resized on re-show');
 });

@@ -18,6 +18,7 @@ import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
 import { diffSummary, renderDiff } from './diff.js';
+import { escape } from './escape.js';
 import { ageInDays, formatAge, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
 
 export interface TableOptions {
@@ -144,6 +145,7 @@ function issueLabel(ref: { owner: string; repo: string; number: number }, pr: Pu
 export function renderTableView(classified: ClassifiedPR[], opts: TableOptions): string {
   const rows = buildTableRows(classified, opts);
   return `<section id="view-table" class="view" hidden>
+  ${renderLabelLinks(rows)}
   <div class="table-panels">
     <div class="panel" id="sort-panel">
       <span class="panel-label">Sort</span>
@@ -159,9 +161,43 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
     </div>
   </div>
   <div id="triage-table"></div>
+  <div id="hscroll" hidden><div></div></div>
 </section>
 <script type="application/json" id="table-rows">${jsonForScript(rows)}</script>
 <script>${TABLE_SCRIPT}</script>`;
+}
+
+// Every label in use, grouped by repo on one wrapping line. Clicking one
+// filters the table to that repo and label, the same as picking both values in
+// the header filters. The changelog labels only classify the release notes, so
+// they are left out.
+export function renderLabelLinks(rows: TableRow[]): string {
+  const byRepo = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const set = byRepo.get(r.repo) ?? new Set<string>();
+    for (const l of r.labels) if (!l.startsWith('changelog:')) set.add(l);
+    byRepo.set(r.repo, set);
+  }
+  const repos = [...byRepo.keys()].filter((repo) => byRepo.get(repo)!.size > 0);
+  const shortName = (repo: string) => repo.split('/')[1] ?? repo;
+  const shortNameCount = new Map<string, number>();
+  for (const repo of repos) {
+    shortNameCount.set(shortName(repo), (shortNameCount.get(shortName(repo)) ?? 0) + 1);
+  }
+  const displayName = (repo: string) =>
+    (shortNameCount.get(shortName(repo)) ?? 0) > 1 ? repo : shortName(repo);
+  const groups = repos.map((repo) => {
+    const links = [...byRepo.get(repo)!]
+      .sort((a, b) => a.localeCompare(b))
+      .map(
+        (l) =>
+          `<a href="#table" data-repo="${escape(repo)}" data-label="${escape(l)}">${escape(l)}</a>`,
+      )
+      .join(', ');
+    return `<span class="label-group"><b>${escape(displayName(repo))}:</b> ${links}</span>`;
+  });
+  if (groups.length === 0) return '';
+  return `<p class="label-links" id="label-links"><span class="panel-label">Labels</span> ${groups.join(' &middot; ')}</p>`;
 }
 
 // `</script>` inside a JSON string literal would end the element early.
@@ -186,7 +222,7 @@ export const TABLE_CSS = `
   body.table-mode .table-total { display: inline; }
   body.table-mode .categorized-total { display: none; }
   header .toolbar .view-switch button[aria-pressed="true"] { background: #1f2328; color: white; border-color: #1f2328; }
-  .table-panels { display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 0.8em; }
+  .table-panels { display: flex; flex-direction: column; gap: 0.5em; padding-bottom: 0.8em; position: sticky; top: 0; z-index: 13; background: white; }
   .panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.5em 0.7em; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; font-size: 0.85em; }
   .panel-label { font-weight: 600; margin-right: 0.4em; }
   .panel-hint { color: #8c959f; margin-left: auto; }
@@ -198,18 +234,35 @@ export const TABLE_CSS = `
   .chip .x:hover { color: #cf222e; }
   .chip .dir { color: #57606a; }
   #clear-filters { font-size: 1em; padding: 0.15em 0.6em; border: 1px solid #d0d7de; border-radius: 12px; background: white; cursor: pointer; }
+  .label-links { margin: -0.4em 0 1em 0; font-size: 0.85em; line-height: 1.7; }
+  .label-links a { color: #0969da; text-decoration: none; }
+  .label-links a:hover { text-decoration: underline; }
   #triage-table { font-size: 0.85em; border: 1px solid #d0d7de; border-radius: 6px; }
+  /* The page is the only vertical scroller: the table takes its full height,
+     and the header sticks to the top of the viewport. Tabulator's own
+     overflow: hidden would otherwise make the table box the scrollport the
+     header sticks to. */
+  #triage-table.tabulator { overflow: visible; }
+  #triage-table .tabulator-header { position: sticky; top: var(--panels-height, 0px); z-index: 12; border-radius: 5px 5px 0 0; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
   #triage-table .cell-diff { white-space: normal; }
   #triage-table .cell-diff [data-tip] { cursor: default; }
   #triage-table .cell-diff [data-tip]:hover::after { display: none; }
-  #triage-table .tabulator-tableholder { overflow-x: scroll; }
-  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track outside the rows. */
-  #triage-table .tabulator-tableholder::-webkit-scrollbar { width: 14px; height: 14px; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-track { background: #f6f8fa; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb:hover { background: #57606a; }
+  /* The table's own horizontal scrollbar would sit below the last row, out of
+     reach in a long report, so it is hidden and #hscroll stands in for it at
+     the bottom of the viewport. Trackpad gestures over the rows still scroll
+     the hidden one; the script keeps the two in step. */
+  #triage-table .tabulator-tableholder { overflow-x: auto; scrollbar-width: none; }
+  #triage-table .tabulator-tableholder::-webkit-scrollbar { display: none; }
+  #hscroll { position: sticky; bottom: 0; overflow-x: scroll; overflow-y: hidden; height: 14px; background: #f6f8fa; border-top: 1px solid #d0d7de; }
+  #hscroll[hidden] { display: none; }
+  #hscroll > div { height: 1px; }
+  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track. */
+  #hscroll::-webkit-scrollbar { width: 14px; height: 14px; }
+  #hscroll::-webkit-scrollbar-track { background: #f6f8fa; }
+  #hscroll::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
+  #hscroll::-webkit-scrollbar-thumb:hover { background: #57606a; }
   #triage-table .tabulator-cell a { color: #0969da; text-decoration: none; }
   #triage-table .tabulator-cell a:hover { text-decoration: underline; }
   #triage-table .tabulator-row.row-hidden { color: #8c959f; }
@@ -240,7 +293,14 @@ const TABLE_SCRIPT = `
     itemFormatter: escapedItem,
     autocomplete: true, clearable: true, listOnEmpty: true, freetext: true,
   });
+  // Typed text matches as a substring. A needle wrapped in double quotes
+  // matches a whole value, which is how a label link selects "bug" without
+  // also showing "bugfix".
+  const exactNeedle = (needle) => /^"(.*)"$/.exec(String(needle))?.[1];
   const listFilter = (needle, values) => {
+    const exact = exactNeedle(needle);
+    if (exact === '') return true;
+    if (exact !== undefined) return values.some((v) => String(v).toLowerCase() === exact.toLowerCase());
     const n = String(needle).toLowerCase();
     return values.some((v) => String(v).toLowerCase().includes(n));
   };
@@ -412,7 +472,7 @@ const TABLE_SCRIPT = `
       data: ROWS,
       columns,
       layout: 'fitDataStretch',
-      height: '78vh',
+      renderVertical: 'basic',
       columnHeaderSortMulti: true,
       columnDefaults: {
         headerWordWrap: true,
@@ -433,7 +493,78 @@ const TABLE_SCRIPT = `
     });
     table.on('dataSorted', renderSortChips);
     table.on('dataFiltered', renderFilterChips);
-    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); });
+    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); bindHscroll(); bindStickyPanels(); });
+    table.on('renderComplete', syncHscroll);
+    table.on('columnResized', syncHscroll);
+    window.addEventListener('resize', syncHscroll);
+  }
+
+  // The panels stick to the top of the viewport and the table header sticks
+  // right under them, so the header's offset follows the panels' height as
+  // their chips wrap.
+  // The height is rounded down so the header tucks under the panels rather
+  // than leaving a sub-pixel slit for the rows to show through.
+  const panels = document.querySelector('.table-panels');
+  function syncStickyTop() {
+    const height = Math.floor(panels.getBoundingClientRect().height);
+    table.element.style.setProperty('--panels-height', height + 'px');
+  }
+  function bindStickyPanels() {
+    syncStickyTop();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncStickyTop).observe(panels);
+  }
+
+  // --- Sticky horizontal scrollbar, mirroring the table holder's scroll range.
+  const hscroll = document.getElementById('hscroll');
+  const holder = () => table.element.querySelector('.tabulator-tableholder');
+  // The holder sits inside the table border, so the two elements differ in
+  // width; sizing the spacer by the holder's overflow gives both the same
+  // scroll range.
+  const sizeMirror = (h) => {
+    hscroll.hidden = h.scrollWidth <= h.clientWidth;
+    hscroll.firstElementChild.style.width = h.scrollWidth - h.clientWidth + hscroll.clientWidth + 'px';
+  };
+  function syncHscroll() {
+    const h = holder();
+    if (!h) return;
+    sizeMirror(h);
+    hscroll.scrollLeft = h.scrollLeft;
+  }
+  // A programmatic scroll fires its event a frame later, so each side ignores
+  // the one echo of the value it wrote; otherwise a stale echo would undo a
+  // wheel movement made in between. The marker is cleared once the echo has
+  // arrived, so a later genuine scroll to the same offset still propagates.
+  // Offsets and ranges are compared with a one-pixel tolerance because a
+  // zoomed page rounds each element's scroll metrics separately. The marker
+  // records the value the counterpart actually took, which may be clamped,
+  // and any event from that side consumes it.
+  function bindHscroll() {
+    const h = holder();
+    let wroteToMirror = -1;
+    let wroteToHolder = -1;
+    const same = (a, b) => Math.abs(a - b) <= 1;
+    const follow = (from, to, pending, setPending) => {
+      if (pending >= 0 && same(from.scrollLeft, pending)) return;
+      if (!same(to.scrollLeft, from.scrollLeft)) {
+        to.scrollLeft = from.scrollLeft;
+        setPending(to.scrollLeft);
+      }
+    };
+    h.addEventListener('scroll', () => {
+      // A column drag widens the holder before columnResized fires; a mirror
+      // with a stale, shorter range would clamp the write and pull the holder
+      // back, so the range is checked first.
+      if (!same(h.scrollWidth - h.clientWidth, hscroll.scrollWidth - hscroll.clientWidth)) sizeMirror(h);
+      const pending = wroteToHolder;
+      wroteToHolder = -1;
+      follow(h, hscroll, pending, (v) => { wroteToMirror = v; });
+    });
+    hscroll.addEventListener('scroll', () => {
+      const pending = wroteToMirror;
+      wroteToMirror = -1;
+      follow(hscroll, h, pending, (v) => { wroteToHolder = v; });
+    });
+    syncHscroll();
   }
 
   // --- Sort panel: chips in priority order (primary first). Tabulator keeps
@@ -494,9 +625,14 @@ const TABLE_SCRIPT = `
   }
   clearBtn.addEventListener('click', () => table.clearHeaderFilter());
 
-  // Summary links filter by repository, buckets, or both in Table view.
-  // Total links clear prior filters so the displayed rows match the summary count.
-  document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets]').forEach((a) => {
+  // Summary and label links filter by repository, buckets, label, or a
+  // combination in Table view. Each click replaces the prior filters so the
+  // displayed rows match the number clicked, then scrolls so the filtered rows
+  // are in view: a summary click brings the Sort panel to the top, a label
+  // click brings the label line, so the next label is still on screen.
+  const sortPanel = document.getElementById('sort-panel');
+  const labelLine = document.getElementById('label-links');
+  document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets], .label-links a[data-label]').forEach((a) => {
     a.addEventListener('click', (e) => {
       if (!document.body.classList.contains('table-mode')) return;
       e.preventDefault();
@@ -504,6 +640,8 @@ const TABLE_SCRIPT = `
       if (a.dataset.repo) table.setHeaderFilterValue('repo', a.dataset.repo);
       const buckets = a.dataset.buckets ? JSON.parse(a.dataset.buckets) : a.dataset.bucket ? [a.dataset.bucket] : [];
       if (buckets.length) table.setHeaderFilterValue('bucket', buckets);
+      if (a.dataset.label) table.setHeaderFilterValue('labels', '"' + a.dataset.label + '"');
+      (a.dataset.label ? labelLine : sortPanel).scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   });
 
