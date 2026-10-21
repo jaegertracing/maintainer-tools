@@ -410,10 +410,17 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
     html.lastIndexOf('</script>'),
   );
   const handlers = new Map<string, () => void>();
+  // Both fakes clamp scrollLeft to their range, as a browser does.
   const holder = {
     scrollWidth: 3000,
     clientWidth: 998,
-    scrollLeft: 0,
+    left: 0,
+    get scrollLeft() {
+      return Math.min(this.left, this.scrollWidth - this.clientWidth);
+    },
+    set scrollLeft(v: number) {
+      this.left = Math.max(0, Math.min(v, this.scrollWidth - this.clientWidth));
+    },
     listeners: new Map<string, () => void>(),
     addEventListener(event: string, fn: () => void) {
       this.listeners.set(event, fn);
@@ -425,7 +432,13 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
     get scrollWidth() {
       return parseInt(this.firstElementChild.style.width, 10) || 0;
     },
-    scrollLeft: 0,
+    left: 0,
+    get scrollLeft() {
+      return Math.min(this.left, this.scrollWidth - this.clientWidth);
+    },
+    set scrollLeft(v: number) {
+      this.left = Math.max(0, Math.min(v, this.scrollWidth - this.clientWidth));
+    },
     firstElementChild: { style: { width: '' } },
     listeners: new Map<string, () => void>(),
     addEventListener(event: string, fn: () => void) {
@@ -461,12 +474,15 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   holder.scrollLeft = 2002;
   holder.listeners.get('scroll')!();
   assert.equal(hscroll.scrollLeft, 2002, 'the mirror follows the holder to its far end');
-  holder.scrollLeft = 2010;
+  hscroll.listeners.get('scroll')!();
+  holder.scrollLeft = 1500;
+  holder.listeners.get('scroll')!();
+  holder.scrollLeft = 1510;
   hscroll.listeners.get('scroll')!();
   assert.equal(
     holder.scrollLeft,
-    2010,
-    "the mirror's echo of 2002 does not undo a later wheel move",
+    1510,
+    "the mirror's echo of 1500 does not undo a later wheel move",
   );
   hscroll.scrollLeft = 700;
   hscroll.listeners.get('scroll')!();
@@ -503,6 +519,26 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
     'the spacer follows a wider holder',
   );
   assert.equal(hscroll.scrollLeft, 2400);
+  hscroll.listeners.get('scroll')!();
+
+  // The table narrows so the mirror's range is the wider one: a drag past the
+  // holder's end clamps, the clamped echo resizes the mirror, and the marker
+  // does not swallow a later genuine pass through the dragged offset.
+  holder.scrollWidth = 2000;
+  hscroll.scrollLeft = 2400;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 1002, 'the holder clamps');
+  holder.listeners.get('scroll')!();
+  assert.equal(
+    hscroll.firstElementChild.style.width,
+    '2002px',
+    'the clamped echo resizes the mirror',
+  );
+  assert.equal(hscroll.scrollLeft, 1002);
+  holder.scrollWidth = 3500;
+  holder.scrollLeft = 2400;
+  holder.listeners.get('scroll')!();
+  assert.equal(hscroll.scrollLeft, 2400, 'the old drag offset is no longer treated as an echo');
   hscroll.listeners.get('scroll')!();
 
   holder.scrollWidth = 998;

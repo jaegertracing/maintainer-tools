@@ -518,30 +518,35 @@ const TABLE_SCRIPT = `
   // the one echo of the value it wrote; otherwise a stale echo would undo a
   // wheel movement made in between. The marker is cleared once the echo has
   // arrived, so a later genuine scroll to the same offset still propagates.
-  // Offsets are compared with a sub-pixel tolerance because zoomed pages
-  // snap scrollLeft to device pixels.
+  // Offsets and ranges are compared with a one-pixel tolerance because a
+  // zoomed page rounds each element's scroll metrics separately. The marker
+  // records the value the counterpart actually took, which may be clamped,
+  // and any event from that side consumes it.
   function bindHscroll() {
     const h = holder();
     let wroteToMirror = -1;
     let wroteToHolder = -1;
-    const same = (a, b) => Math.abs(a - b) < 1;
+    const same = (a, b) => Math.abs(a - b) <= 1;
     const follow = (from, to, pending, setPending) => {
-      if (same(from.scrollLeft, pending)) return -1;
+      if (same(from.scrollLeft, pending)) return;
       if (!same(to.scrollLeft, from.scrollLeft)) {
-        setPending(from.scrollLeft);
         to.scrollLeft = from.scrollLeft;
+        setPending(to.scrollLeft);
       }
-      return pending;
     };
     h.addEventListener('scroll', () => {
       // A column drag widens the holder before columnResized fires; a mirror
       // with a stale, shorter range would clamp the write and pull the holder
       // back, so the range is checked first.
-      if (h.scrollWidth - h.clientWidth !== hscroll.scrollWidth - hscroll.clientWidth) sizeMirror(h);
-      wroteToHolder = follow(h, hscroll, wroteToHolder, (v) => { wroteToMirror = v; });
+      if (!same(h.scrollWidth - h.clientWidth, hscroll.scrollWidth - hscroll.clientWidth)) sizeMirror(h);
+      const pending = wroteToHolder;
+      wroteToHolder = -1;
+      follow(h, hscroll, pending, (v) => { wroteToMirror = v; });
     });
     hscroll.addEventListener('scroll', () => {
-      wroteToMirror = follow(hscroll, h, wroteToMirror, (v) => { wroteToHolder = v; });
+      const pending = wroteToMirror;
+      wroteToMirror = -1;
+      follow(hscroll, h, pending, (v) => { wroteToHolder = v; });
     });
     syncHscroll();
   }
