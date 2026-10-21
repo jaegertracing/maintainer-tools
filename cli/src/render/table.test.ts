@@ -260,8 +260,11 @@ test('summary links replace filters and match multiple buckets exactly', () => {
   let tableMode = false;
   let bucketFilter: (values: string[], bucket: string) => boolean = () => false;
   let labelFilter: (needle: string, labels: string[]) => boolean = () => false;
+  const built: Array<() => void> = [];
   const table = {
-    on() {},
+    on: (event: string, handler: () => void) => {
+      if (event === 'tableBuilt') built.push(handler);
+    },
     redraw() {},
     clearHeaderFilter: () => filters.clear(),
     setHeaderFilterValue: (field: string, value: string | string[]) => {
@@ -293,7 +296,7 @@ test('summary links replace filters and match multiple buckets exactly', () => {
         },
       },
     },
-    location: { hash: '#table' },
+    location: { hash: '', pathname: '/triage.html', search: '' },
     window: { addEventListener() {} },
     history: { replaceState() {} },
     Tabulator: function (
@@ -307,9 +310,32 @@ test('summary links replace filters and match multiple buckets exactly', () => {
     },
   });
 
+  // The page opens in the Categorized view, so the first label click has to
+  // build the table and wait for it before filtering.
+  assert.equal(tableMode, false);
+  assert.ok(listeners.has('0'), 'bucket totals must have click handlers');
+  listeners.get('0')!();
+  assert.equal(filters.size, 0, 'outside Table view a bucket link leaves the filters alone');
+  assert.equal(scrolled.length, 0, 'outside Table view a bucket link does not scroll');
+  listeners.get('5')!();
+  assert.equal(tableMode, true, 'a label count opens the Table view from the Categorized view');
+  assert.equal(filters.size, 0, 'the filters wait until Tabulator has built its columns');
+  // The table's own tableBuilt handler wires panels the stub does not model;
+  // the click registers its filter handler after it.
+  assert.equal(built.length, 2);
+  built[1]!();
+  assert.deepEqual(
+    [...filters],
+    [
+      ['bucket', ['Needs triage']],
+      ['labels', '"bug"'],
+    ],
+  );
+  assert.deepEqual(scrolled, ['sort-panel']);
+  scrolled.length = 0;
+
   filters.set('repo', 'other/repo');
   filters.set('author', 'someone');
-  assert.ok(listeners.has('0'), 'bucket totals must have click handlers');
   listeners.get('0')!();
   assert.deepEqual([...filters], [['bucket', ['Needs triage']]]);
   listeners.get('1')!();
@@ -358,8 +384,10 @@ test('summary links replace filters and match multiple buckets exactly', () => {
     'outside Table view the repo and bucket links leave the filters alone',
   );
   assert.equal(scrolled.length, 6, 'outside Table view the repo and bucket links do not scroll');
+  const builtBefore = built.length;
   listeners.get('5')!();
-  assert.equal(tableMode, true, 'a label count opens the Table view from the Categorized view');
+  assert.equal(tableMode, true, 'a label count reopens the Table view from the Categorized view');
+  assert.equal(built.length, builtBefore, 'an already built table takes the filters at once');
   assert.deepEqual(
     [...filters],
     [
