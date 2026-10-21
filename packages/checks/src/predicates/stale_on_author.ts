@@ -7,10 +7,10 @@ const DEFAULT_STALE_DAYS = 30;
 
 export function staleOnAuthor(
   pr: PullRequest,
-  opts: { staleDays?: number; now?: Date } = {},
+  opts: { staleDays?: number; now: Date },
 ): CheckResult {
   const staleDays = opts.staleDays ?? DEFAULT_STALE_DAYS;
-  const now = opts.now ?? new Date();
+  const now = opts.now;
   const updated = new Date(pr.updatedAt);
   const ageDays = (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24);
 
