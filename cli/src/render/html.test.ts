@@ -189,7 +189,7 @@ test('summary label columns count actionable PRs across repos and open the Table
   const classified = [
     pullRequest({
       number: 1,
-      labels: ['bug', 'area/storage', 'changelog:bugfix-or-minor-feature'],
+      labels: ['bug', 'area/storage', 'changelog:bugfix-or-minor-feature', 'ci:parallel'],
     }),
     pullRequest({ number: 2, repo: { owner: 'other', name: 'repo2' }, labels: ['Bug'] }),
     pullRequest({ number: 3, isDraft: true, labels: ['bug', 'stale'] }), // hidden
@@ -212,17 +212,17 @@ test('summary label columns count actionable PRs across repos and open the Table
   );
   assert.match(
     summary,
-    /<th scope="col">total<\/th><th scope="col" class="labels">bug<\/th><th scope="col">area\/storage<\/th><\/tr>/,
-    'label columns follow the total, most-used first; changelog, stale and bot-only labels are left out',
+    /<th scope="col">total<\/th><th scope="col" class="labels">area\/storage<\/th><th scope="col">bug<\/th><\/tr>/,
+    'label columns follow the total alphabetically; changelog, ci, stale and bot-only labels are left out',
   );
   assert.match(
     summary,
-    /<th scope="row">subtotal<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="bug">2<\/a><\/td><td><a href="#table" data-buckets="\1" data-label="area\/storage">1<\/a><\/td><\/tr>/,
+    /<th scope="row">subtotal<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="area\/storage">1<\/a><\/td><td><a href="#table" data-buckets="\1" data-label="bug">2<\/a><\/td><\/tr>/,
     'a subtotal label cell counts the label across repos and spellings in the actionable buckets only',
   );
   assert.match(
     summary,
-    /Blocked on author<span class="note"> \(excluded\)<\/span><\/th>.*<td class="labels"><a href="#table" data-buckets="\[&quot;Blocked on author&quot;\]" data-label="bug">1<\/a><\/td><td class="zero">0<\/td><\/tr>/,
+    /Blocked on author<span class="note"> \(excluded\)<\/span><\/th>.*<td class="zero labels">0<\/td><td><a href="#table" data-buckets="\[&quot;Blocked on author&quot;\]" data-label="bug">1<\/a><\/td><\/tr>/,
     'an excluded row still counts its own labelled PRs',
   );
   assert.match(
@@ -231,7 +231,7 @@ test('summary label columns count actionable PRs across repos and open the Table
     'per-repo totals link to the repo heading and select the repo with no bucket filter',
   );
   const totalBug =
-    /<th scope="row">Total<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="bug">3<\/a>/.exec(
+    /<th scope="row">Total<\/th>.*<td><a href="#table" data-buckets="([^"]*)" data-label="bug">3<\/a>/.exec(
       summary,
     );
   assert.ok(totalBug, 'the Total row counts the label over every bucket, hidden included');

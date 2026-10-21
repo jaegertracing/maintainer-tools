@@ -181,9 +181,11 @@ const SUBTOTAL_EXCLUDED_BUCKETS: Bucket[] = ['dependency-bots', 'hidden'];
 
 // Labels the classifier already turns into a flag or a bucket, so a column
 // for them would repeat what the rows and the flags column say. The
-// `changelog:` labels only classify the release notes, and the configured
-// priority labels already group the Categorized view.
+// `changelog:` labels only classify the release notes, the `ci:` labels only
+// steer workflows, and the configured priority labels already group the
+// Categorized view.
 const FLAG_LABELS = new Set(['stale', 'waiting-for-author', 'pr-quota-reached']);
+const CONTROL_LABEL_PREFIXES = ['changelog:', 'ci:'];
 
 function prsInBucket(block: RepoBlock, bucket: Bucket): ClassifiedPR[] {
   const sections =
@@ -211,7 +213,7 @@ function labelCountsByBucket(
     for (const block of blocks) {
       for (const c of prsInBucket(block, bucket)) {
         for (const l of c.pr.labels) {
-          if (skip.has(l) || l.startsWith('changelog:')) continue;
+          if (skip.has(l) || CONTROL_LABEL_PREFIXES.some((p) => l.startsWith(p))) continue;
           const key = l.toLowerCase();
           const entry = counts.get(key) ?? { label: l, count: 0 };
           entry.count += 1;
@@ -243,10 +245,10 @@ function renderSummary(blocks: RepoBlock[], priorityLabels: string[]): string {
 
   // Label columns of the summary table. Only labels carried by at least one
   // PR in the subtotal buckets qualify, so a label that only marks bot or
-  // blocked PRs (Dependabot's `dependencies`) is left out, and the columns
-  // are ordered by how much actionable work each label marks.
+  // blocked PRs (Dependabot's `dependencies`) is left out. The columns are
+  // alphabetical so a reader can find a label without scanning them all.
   const labels = [...sumLabelCounts(labelsByBucket, subtotalBuckets).entries()]
-    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([key, { label }]) => ({ key, label }));
 
   // A cell links to the first section holding its PRs. When the count spans
