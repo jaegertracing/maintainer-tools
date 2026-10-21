@@ -23,9 +23,13 @@ import { resolvedWithoutReply } from './resolved_without_reply.js';
 
 // Predicates are pure functions of the PR, so a predicate that compares
 // against the current time takes it from here instead of the wall clock. A
-// caller that passes no clock gets the real one.
+// caller that passes no clock gets the real one, resolved once in runAll.
 export interface PredicateOptions {
   now?: Date;
+}
+
+export interface ResolvedPredicateOptions {
+  now: Date;
 }
 
 // Renamed from P0_PREDICATES — the registry no longer reflects a single
@@ -34,7 +38,7 @@ export interface PredicateOptions {
 // its `rules` input).
 export const ALL_PREDICATES: Record<
   CheckId,
-  (pr: PullRequest, opts?: PredicateOptions) => CheckResult
+  (pr: PullRequest, opts: ResolvedPredicateOptions) => CheckResult
 > = {
   dco_missing: dcoMissing,
   ci_failing: ciFailing,
@@ -57,5 +61,6 @@ export function runAll(
   opts: PredicateOptions = {},
 ): CheckResult[] {
   const selected = ids ?? (Object.keys(ALL_PREDICATES) as CheckId[]);
-  return selected.map((id) => ALL_PREDICATES[id](pr, opts));
+  const resolved: ResolvedPredicateOptions = { now: opts.now ?? new Date() };
+  return selected.map((id) => ALL_PREDICATES[id](pr, resolved));
 }

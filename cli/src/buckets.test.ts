@@ -406,3 +406,16 @@ test('priority-author issue flags use case-insensitive membership', () => {
 
   assert.equal(classify(pr, context).flags.includes('SELF-FILED'), false);
 });
+
+test('the stale check uses the injected clock, not the wall clock', () => {
+  const past = new Date('2020-01-10T00:00:00Z');
+  const pr = pullRequest({
+    createdAt: '2020-01-01T00:00:00Z',
+    updatedAt: '2020-01-09T00:00:00Z',
+    comments: [],
+  });
+  const fresh = classify(pr, { ...context, now: past });
+  assert.ok(!fresh.facets.hideReasons.includes('hide:stale_on_author'));
+  const later = classify(pr, { ...context, now: new Date('2020-03-01T00:00:00Z') });
+  assert.ok(later.facets.hideReasons.includes('hide:stale_on_author'));
+});

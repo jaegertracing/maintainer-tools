@@ -23,6 +23,7 @@ export {
   P0_PREDICATES,
   runAll,
   type PredicateOptions,
+  type ResolvedPredicateOptions,
   dcoMissing,
   ciFailing,
   mergeConflict,
