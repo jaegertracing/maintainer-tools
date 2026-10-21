@@ -504,30 +504,40 @@ const TABLE_SCRIPT = `
   // The holder sits inside the table border, so the two elements differ in
   // width; sizing the spacer by the holder's overflow gives both the same
   // scroll range.
+  const sizeMirror = (h) => {
+    hscroll.hidden = h.scrollWidth <= h.clientWidth;
+    hscroll.firstElementChild.style.width = h.scrollWidth - h.clientWidth + hscroll.clientWidth + 'px';
+  };
   function syncHscroll() {
     const h = holder();
     if (!h) return;
-    hscroll.hidden = h.scrollWidth <= h.clientWidth;
-    hscroll.firstElementChild.style.width = h.scrollWidth - h.clientWidth + hscroll.clientWidth + 'px';
+    sizeMirror(h);
     hscroll.scrollLeft = h.scrollLeft;
   }
   // A programmatic scroll fires its event a frame later, so each side ignores
   // the one echo of the value it wrote; otherwise a stale echo would undo a
   // wheel movement made in between. The marker is cleared once the echo has
   // arrived, so a later genuine scroll to the same offset still propagates.
+  // Offsets are compared with a sub-pixel tolerance because zoomed pages
+  // snap scrollLeft to device pixels.
   function bindHscroll() {
     const h = holder();
     let wroteToMirror = -1;
     let wroteToHolder = -1;
+    const same = (a, b) => Math.abs(a - b) < 1;
     const follow = (from, to, pending, setPending) => {
-      if (from.scrollLeft === pending) return -1;
-      if (to.scrollLeft !== from.scrollLeft) {
+      if (same(from.scrollLeft, pending)) return -1;
+      if (!same(to.scrollLeft, from.scrollLeft)) {
         setPending(from.scrollLeft);
         to.scrollLeft = from.scrollLeft;
       }
       return pending;
     };
     h.addEventListener('scroll', () => {
+      // A column drag widens the holder before columnResized fires; a mirror
+      // with a stale, shorter range would clamp the write and pull the holder
+      // back, so the range is checked first.
+      if (h.scrollWidth - h.clientWidth !== hscroll.scrollWidth - hscroll.clientWidth) sizeMirror(h);
       wroteToHolder = follow(h, hscroll, wroteToHolder, (v) => { wroteToMirror = v; });
     });
     hscroll.addEventListener('scroll', () => {

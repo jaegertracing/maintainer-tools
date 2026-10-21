@@ -422,6 +422,9 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   const hscroll = {
     hidden: true,
     clientWidth: 1000,
+    get scrollWidth() {
+      return parseInt(this.firstElementChild.style.width, 10) || 0;
+    },
     scrollLeft: 0,
     firstElementChild: { style: { width: '' } },
     listeners: new Map<string, () => void>(),
@@ -488,6 +491,19 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
     300,
     'a genuine return to an old offset is not treated as an echo',
   );
+
+  // A column drag widens the holder before any Tabulator event resizes the
+  // mirror; the holder's own scroll handler notices the range mismatch.
+  holder.scrollWidth = 3500;
+  holder.scrollLeft = 2400;
+  holder.listeners.get('scroll')!();
+  assert.equal(
+    hscroll.firstElementChild.style.width,
+    '3502px',
+    'the spacer follows a wider holder',
+  );
+  assert.equal(hscroll.scrollLeft, 2400);
+  hscroll.listeners.get('scroll')!();
 
   holder.scrollWidth = 998;
   handlers.get('renderComplete')!();
