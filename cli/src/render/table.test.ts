@@ -454,21 +454,28 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
       this.listeners.set(event, fn);
     },
   };
-  const panels = { offsetHeight: 72 };
+  const panels = { height: 72.6, getBoundingClientRect: () => ({ height: panels.height }) };
   const cssVars = new Map<string, string>();
+  let onPanelsResize: (() => void) | undefined;
   runInNewContext(script, {
     document: {
       getElementById: (id: string) =>
         id === 'hscroll'
           ? hscroll
           : { textContent: '[]', innerHTML: '', hidden: false, addEventListener() {} },
-      querySelector: () => panels,
+      querySelector: (selector: string) => (selector === '.table-panels' ? panels : null),
       querySelectorAll: () => [],
       body: { classList: { toggle() {}, contains: () => true } },
     },
     location: { hash: '#table' },
     history: { replaceState() {} },
     window: { addEventListener() {} },
+    ResizeObserver: class {
+      constructor(fn: () => void) {
+        onPanelsResize = fn;
+      }
+      observe() {}
+    },
     Tabulator: function () {
       return {
         on: (event: string, fn: () => void) => handlers.set(event, fn),
@@ -486,7 +493,10 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   });
 
   handlers.get('tableBuilt')!();
-  assert.equal(cssVars.get('--panels-height'), '72px', 'the header sticks under the panels');
+  assert.equal(cssVars.get('--panels-height'), '72px', 'the header tucks under the panels');
+  panels.height = 101.2;
+  onPanelsResize!();
+  assert.equal(cssVars.get('--panels-height'), '101px', 'the offset follows the panel height');
   assert.equal(hscroll.hidden, false);
   assert.equal(hscroll.firstElementChild.style.width, '3002px');
   holder.scrollLeft = 2002;
@@ -525,6 +535,11 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
     300,
     'a genuine return to an old offset is not treated as an echo',
   );
+  hscroll.listeners.get('scroll')!();
+  hscroll.scrollLeft = 0;
+  hscroll.listeners.get('scroll')!();
+  assert.equal(holder.scrollLeft, 0, 'a drag to the left edge is not mistaken for an echo');
+  holder.listeners.get('scroll')!();
 
   // A column drag widens the holder before any Tabulator event resizes the
   // mirror; the holder's own scroll handler notices the range mismatch.

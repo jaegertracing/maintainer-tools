@@ -502,9 +502,12 @@ const TABLE_SCRIPT = `
   // The panels stick to the top of the viewport and the table header sticks
   // right under them, so the header's offset follows the panels' height as
   // their chips wrap.
+  // The height is rounded down so the header tucks under the panels rather
+  // than leaving a sub-pixel slit for the rows to show through.
   const panels = document.querySelector('.table-panels');
   function syncStickyTop() {
-    table.element.style.setProperty('--panels-height', panels.offsetHeight + 'px');
+    const height = Math.floor(panels.getBoundingClientRect().height);
+    table.element.style.setProperty('--panels-height', height + 'px');
   }
   function bindStickyPanels() {
     syncStickyTop();
@@ -541,7 +544,7 @@ const TABLE_SCRIPT = `
     let wroteToHolder = -1;
     const same = (a, b) => Math.abs(a - b) <= 1;
     const follow = (from, to, pending, setPending) => {
-      if (same(from.scrollLeft, pending)) return;
+      if (pending >= 0 && same(from.scrollLeft, pending)) return;
       if (!same(to.scrollLeft, from.scrollLeft)) {
         to.scrollLeft = from.scrollLeft;
         setPending(to.scrollLeft);
