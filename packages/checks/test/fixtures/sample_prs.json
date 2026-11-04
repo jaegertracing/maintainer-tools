@@ -1,0 +1,362 @@
+[
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 101,
+    "title": "chore(deps): bump opentelemetry-go to 1.30.0",
+    "url": "https://github.com/jaegertracing/jaeger/pull/101",
+    "author": { "login": "dependabot[bot]", "typename": "Bot" },
+    "authorAssociation": "NONE",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-20T10:00:00.000Z",
+    "updatedAt": "2026-10-20T10:05:00.000Z",
+    "labels": ["dependencies"],
+    "additions": 15,
+    "deletions": 15,
+    "changedFiles": 2,
+    "files": ["go.mod", "go.sum"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "dep0001",
+        "messageHeadline": "chore(deps): bump opentelemetry-go to 1.30.0",
+        "messageBody": "Signed-off-by: dependabot[bot] <support@github.com>",
+        "authorEmail": "support@github.com",
+        "committedDate": "2026-10-20T10:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 102,
+    "title": "WIP: Prototype alternative in-memory buffer pool",
+    "url": "https://github.com/jaegertracing/jaeger/pull/102",
+    "author": { "login": "alice", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": true,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-25T14:00:00.000Z",
+    "updatedAt": "2026-10-28T09:00:00.000Z",
+    "labels": [],
+    "additions": 120,
+    "deletions": 40,
+    "changedFiles": 4,
+    "files": ["pkg/buffer/pool.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "wip0001",
+        "messageHeadline": "WIP: pool",
+        "messageBody": "Signed-off-by: Alice <alice@example.com>",
+        "authorEmail": "alice@example.com",
+        "committedDate": "2026-10-28T09:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 103,
+    "title": "fix: resolve data race in query service handler",
+    "url": "https://github.com/jaegertracing/jaeger/pull/103",
+    "author": { "login": "bob", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-26T11:00:00.000Z",
+    "updatedAt": "2026-10-29T10:00:00.000Z",
+    "labels": [],
+    "additions": 45,
+    "deletions": 12,
+    "changedFiles": 2,
+    "files": ["cmd/query/app/handler.go"],
+    "statusCheckRollup": "FAILURE",
+    "commits": [
+      {
+        "sha": "ci0001",
+        "messageHeadline": "fix: resolve data race in query service handler",
+        "messageBody": "Signed-off-by: Bob <bob@example.com>",
+        "authorEmail": "bob@example.com",
+        "committedDate": "2026-10-29T10:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 104,
+    "title": "feat: add clickhouse compression level configuration",
+    "url": "https://github.com/jaegertracing/jaeger/pull/104",
+    "author": { "login": "charlie", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "CONFLICTING",
+    "createdAt": "2026-10-24T08:00:00.000Z",
+    "updatedAt": "2026-10-27T16:00:00.000Z",
+    "labels": [],
+    "additions": 90,
+    "deletions": 10,
+    "changedFiles": 3,
+    "files": ["plugin/storage/clickhouse/options.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "conf0001",
+        "messageHeadline": "feat: add clickhouse compression",
+        "messageBody": "Signed-off-by: Charlie <charlie@example.com>",
+        "authorEmail": "charlie@example.com",
+        "committedDate": "2026-10-24T08:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 105,
+    "title": "docs: update trace sampling documentation",
+    "url": "https://github.com/jaegertracing/jaeger/pull/105",
+    "author": { "login": "dave", "typename": "User" },
+    "authorAssociation": "FIRST_TIME_CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-27T09:00:00.000Z",
+    "updatedAt": "2026-10-27T09:10:00.000Z",
+    "labels": [],
+    "additions": 10,
+    "deletions": 2,
+    "changedFiles": 1,
+    "files": ["docs/sampling.md"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "dco0001",
+        "messageHeadline": "docs: update sampling",
+        "messageBody": "Forgot signoff line",
+        "authorEmail": "dave@example.com",
+        "committedDate": "2026-10-27T09:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 106,
+    "title": "refactor: optimize span store batching allocations",
+    "url": "https://github.com/jaegertracing/jaeger/pull/106",
+    "author": { "login": "eve", "typename": "User" },
+    "authorAssociation": "MEMBER",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-22T10:00:00.000Z",
+    "updatedAt": "2026-10-25T12:00:00.000Z",
+    "labels": [],
+    "additions": 60,
+    "deletions": 30,
+    "changedFiles": 2,
+    "files": ["storage/spanstore/writer.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "cr0001",
+        "messageHeadline": "refactor: batching allocations",
+        "messageBody": "Signed-off-by: Eve <eve@example.com>",
+        "authorEmail": "eve@example.com",
+        "committedDate": "2026-10-22T10:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [
+      {
+        "author": "frank",
+        "state": "CHANGES_REQUESTED",
+        "submittedAt": "2026-10-25T12:00:00.000Z"
+      }
+    ],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 107,
+    "title": "perf: reduce allocations in memory store search",
+    "url": "https://github.com/jaegertracing/jaeger/pull/107",
+    "author": { "login": "grace", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-20T12:00:00.000Z",
+    "updatedAt": "2026-10-26T15:00:00.000Z",
+    "labels": [],
+    "additions": 35,
+    "deletions": 15,
+    "changedFiles": 1,
+    "files": ["plugin/storage/memory/memory.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "th0001",
+        "messageHeadline": "perf: memory store",
+        "messageBody": "Signed-off-by: Grace <grace@example.com>",
+        "authorEmail": "grace@example.com",
+        "committedDate": "2026-10-20T12:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": [],
+    "reviewThreads": [
+      {
+        "isResolved": false,
+        "resolvedBy": null,
+        "comments": [{ "author": "frank", "createdAt": "2026-10-26T15:00:00.000Z" }]
+      }
+    ]
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 108,
+    "title": "test: add integration test for grpc trace exporter",
+    "url": "https://github.com/jaegertracing/jaeger/pull/108",
+    "author": { "login": "heidi", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-21T09:00:00.000Z",
+    "updatedAt": "2026-10-27T10:00:00.000Z",
+    "labels": ["waiting-for-author"],
+    "additions": 80,
+    "deletions": 0,
+    "changedFiles": 2,
+    "files": ["cmd/collector/app/grpc_test.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "lbl0001",
+        "messageHeadline": "test: grpc exporter",
+        "messageBody": "Signed-off-by: Heidi <heidi@example.com>",
+        "authorEmail": "heidi@example.com",
+        "committedDate": "2026-10-21T09:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 109,
+    "title": "feat: support multiple elasticsearch cluster endpoints",
+    "url": "https://github.com/jaegertracing/jaeger/pull/109",
+    "author": { "login": "ivan", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-28T14:00:00.000Z",
+    "updatedAt": "2026-10-29T16:00:00.000Z",
+    "labels": [],
+    "additions": 140,
+    "deletions": 25,
+    "changedFiles": 5,
+    "files": ["pkg/es/client.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "rev0001",
+        "messageHeadline": "feat: multiple es clusters",
+        "messageBody": "Signed-off-by: Ivan <ivan@example.com>",
+        "authorEmail": "ivan@example.com",
+        "committedDate": "2026-10-28T14:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [{ "kind": "user", "login": "maintainer-judy" }],
+    "reviews": [],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 110,
+    "title": "chore: clean up deprecated metrics constants",
+    "url": "https://github.com/jaegertracing/jaeger/pull/110",
+    "author": { "login": "judy", "typename": "User" },
+    "authorAssociation": "MEMBER",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-29T08:00:00.000Z",
+    "updatedAt": "2026-10-29T11:00:00.000Z",
+    "labels": [],
+    "additions": 12,
+    "deletions": 45,
+    "changedFiles": 2,
+    "files": ["pkg/metrics/constants.go"],
+    "statusCheckRollup": "SUCCESS",
+    "commits": [
+      {
+        "sha": "appr0001",
+        "messageHeadline": "chore: cleanup metrics",
+        "messageBody": "Signed-off-by: Judy <judy@example.com>",
+        "authorEmail": "judy@example.com",
+        "committedDate": "2026-10-29T08:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [
+      {
+        "author": "maintainer-frank",
+        "state": "APPROVED",
+        "submittedAt": "2026-10-29T11:00:00.000Z"
+      }
+    ],
+    "comments": []
+  },
+  {
+    "repo": { "owner": "jaegertracing", "name": "jaeger" },
+    "number": 111,
+    "title": "fix: correct timestamp precision in trace search queries",
+    "url": "https://github.com/jaegertracing/jaeger/pull/111",
+    "author": { "login": "karl", "typename": "User" },
+    "authorAssociation": "CONTRIBUTOR",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "createdAt": "2026-10-15T09:00:00.000Z",
+    "updatedAt": "2026-10-30T17:00:00.000Z",
+    "labels": [],
+    "additions": 22,
+    "deletions": 5,
+    "changedFiles": 1,
+    "files": ["model/timestamp.go"],
+    "statusCheckRollup": "FAILURE",
+    "commits": [
+      {
+        "sha": "age0001",
+        "messageHeadline": "fix: timestamp precision",
+        "messageBody": "Signed-off-by: Karl <karl@example.com>",
+        "authorEmail": "karl@example.com",
+        "committedDate": "2026-10-15T09:00:00.000Z",
+        "parents": 1
+      }
+    ],
+    "reviewRequests": [],
+    "reviews": [],
+    "comments": [{ "author": "karl", "createdAt": "2026-10-15T09:05:00.000Z" }]
+  }
+]

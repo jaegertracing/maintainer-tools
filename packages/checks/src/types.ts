@@ -200,3 +200,45 @@ export interface IssueMeta {
 // Subset of GraphQL Actor __typename we care about.
 export type AuthorTypename =
   'User' | 'Bot' | 'EnterpriseUserAccount' | 'Mannequin' | 'Organization';
+
+// Neutral next-actor assignment for public triage.
+export type NextActor = 'author' | 'reviewer' | 'maintainer' | 'bot';
+
+export interface ActorClassification {
+  nextActor: NextActor;
+  isDraft: boolean;
+  isBotAuthored: boolean;
+  isDependencyBot: boolean;
+  reason: string;
+  turnStartedAt: string;
+  isTruncated?: boolean;
+}
+
+export type DashboardSectionKey =
+  | 'ready_to_merge'
+  | 'waiting_on_reviewers'
+  | 'waiting_on_authors'
+  | 'draft_prs'
+  | 'dependency_updates';
+
+export interface DashboardItem {
+  pr: PullRequest;
+  classification: ActorClassification;
+  waitingDurationMs: number;
+  isInactiveAuthor?: boolean;
+}
+
+export interface DashboardSection {
+  key: DashboardSectionKey;
+  title: string;
+  items: DashboardItem[];
+  totalCount: number;
+  omittedCount: number;
+  inactiveAuthorCount?: number;
+}
+
+export interface DashboardData {
+  repo: { owner: string; name: string };
+  sections: DashboardSection[];
+  generatedAt: string;
+}
