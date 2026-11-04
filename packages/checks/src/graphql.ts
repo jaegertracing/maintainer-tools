@@ -9,7 +9,8 @@
 // One full-PR query pulls every field any current or planned consumer might
 // need. Cache eviction is keyed by `updatedAt` — see cache.ts.
 
-import { graphql } from '@octokit/graphql';
+import { graphql, type withCustomRequest } from '@octokit/graphql';
+import { retryRequest } from './retry.js';
 import { refKey } from './issue-refs.js';
 import type {
   AuthorAssociation,
@@ -442,6 +443,12 @@ async function fetchRemainingReviewThreads(
 export function createGraphqlClient(token: string): GraphqlClient {
   const gql = graphql.defaults({
     headers: { authorization: `token ${token}` },
+    request: {
+      hook: (
+        request: Parameters<typeof withCustomRequest>[0],
+        options: Parameters<typeof graphql.defaults>[0] & { url: string },
+      ) => retryRequest(() => request(options)),
+    },
   });
 
   return {
