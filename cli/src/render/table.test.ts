@@ -593,6 +593,9 @@ test('the PR cell carries a copy button that puts the PR URL on the clipboard', 
   );
   const copied: string[] = [];
   const classes = new Set<string>();
+  const timers: Array<() => void> = [];
+  const warnings: unknown[][] = [];
+  let clipboardFails = false;
   let tableClick: ((e: unknown) => void) | undefined;
   let prFormatter: ((cell: unknown) => string) | undefined;
   runInNewContext(script, {
@@ -614,12 +617,14 @@ test('the PR cell carries a copy button that puts the PR URL on the clipboard', 
     navigator: {
       clipboard: {
         writeText: (s: string) => {
+          if (clipboardFails) return Promise.reject(new Error('Document is not focused'));
           copied.push(s);
           return Promise.resolve();
         },
       },
     },
-    setTimeout: (fn: () => void) => fn(),
+    setTimeout: (fn: () => void) => timers.push(fn),
+    console: { warn: (...args: unknown[]) => warnings.push(args) },
     Tabulator: function (
       _selector: string,
       options: { columns: Array<{ field: string; formatter: (cell: unknown) => string }> },
@@ -643,8 +648,20 @@ test('the PR cell carries a copy button that puts the PR URL on the clipboard', 
   };
   tableClick!({ target: { closest: () => null } });
   assert.deepEqual(copied, [], 'a click elsewhere in the table copies nothing');
-  tableClick!({ target: { closest: (sel: string) => (sel === '.copy-link' ? button : null) } });
-  await Promise.resolve();
+  const clickCopy = () =>
+    tableClick!({ target: { closest: (sel: string) => (sel === '.copy-link' ? button : null) } });
+  clickCopy();
+  await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(copied, [url]);
-  assert.equal(classes.size, 0, 'the copied highlight is cleared after its timeout');
+  assert.deepEqual([...classes], ['copied'], 'the icon is highlighted while the copy is fresh');
+  assert.equal(timers.length, 1);
+  timers[0]!();
+  assert.equal(classes.size, 0, 'the highlight is cleared by its timer');
+
+  clipboardFails = true;
+  clickCopy();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(copied, [url], 'a rejected write copies nothing');
+  assert.equal(classes.size, 0, 'a rejected write leaves the icon unchanged');
+  assert.equal(warnings.length, 1, 'a rejected write is logged once');
 });

@@ -462,15 +462,21 @@ const TABLE_SCRIPT = `
         { column: 'repo', dir: 'asc' },
       ],
     });
-    // One listener on the table rather than one per cell: Tabulator re-renders
-    // cells on every sort and filter, which would drop per-cell handlers.
+    // One listener on the table rather than one per cell: a formatter that
+    // returns a string cannot attach a handler, and Tabulator regenerates the
+    // cell elements when a column is moved.
     document.getElementById('triage-table').addEventListener('click', (e) => {
       const btn = e.target.closest('.copy-link');
       if (!btn) return;
-      navigator.clipboard.writeText(btn.dataset.url).then(() => {
-        btn.classList.add('copied');
-        setTimeout(() => btn.classList.remove('copied'), 1200);
-      });
+      // The clipboard API is absent outside a secure context and rejects when
+      // the document is not focused; the icon then stays unchanged.
+      Promise.resolve()
+        .then(() => navigator.clipboard.writeText(btn.dataset.url))
+        .then(() => {
+          btn.classList.add('copied');
+          setTimeout(() => btn.classList.remove('copied'), 1200);
+        })
+        .catch((err) => console.warn('copy failed', err));
     });
     table.on('dataSorted', renderSortChips);
     table.on('dataFiltered', renderFilterChips);
