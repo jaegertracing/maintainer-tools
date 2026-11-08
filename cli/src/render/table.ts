@@ -229,6 +229,9 @@ export const TABLE_CSS = `
   #triage-table .tabulator-cell a { color: #0969da; text-decoration: none; }
   #triage-table .tabulator-cell a:hover { text-decoration: underline; }
   #triage-table .tabulator-row.row-hidden { color: #8c959f; }
+  #triage-table .copy-link { margin-left: 0.35em; padding: 0 0.15em; border: 0; background: none; color: #8c959f; cursor: pointer; vertical-align: middle; line-height: 1; }
+  #triage-table .copy-link:hover { color: #0969da; }
+  #triage-table .copy-link.copied { color: #1f883d; }
   .copilot-green { color: #1f883d; }
   .copilot-yellow { color: #9a6700; }
   .copilot-red { color: #cf222e; }
@@ -243,6 +246,7 @@ const TABLE_SCRIPT = `
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const chips = (values, cls) => values.map((v) => '<span class="flag ' + cls(v) + '">' + esc(v) + '</span>').join(' ');
   const flagClass = (v) => 'flag-' + (v.split(':')[0] || v).trim().replace(/[^A-Za-z0-9-]/g, '-');
+  const COPY_ICON = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path fill="currentColor" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>';
 
   // Tabulator inserts tooltips and list items as HTML, so every value that
   // came from a PR (titles, labels, author logins) is escaped first.
@@ -351,8 +355,12 @@ const TABLE_SCRIPT = `
       sorter: (a, b, aRow, bRow) => aRow.getData().repoOrder - bRow.getData().repoOrder,
     }),
     num('PR', 'number', {
-      frozen: true, width: 70, headerFilterPlaceholder: '#',
-      formatter: (cell) => '<a href="' + esc(cell.getRow().getData().url) + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>',
+      frozen: true, width: 88, headerFilterPlaceholder: '#',
+      formatter: (cell) => {
+        const url = esc(cell.getRow().getData().url);
+        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>'
+          + '<button type="button" class="copy-link" data-url="' + url + '" title="Copy PR link" aria-label="Copy PR link">' + COPY_ICON + '</button>';
+      },
     }),
     en('author', 'author', {
       maxInitialWidth: 160, tooltip: (e, cell) => esc(cell.getValue()),
@@ -453,6 +461,16 @@ const TABLE_SCRIPT = `
         ...(HAS_TIERS ? [{ column: 'priorityLabel', dir: 'asc' }] : []),
         { column: 'repo', dir: 'asc' },
       ],
+    });
+    // One listener on the table rather than one per cell: Tabulator re-renders
+    // cells on every sort and filter, which would drop per-cell handlers.
+    document.getElementById('triage-table').addEventListener('click', (e) => {
+      const btn = e.target.closest('.copy-link');
+      if (!btn) return;
+      navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 1200);
+      });
     });
     table.on('dataSorted', renderSortChips);
     table.on('dataFiltered', renderFilterChips);

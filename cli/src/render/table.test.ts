@@ -577,3 +577,74 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   assert.equal(hscroll.hidden, false);
   assert.equal(hscroll.firstElementChild.style.width, '2000px', 'the spacer is resized on re-show');
 });
+
+test('the PR cell carries a copy button that puts the PR URL on the clipboard', async () => {
+  const html = renderTableView([classify(pullRequest(), context)], {
+    viewer: 'maintainer-a',
+    now,
+  });
+  const script = html.slice(
+    html.indexOf('<script>') + '<script>'.length,
+    html.lastIndexOf('</script>'),
+  );
+  const rowsJson = html.slice(
+    html.indexOf('id="table-rows">') + 'id="table-rows">'.length,
+    html.indexOf('</script>'),
+  );
+  const copied: string[] = [];
+  const classes = new Set<string>();
+  let tableClick: ((e: unknown) => void) | undefined;
+  let prFormatter: ((cell: unknown) => string) | undefined;
+  runInNewContext(script, {
+    document: {
+      getElementById: (id: string) => ({
+        textContent: id === 'table-rows' ? rowsJson : '',
+        addEventListener: (event: string, handler: (e: unknown) => void) => {
+          if (id === 'triage-table' && event === 'click') tableClick = handler;
+        },
+      }),
+      querySelector: () => ({ offsetHeight: 0 }),
+      querySelectorAll: () => [],
+      body: { classList: { toggle() {}, contains: () => true } },
+    },
+    // Opening on #table builds the Tabulator instance at load.
+    location: { hash: '#table', pathname: '/triage.html', search: '' },
+    window: { addEventListener() {} },
+    history: { replaceState() {} },
+    navigator: {
+      clipboard: {
+        writeText: (s: string) => {
+          copied.push(s);
+          return Promise.resolve();
+        },
+      },
+    },
+    setTimeout: (fn: () => void) => fn(),
+    Tabulator: function (
+      _selector: string,
+      options: { columns: Array<{ field: string; formatter: (cell: unknown) => string }> },
+    ) {
+      prFormatter = options.columns.find((column) => column.field === 'number')!.formatter;
+      return { on() {}, redraw() {} };
+    },
+  });
+
+  const url = 'https://github.com/example/repo/pull/7';
+  const cell = prFormatter!({
+    getValue: () => 7,
+    getRow: () => ({ getData: () => ({ url }) }),
+  });
+  assert.ok(cell.includes(`<a href="${url}" target="_blank" rel="noopener noreferrer">#7</a>`));
+  assert.ok(cell.includes(`class="copy-link" data-url="${url}"`));
+
+  const button = {
+    dataset: { url },
+    classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+  };
+  tableClick!({ target: { closest: () => null } });
+  assert.deepEqual(copied, [], 'a click elsewhere in the table copies nothing');
+  tableClick!({ target: { closest: (sel: string) => (sel === '.copy-link' ? button : null) } });
+  await Promise.resolve();
+  assert.deepEqual(copied, [url]);
+  assert.equal(classes.size, 0, 'the copied highlight is cleared after its timeout');
+});
