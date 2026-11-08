@@ -577,3 +577,91 @@ test('the bottom scrollbar mirrors the table holder with the same scroll range',
   assert.equal(hscroll.hidden, false);
   assert.equal(hscroll.firstElementChild.style.width, '2000px', 'the spacer is resized on re-show');
 });
+
+test('the PR cell carries a copy button that puts the PR URL on the clipboard', async () => {
+  const html = renderTableView([classify(pullRequest(), context)], {
+    viewer: 'maintainer-a',
+    now,
+  });
+  const script = html.slice(
+    html.indexOf('<script>') + '<script>'.length,
+    html.lastIndexOf('</script>'),
+  );
+  const rowsJson = html.slice(
+    html.indexOf('id="table-rows">') + 'id="table-rows">'.length,
+    html.indexOf('</script>'),
+  );
+  const copied: string[] = [];
+  const classes = new Set<string>();
+  const timers: Array<() => void> = [];
+  const warnings: unknown[][] = [];
+  let clipboardFails = false;
+  let tableClick: ((e: unknown) => void) | undefined;
+  let prFormatter: ((cell: unknown) => string) | undefined;
+  runInNewContext(script, {
+    document: {
+      getElementById: (id: string) => ({
+        textContent: id === 'table-rows' ? rowsJson : '',
+        addEventListener: (event: string, handler: (e: unknown) => void) => {
+          if (id === 'triage-table' && event === 'click') tableClick = handler;
+        },
+      }),
+      querySelector: () => ({ offsetHeight: 0 }),
+      querySelectorAll: () => [],
+      body: { classList: { toggle() {}, contains: () => true } },
+    },
+    // Opening on #table builds the Tabulator instance at load.
+    location: { hash: '#table', pathname: '/triage.html', search: '' },
+    window: { addEventListener() {} },
+    history: { replaceState() {} },
+    navigator: {
+      clipboard: {
+        writeText: (s: string) => {
+          if (clipboardFails) return Promise.reject(new Error('Document is not focused'));
+          copied.push(s);
+          return Promise.resolve();
+        },
+      },
+    },
+    setTimeout: (fn: () => void) => timers.push(fn),
+    console: { warn: (...args: unknown[]) => warnings.push(args) },
+    Tabulator: function (
+      _selector: string,
+      options: { columns: Array<{ field: string; formatter: (cell: unknown) => string }> },
+    ) {
+      prFormatter = options.columns.find((column) => column.field === 'number')!.formatter;
+      return { on() {}, redraw() {} };
+    },
+  });
+
+  const url = 'https://github.com/example/repo/pull/7';
+  const cell = prFormatter!({
+    getValue: () => 7,
+    getRow: () => ({ getData: () => ({ url }) }),
+  });
+  assert.ok(cell.includes(`<a href="${url}" target="_blank" rel="noopener noreferrer">#7</a>`));
+  assert.ok(cell.includes(`class="copy-link" data-url="${url}"`));
+
+  const button = {
+    dataset: { url },
+    classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+  };
+  tableClick!({ target: { closest: () => null } });
+  assert.deepEqual(copied, [], 'a click elsewhere in the table copies nothing');
+  const clickCopy = () =>
+    tableClick!({ target: { closest: (sel: string) => (sel === '.copy-link' ? button : null) } });
+  clickCopy();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(copied, [url]);
+  assert.deepEqual([...classes], ['copied'], 'the icon is highlighted while the copy is fresh');
+  assert.equal(timers.length, 1);
+  timers[0]!();
+  assert.equal(classes.size, 0, 'the highlight is cleared by its timer');
+
+  clipboardFails = true;
+  clickCopy();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(copied, [url], 'a rejected write copies nothing');
+  assert.equal(classes.size, 0, 'a rejected write leaves the icon unchanged');
+  assert.equal(warnings.length, 1, 'a rejected write is logged once');
+});
