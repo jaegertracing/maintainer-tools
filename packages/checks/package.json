@@ -28,7 +28,9 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "tsc-lint": "tsc -p tsconfig.json --noEmit"
+    "tsc-lint": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "preview:dashboard": "tsx src/preview.ts"
   },
   "dependencies": {
     "@octokit/graphql": "9.0.3",

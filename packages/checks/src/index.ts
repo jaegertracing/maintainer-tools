@@ -2,12 +2,18 @@
 // (`@jaegertracing/maintainer-tools-checks/cache`) so action bundles built
 // with @vercel/ncc do not statically pull in the native SQLite module.
 export type {
+  ActorClassification,
   CheckId,
   CheckConclusion,
   CheckResult,
+  DashboardData,
+  DashboardItem,
+  DashboardSection,
+  DashboardSectionKey,
   FileChange,
   IssueMeta,
   IssueRef,
+  NextActor,
   PullRequest,
 } from './types.js';
 export {
@@ -31,3 +37,16 @@ export {
 } from './predicates/index.js';
 export { createGraphqlClient } from './graphql.js';
 export type { GraphqlClient, PrSummary } from './graphql.js';
+export {
+  classifyActor,
+  isBotAuthor,
+  isDependencyBotAuthor,
+  DEPENDENCY_BOT_LOGINS,
+} from './actor.js';
+export {
+  renderDashboard,
+  groupDashboardItems,
+  escapeMarkdown,
+  formatAge,
+  type RenderOptions,
+} from './render/dashboard.js';
