@@ -151,6 +151,7 @@ function getLatestReviewsByReviewer(pr: PullRequest): LatestReviewInfo[] {
     if (!r.author || (authorLogin && sameLogin(r.author, authorLogin))) continue;
     if (isBotLogin(r.author)) continue;
     if (parseDateSafe(r.submittedAt) === 0) continue;
+    if (r.state === 'COMMENTED' || r.state === 'PENDING') continue;
 
     const prev = latestByReviewer.get(r.author.toLowerCase());
     if (!prev || isLater(r.submittedAt, prev.submittedAt)) {
