@@ -93,7 +93,7 @@ export async function runDigest(
     stats.considered++;
     try {
       const pr = await gql.fetchPullRequest(owner, repo, summary.number);
-      const triggered = runAll(pr).filter((c) => c.inDigest && c.triggered);
+      const triggered = runAll(pr, undefined, { now }).filter((c) => c.inDigest && c.triggered);
       if (triggered.length === 0) {
         stats.skippedNoChecks++;
         logger.info(`  #${pr.number}: no in-digest checks triggered — skipping`);

@@ -9,7 +9,7 @@ import type {
   DashboardSectionKey,
   PullRequest,
 } from '../types.js';
-import { classifyActor } from '../actor.js';
+import { classifyActor, parseDateSafe } from '../actor.js';
 
 const INACTIVE_AUTHOR_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -18,7 +18,11 @@ export function escapeMarkdown(str: string): string {
     .replace(/\|/g, '\\|')
     .replace(/\r?\n/g, ' ')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/@/g, '&#64;')
+    .replace(/\[/g, '&#91;')
+    .replace(/\]/g, '&#93;')
+    .replace(/`/g, '&#96;');
 }
 
 export function formatAge(ms: number): string {
@@ -33,8 +37,22 @@ export function formatAge(ms: number): string {
 
 function renderLogin(login: string | null | undefined): string {
   if (!login) return 'ghost';
-  const clean = escapeMarkdown(login);
-  return `[${clean}](https://github.com/${clean})`;
+  const label = escapeMarkdown(login);
+  const target = encodeURIComponent(login);
+  return `[${label}](https://github.com/${target})`;
+}
+
+function renderReviewRequest(
+  req: PullRequest['reviewRequests'][number],
+  repoOwner: string,
+): string {
+  const label = escapeMarkdown(req.login);
+  const target = encodeURIComponent(req.login);
+  if (req.kind === 'team') {
+    const owner = encodeURIComponent(repoOwner);
+    return `[${label}](https://github.com/orgs/${owner}/teams/${target})`;
+  }
+  return `[${label}](https://github.com/${target})`;
 }
 
 function renderPrLink(pr: PullRequest): string {
@@ -42,7 +60,15 @@ function renderPrLink(pr: PullRequest): string {
   return `[#${pr.number}](${pr.url}) ${title}`;
 }
 
-export function groupDashboardItems(prs: PullRequest[], now: Date = new Date()): DashboardData {
+function renderWarnings(classification: ActorClassification): string {
+  return classification.warnings?.includes('resolved_without_reply') ? ' `resolved-w/o-reply`' : '';
+}
+
+export function groupDashboardItems(
+  prs: PullRequest[],
+  repo: { owner: string; name: string },
+  now: Date = new Date(),
+): DashboardData {
   const sectionsMap = new Map<DashboardSectionKey, DashboardItem[]>([
     ['ready_to_merge', []],
     ['waiting_on_reviewers', []],
@@ -52,14 +78,13 @@ export function groupDashboardItems(prs: PullRequest[], now: Date = new Date()):
   ]);
 
   for (const pr of prs) {
-    const classification = classifyActor(pr, now);
-    const turnStartedMs = Date.parse(classification.turnStartedAt);
-    const waitingDurationMs =
-      isNaN(turnStartedMs) || turnStartedMs <= 0 ? 0 : Math.max(0, now.getTime() - turnStartedMs);
+    const classification = classifyActor(pr);
+    const turnStartedMs = parseDateSafe(classification.turnStartedAt);
+    const waitingDurationMs = turnStartedMs <= 0 ? 0 : Math.max(0, now.getTime() - turnStartedMs);
     const isInactiveAuthor =
       classification.nextActor === 'author' &&
       !classification.isDraft &&
-      waitingDurationMs >= INACTIVE_AUTHOR_MS;
+      waitingDurationMs > INACTIVE_AUTHOR_MS;
 
     const item: DashboardItem = {
       pr,
@@ -68,7 +93,7 @@ export function groupDashboardItems(prs: PullRequest[], now: Date = new Date()):
       isInactiveAuthor,
     };
 
-    if (classification.isDependencyBot) {
+    if (classification.nextActor === 'bot') {
       sectionsMap.get('dependency_updates')!.push(item);
     } else if (classification.isDraft) {
       sectionsMap.get('draft_prs')!.push(item);
@@ -88,8 +113,6 @@ export function groupDashboardItems(prs: PullRequest[], now: Date = new Date()):
 
   const waitingOnAuthors = sectionsMap.get('waiting_on_authors')!;
   const inactiveAuthorCount = waitingOnAuthors.filter((i) => i.isInactiveAuthor).length;
-
-  const repo = prs[0]?.repo ?? { owner: 'jaegertracing', name: 'maintainer-tools' };
 
   const sections: DashboardSection[] = [
     {
@@ -137,9 +160,12 @@ export function groupDashboardItems(prs: PullRequest[], now: Date = new Date()):
   };
 }
 
+export const ROW_LIMIT_STEPS = [40, 20, 10, 5, 2, 1] as const;
+
 export interface RenderOptions {
   maxRowsPerSection?: number;
   countOnlyCollapsed?: boolean;
+  countOnlyAll?: boolean;
 }
 
 function renderSectionHeader(section: DashboardSection): string {
@@ -153,6 +179,7 @@ function renderTable(
   section: DashboardSection,
   maxRows: number,
   countOnly: boolean,
+  repoOwner: string,
 ): { content: string; omitted: number } {
   if (section.items.length === 0) {
     return { content: '_No pull requests in this section._\n', omitted: 0 };
@@ -172,7 +199,7 @@ function renderTable(
       rows.push('| :--- | :--- | :--- | :--- |');
       for (const item of itemsToRender) {
         rows.push(
-          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${formatAge(item.waitingDurationMs)} | \`${item.classification.reason}\` |`,
+          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${formatAge(item.waitingDurationMs)} | \`${item.classification.reason}\`${renderWarnings(item.classification)} |`,
         );
       }
       break;
@@ -183,10 +210,10 @@ function renderTable(
       for (const item of itemsToRender) {
         const reviewers =
           item.pr.reviewRequests.length > 0
-            ? item.pr.reviewRequests.map((r) => renderLogin(r.login)).join(', ')
+            ? item.pr.reviewRequests.map((r) => renderReviewRequest(r, repoOwner)).join(', ')
             : '_None requested_';
         rows.push(
-          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${reviewers} | ${formatAge(item.waitingDurationMs)} | \`${item.classification.reason}\` |`,
+          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${reviewers} | ${formatAge(item.waitingDurationMs)} | \`${item.classification.reason}\`${renderWarnings(item.classification)} |`,
         );
       }
       break;
@@ -199,7 +226,7 @@ function renderTable(
           ? `${formatAge(item.waitingDurationMs)} \`7d+\``
           : formatAge(item.waitingDurationMs);
         rows.push(
-          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | \`${item.classification.reason}\` | ${ageBadge} |`,
+          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | \`${item.classification.reason}\`${renderWarnings(item.classification)} | ${ageBadge} |`,
         );
       }
       break;
@@ -209,7 +236,7 @@ function renderTable(
       rows.push('| :--- | :--- | :--- |');
       for (const item of itemsToRender) {
         rows.push(
-          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${formatAge(item.waitingDurationMs)} |`,
+          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${formatAge(item.waitingDurationMs)}${renderWarnings(item.classification)} |`,
         );
       }
       break;
@@ -220,7 +247,7 @@ function renderTable(
       for (const item of itemsToRender) {
         const status = item.pr.isDraft ? '`draft`' : '`ready`';
         rows.push(
-          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${status} | ${formatAge(item.waitingDurationMs)} |`,
+          `| ${renderPrLink(item.pr)} | ${renderLogin(item.pr.author?.login)} | ${status} | ${formatAge(item.waitingDurationMs)}${renderWarnings(item.classification)} |`,
         );
       }
       break;
@@ -235,7 +262,8 @@ function renderTable(
 }
 
 function assembleBody(data: DashboardData, options: RenderOptions): string {
-  const maxRows = options.maxRowsPerSection ?? 40;
+  const maxRows = options.maxRowsPerSection ?? ROW_LIMIT_STEPS[0];
+  const countOnlyAll = options.countOnlyAll ?? false;
   const countOnly = options.countOnlyCollapsed ?? false;
   const parts: string[] = [];
 
@@ -243,9 +271,8 @@ function assembleBody(data: DashboardData, options: RenderOptions): string {
 
   for (const section of data.sections) {
     const isCollapsed = section.key === 'draft_prs' || section.key === 'dependency_updates';
-    const countOnlyForSection = isCollapsed && countOnly;
-    const { content, omitted } = renderTable(section, maxRows, countOnlyForSection);
-    section.omittedCount = omitted;
+    const countOnlyForSection = countOnlyAll || (isCollapsed && countOnly);
+    const { content } = renderTable(section, maxRows, countOnlyForSection, data.repo.owner);
 
     if (isCollapsed) {
       parts.push('<details>');
@@ -262,28 +289,57 @@ function assembleBody(data: DashboardData, options: RenderOptions): string {
   return parts.join('\n');
 }
 
-export function renderDashboard(data: DashboardData, options: RenderOptions = {}): string {
-  let maxRows = options.maxRowsPerSection ?? 40;
-  let countOnlyCollapsed = options.countOnlyCollapsed ?? false;
+const MAX_RECOMMENDED_BYTES = 60_000;
+const MAX_HARD_CEILING_BYTES = 65_000;
 
-  const buildOutput = (rows: number, countOnly: boolean): string => {
-    return assembleBody(data, { maxRowsPerSection: rows, countOnlyCollapsed: countOnly });
+export function renderDashboard(data: DashboardData, options: RenderOptions = {}): string {
+  const initialMaxRows = options.maxRowsPerSection ?? ROW_LIMIT_STEPS[0];
+  let countOnlyCollapsed = options.countOnlyCollapsed ?? false;
+  const initialCountOnlyAll = options.countOnlyAll ?? false;
+
+  const buildOutput = (rows: number, collapsedOnly: boolean, allCountOnly: boolean): string => {
+    return assembleBody(data, {
+      maxRowsPerSection: rows,
+      countOnlyCollapsed: collapsedOnly,
+      countOnlyAll: allCountOnly,
+    });
   };
 
-  let rendered = buildOutput(maxRows, countOnlyCollapsed);
+  let rendered = buildOutput(initialMaxRows, countOnlyCollapsed, initialCountOnlyAll);
   let totalBytes = Buffer.byteLength(rendered, 'utf-8');
-
-  // Progressive budget compression if total output approaches GitHub's 65,536 limit
-  if (totalBytes > 60_000 && !countOnlyCollapsed) {
-    countOnlyCollapsed = true;
-    rendered = buildOutput(maxRows, countOnlyCollapsed);
-    totalBytes = Buffer.byteLength(rendered, 'utf-8');
+  if (totalBytes <= MAX_RECOMMENDED_BYTES) {
+    return rendered;
   }
 
-  while (totalBytes > 60_000 && maxRows > 10) {
-    maxRows = Math.max(10, Math.floor(maxRows / 2));
-    rendered = buildOutput(maxRows, countOnlyCollapsed);
+  if (!countOnlyCollapsed) {
+    countOnlyCollapsed = true;
+    rendered = buildOutput(initialMaxRows, countOnlyCollapsed, false);
     totalBytes = Buffer.byteLength(rendered, 'utf-8');
+    if (totalBytes <= MAX_RECOMMENDED_BYTES) {
+      return rendered;
+    }
+  }
+
+  for (const limit of ROW_LIMIT_STEPS) {
+    if (limit >= initialMaxRows) continue;
+    rendered = buildOutput(limit, countOnlyCollapsed, false);
+    totalBytes = Buffer.byteLength(rendered, 'utf-8');
+    if (totalBytes <= MAX_RECOMMENDED_BYTES) {
+      return rendered;
+    }
+  }
+
+  rendered = buildOutput(1, true, true);
+  totalBytes = Buffer.byteLength(rendered, 'utf-8');
+  if (totalBytes <= MAX_RECOMMENDED_BYTES) {
+    return rendered;
+  }
+
+  if (totalBytes > MAX_HARD_CEILING_BYTES) {
+    const fallbackHeader = `# Pull Request Triage Dashboard for ${escapeMarkdown(data.repo.owner)}/${escapeMarkdown(data.repo.name)}\n\n_Output truncated due to payload size limits._\n`;
+    return Buffer.byteLength(fallbackHeader, 'utf-8') <= MAX_HARD_CEILING_BYTES
+      ? fallbackHeader
+      : '# Pull Request Triage Dashboard\n\n_Output truncated due to payload size limits._\n';
   }
 
   return rendered;

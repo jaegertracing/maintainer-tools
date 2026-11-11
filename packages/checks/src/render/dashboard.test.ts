@@ -10,12 +10,19 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import type { PullRequest } from '../types.js';
-import { escapeMarkdown, formatAge, groupDashboardItems, renderDashboard } from './dashboard.js';
+import {
+  escapeMarkdown,
+  formatAge,
+  groupDashboardItems,
+  renderDashboard,
+  ROW_LIMIT_STEPS,
+} from './dashboard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const now = new Date('2026-10-30T12:00:00.000Z');
+const defaultRepo = { owner: 'jaegertracing', name: 'jaeger' };
 
 function daysAgo(days: number): string {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -69,12 +76,16 @@ test('formatAge renders durations cleanly', () => {
   assert.equal(formatAge(10 * 24 * 60 * 60_000), '10d');
 });
 
-test('escapeMarkdown sanitizes pipe characters and HTML', () => {
+test('escapeMarkdown sanitizes pipe characters, HTML, mentions, links, and code spans', () => {
   assert.equal(
     escapeMarkdown('feat(ui)| fix table <script>'),
     'feat(ui)\\| fix table &lt;script&gt;',
   );
   assert.equal(escapeMarkdown('line1\nline2'), 'line1 line2');
+  assert.equal(
+    escapeMarkdown('fix @someone [x](https://example.com) `code`'),
+    'fix &#64;someone &#91;x&#93;(https://example.com) &#96;code&#96;',
+  );
 });
 
 test('renderDashboard suppresses @ mentions in all sections', () => {
@@ -91,7 +102,7 @@ test('renderDashboard suppresses @ mentions in all sections', () => {
     }),
   ];
 
-  const data = groupDashboardItems(prs, now);
+  const data = groupDashboardItems(prs, defaultRepo, now);
   const markdown = renderDashboard(data);
 
   // Must not contain '@author-alice' or '@reviewer-bob'
@@ -102,6 +113,55 @@ test('renderDashboard suppresses @ mentions in all sections', () => {
   // Must format logins as Markdown links
   assert.ok(markdown.includes('[author-alice](https://github.com/author-alice)'));
   assert.ok(markdown.includes('[reviewer-bob](https://github.com/reviewer-bob)'));
+});
+
+test('renderDashboard formats team review request links with orgs URL and users with user URL', () => {
+  const pr = makePr({
+    number: 5,
+    title: 'Multi-reviewer request',
+    reviewRequests: [
+      { kind: 'team', login: 'backend-maintainers' },
+      { kind: 'user', login: 'alice' },
+    ],
+  });
+
+  const data = groupDashboardItems([pr], { owner: 'jaegertracing', name: 'jaeger' }, now);
+  const markdown = renderDashboard(data);
+
+  assert.ok(
+    markdown.includes(
+      '[backend-maintainers](https://github.com/orgs/jaegertracing/teams/backend-maintainers)',
+    ),
+  );
+  assert.ok(markdown.includes('[alice](https://github.com/alice)'));
+  assert.ok(!markdown.includes('https://github.com/backend-maintainers)'));
+});
+
+test('groupDashboardItems respects explicitly passed repository on empty list', () => {
+  const explicitRepo = { owner: 'open-telemetry', name: 'opentelemetry-collector' };
+  const data = groupDashboardItems([], explicitRepo, now);
+  assert.deepEqual(data.repo, explicitRepo);
+
+  const markdown = renderDashboard(data);
+  assert.ok(
+    markdown.includes('# Pull Request Triage Dashboard for open-telemetry/opentelemetry-collector'),
+  );
+  assert.ok(!markdown.includes('jaegertracing/maintainer-tools'));
+});
+
+test('renderDashboard does not mutate caller data or section objects', () => {
+  const prs = [
+    makePr({ number: 1, title: 'Item 1' }),
+    makePr({ number: 2, title: 'Item 2', statusCheckRollup: 'FAILURE' }),
+  ];
+
+  const data = groupDashboardItems(prs, defaultRepo, now);
+  const snapshotBefore = JSON.stringify(data);
+
+  renderDashboard(data);
+
+  const snapshotAfter = JSON.stringify(data);
+  assert.strictEqual(snapshotBefore, snapshotAfter);
 });
 
 test('renderDashboard formats 7d+ inactive author aging indicator and header count', () => {
@@ -139,7 +199,7 @@ test('renderDashboard formats 7d+ inactive author aging indicator and header cou
     ],
   });
 
-  const data = groupDashboardItems([activeBlockerPr, inactiveBlockerPr], now);
+  const data = groupDashboardItems([activeBlockerPr, inactiveBlockerPr], defaultRepo, now);
   const markdown = renderDashboard(data);
 
   // Section header must report total count and inactive 7d+ count
@@ -179,11 +239,11 @@ test('renderDashboard renders all 5 sections in correct order', () => {
     makePr({
       number: 25,
       title: 'Dependabot PR',
-      author: { login: 'dependabot[bot]', typename: 'Bot' },
+      author: { login: 'dependabot', typename: 'Bot' },
     }),
   ];
 
-  const data = groupDashboardItems(prs, now);
+  const data = groupDashboardItems(prs, defaultRepo, now);
   const markdown = renderDashboard(data);
 
   const idxReady = markdown.indexOf('### Ready to merge');
@@ -207,7 +267,7 @@ test('renderDashboard renders all 5 sections in correct order', () => {
 
 test('renderDashboard outputs clean markdown without comment footers', () => {
   const prs = [makePr()];
-  const data = groupDashboardItems(prs, now);
+  const data = groupDashboardItems(prs, defaultRepo, now);
   const markdown = renderDashboard(data);
 
   assert.ok(!markdown.includes('<!-- maintainer-tools:'));
@@ -256,7 +316,7 @@ test('groupDashboardItems sorts descending by duration with pr.number ascending 
     ],
   });
 
-  const data = groupDashboardItems([prA, prB, prC], now);
+  const data = groupDashboardItems([prA, prB, prC], defaultRepo, now);
   const reviewersSection = data.sections.find((s) => s.key === 'waiting_on_reviewers')!;
   const numbers = reviewersSection.items.map((i) => i.pr.number);
 
@@ -264,14 +324,14 @@ test('groupDashboardItems sorts descending by duration with pr.number ascending 
   assert.deepEqual(numbers, [10, 30, 50]);
 });
 
-test('renderDashboard enforces budget compression under 65,000 bytes', () => {
-  // Generate 200 large PRs to trigger budget compression
+test('renderDashboard enforces normal reduction ladder under 60,000 bytes with closed tags', () => {
+  // Generate 250 large PRs with multibyte characters to trigger reduction ladder
   const largePrs: PullRequest[] = [];
-  for (let i = 1; i <= 200; i++) {
+  for (let i = 1; i <= 250; i++) {
     largePrs.push(
       makePr({
         number: i,
-        title: `Comprehensive PR description and metadata for item ${i} with long descriptive text`,
+        title: `Comprehensive PR description and metadata for item ${i} with long descriptive text and unicode 🚀`,
         statusCheckRollup: 'FAILURE',
         commits: [
           {
@@ -287,27 +347,63 @@ test('renderDashboard enforces budget compression under 65,000 bytes', () => {
     );
   }
 
-  const data = groupDashboardItems(largePrs, now);
+  const data = groupDashboardItems(largePrs, defaultRepo, now);
+  const markdown = renderDashboard(data);
+  const byteLength = Buffer.byteLength(markdown, 'utf-8');
+
+  assert.ok(byteLength <= 60_000, `Expected byteLength <= 60000, got ${byteLength}`);
+  const openDetails = (markdown.match(/<details>/g) || []).length;
+  const closeDetails = (markdown.match(/<\/details>/g) || []).length;
+  assert.equal(openDetails, closeDetails);
+  assert.ok(!markdown.includes('<!-- maintainer-tools:'));
+});
+
+test('renderDashboard extreme fallback guarantees hard ceiling under 65,000 bytes without crashing', () => {
+  const hugeRepo = {
+    owner: 'jaegertracing',
+    name: 'a'.repeat(70_000),
+  };
+  const data = groupDashboardItems([makePr()], hugeRepo, now);
   const markdown = renderDashboard(data);
   const byteLength = Buffer.byteLength(markdown, 'utf-8');
 
   assert.ok(byteLength <= 65_000, `Expected byteLength <= 65000, got ${byteLength}`);
-  assert.ok(!markdown.includes('<!-- maintainer-tools:'));
+  assert.ok(markdown.includes('# Pull Request Triage Dashboard'));
+  assert.ok(markdown.includes('_Output truncated due to payload size limits._'));
+});
+
+test('groupDashboardItems partitions dependency updates strictly by nextActor === bot', () => {
+  const dependabotPr = makePr({
+    number: 501,
+    author: { login: 'dependabot', typename: 'Bot' },
+  });
+  const releasePleasePr = makePr({
+    number: 502,
+    author: { login: 'release-please', typename: 'Bot' },
+  });
+
+  const data = groupDashboardItems([dependabotPr, releasePleasePr], defaultRepo, now);
+  const depSection = data.sections.find((s) => s.key === 'dependency_updates')!;
+  const reviewerSection = data.sections.find((s) => s.key === 'waiting_on_reviewers')!;
+
+  assert.ok(depSection.items.some((i) => i.pr.number === 501));
+  assert.ok(!depSection.items.some((i) => i.pr.number === 502));
+  assert.ok(reviewerSection.items.some((i) => i.pr.number === 502));
 });
 
 test('Dependency updates section renders draft vs ready status correctly', () => {
   const readyBotPr = makePr({
     number: 101,
-    author: { login: 'dependabot[bot]', typename: 'Bot' },
+    author: { login: 'dependabot', typename: 'Bot' },
     isDraft: false,
   });
   const draftBotPr = makePr({
     number: 102,
-    author: { login: 'renovate[bot]', typename: 'Bot' },
+    author: { login: 'renovate', typename: 'Bot' },
     isDraft: true,
   });
 
-  const data = groupDashboardItems([readyBotPr, draftBotPr], now);
+  const data = groupDashboardItems([readyBotPr, draftBotPr], defaultRepo, now);
   const markdown = renderDashboard(data);
 
   // Ready PR row displays `ready`, Draft PR row displays `draft`
@@ -317,7 +413,7 @@ test('Dependency updates section renders draft vs ready status correctly', () =>
 
 test('Exact 7-day boundary for inactive author flag', () => {
   const exact7dMs = 7 * 24 * 60 * 60 * 1000;
-  // PR 1: exactly 7 days old turn
+  // PR 1: exactly 7 days old turn (not strictly > 7 days, so not inactive)
   const prExact7d = makePr({
     number: 201,
     statusCheckRollup: 'FAILURE',
@@ -332,30 +428,30 @@ test('Exact 7-day boundary for inactive author flag', () => {
       },
     ],
   });
-  // PR 2: 7 days minus 1 second
-  const prUnder7d = makePr({
+  // PR 2: 7 days plus 1 second (strictly > 7 days, so inactive)
+  const prOver7d = makePr({
     number: 202,
     statusCheckRollup: 'FAILURE',
     commits: [
       {
-        sha: 'under7d',
-        messageHeadline: 'under 7d',
+        sha: 'over7d',
+        messageHeadline: 'over 7d',
         messageBody: 'Signed-off-by: B <b@example.com>',
         authorEmail: 'b@example.com',
-        committedDate: new Date(now.getTime() - (exact7dMs - 1000)).toISOString(),
+        committedDate: new Date(now.getTime() - (exact7dMs + 1000)).toISOString(),
         parents: 1,
       },
     ],
   });
 
-  const data = groupDashboardItems([prExact7d, prUnder7d], now);
+  const data = groupDashboardItems([prExact7d, prOver7d], defaultRepo, now);
   const authorsSection = data.sections.find((s) => s.key === 'waiting_on_authors')!;
   assert.equal(authorsSection.totalCount, 2);
   assert.equal(authorsSection.inactiveAuthorCount, 1);
 
   const markdown = renderDashboard(data);
   assert.ok(markdown.includes('### Waiting on authors (2 - 1 inactive 7d+)'));
-  assert.ok(markdown.includes('[#201](https://github.com/jaegertracing/jaeger/pull/201)'));
+  assert.ok(markdown.includes('[#202](https://github.com/jaegertracing/jaeger/pull/202)'));
 });
 
 test('Invalid or future timestamps gracefully clamp duration to 0 and render < 1m', () => {
@@ -389,7 +485,7 @@ test('Invalid or future timestamps gracefully clamp duration to 0 and render < 1
     ],
   });
 
-  const data = groupDashboardItems([futurePr, invalidDatePr], now);
+  const data = groupDashboardItems([futurePr, invalidDatePr], defaultRepo, now);
   assert.equal(data.sections[1]!.items[0]!.waitingDurationMs, 0);
   assert.equal(data.sections[1]!.items[1]!.waitingDurationMs, 0);
 
@@ -413,4 +509,78 @@ test('Preview script writes to GITHUB_STEP_SUMMARY when environment variable is 
   } finally {
     rmSync(summaryFile, { force: true });
   }
+});
+
+test('renderDashboard renders `resolved-w/o-reply` badge when warnings are present', () => {
+  const prWithWarning = makePr({
+    number: 401,
+    reviews: [{ author: 'reviewer-alice', state: 'COMMENTED', submittedAt: hoursAgo(5) }],
+    reviewThreads: [
+      {
+        isResolved: true,
+        resolvedBy: 'contributor',
+        comments: [{ author: 'reviewer-alice', createdAt: hoursAgo(5) }],
+      },
+    ],
+  });
+  const data = groupDashboardItems([prWithWarning], defaultRepo, now);
+  const markdown = renderDashboard(data);
+  assert.ok(markdown.includes('`resolved-w/o-reply`'));
+});
+
+test('renderDashboard with countOnlyAll: true renders all sections as count-only with no table rows', () => {
+  const prs = [
+    makePr({
+      number: 1,
+      title: 'Ready PR',
+      statusCheckRollup: 'SUCCESS',
+      reviews: [{ author: 'alice', state: 'APPROVED', submittedAt: hoursAgo(1) }],
+    }),
+    makePr({
+      number: 2,
+      title: 'Reviewer PR',
+      reviewRequests: [{ kind: 'user', login: 'bob' }],
+    }),
+    makePr({ number: 3, title: 'Author PR', labels: ['waiting-for-author'] }),
+    makePr({ number: 4, title: 'Draft PR', isDraft: true }),
+    makePr({
+      number: 5,
+      title: 'Dep PR',
+      author: { login: 'dependabot[bot]', typename: 'Bot' },
+    }),
+  ];
+
+  const data = groupDashboardItems(prs, defaultRepo, now);
+  const markdown = renderDashboard(data, { countOnlyAll: true });
+
+  // Each non-empty section must render a count string
+  assert.ok(markdown.includes('_1 pull requests._'));
+  // Zero table headers or table pipe rows
+  assert.ok(!markdown.includes('| :--- |'));
+  assert.ok(!markdown.includes('| PR |'));
+});
+
+test('renderDashboard encodes URLs safely while escaping display markdown labels', () => {
+  const pr = makePr({
+    number: 501,
+    author: { login: 'user@domain', typename: 'User' },
+    reviewRequests: [
+      { kind: 'user', login: 'reviewer@work' },
+      { kind: 'team', login: 'team/special' },
+    ],
+  });
+
+  const data = groupDashboardItems([pr], { owner: 'org/with-slash', name: 'repo' }, now);
+  const markdown = renderDashboard(data);
+
+  // Author login: label escaped, url encoded
+  assert.ok(markdown.includes('[user&#64;domain](https://github.com/user%40domain)'));
+  // Review request user
+  assert.ok(markdown.includes('[reviewer&#64;work](https://github.com/reviewer%40work)'));
+  // Review request team: team slug and owner both encoded
+  assert.ok(
+    markdown.includes(
+      '[team/special](https://github.com/orgs/org%2Fwith-slash/teams/team%2Fspecial)',
+    ),
+  );
 });

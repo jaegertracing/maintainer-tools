@@ -1,10 +1,12 @@
-export function sameLogin(left: string, right: string): boolean {
-  return left.toLowerCase() === right.toLowerCase();
-}
+// Copyright (c) 2026 The Jaeger Authors.
+// SPDX-License-Identifier: Apache-2.0
 
-export function hasLogin(logins: Set<string>, login: string): boolean {
-  for (const configured of logins) {
-    if (sameLogin(configured, login)) return true;
-  }
-  return false;
-}
+export {
+  DEPENDENCY_BOT_LOGINS,
+  hasLogin,
+  isBotAuthor,
+  isBotLogin,
+  isDependencyBotAuthor,
+  KNOWN_BOT_LOGINS,
+  sameLogin,
+} from '@jaegertracing/maintainer-tools-checks/logins';

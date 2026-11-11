@@ -8,7 +8,7 @@
 import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
 
 import { type CopilotReview, copilotReview } from './copilot.js';
-import { hasLogin, sameLogin } from './logins.js';
+import { hasLogin, isBotAuthor, isDependencyBotAuthor, sameLogin } from './logins.js';
 
 export type Bucket =
   | 'priority-authors'
@@ -61,26 +61,6 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
   'dependency-bots': 'Opened by a recognized dependency-update bot (Dependabot, Renovate).',
   hidden: 'Not actionable right now — draft, blocked, or flagged as waiting on the author.',
 };
-
-// Logins treated as "dependency bots" — PRs they open are reviewable
-// merges, just authored by a service account. They always land in their
-// own bucket, regardless of draft state, CI status, or merge conflicts, so
-// they never drown out human-authored PRs in CODEOWNERS hits / FYI and
-// never inflate Blocked-on-author with noise nobody needs to triage.
-// GraphQL's `login` field omits the `[bot]` suffix even for an installed
-// GitHub App — Renovate's own App reports as plain `renovate` — so the
-// unbracketed forms are what this GraphQL-only CLI actually sees.
-// `renovate-bot` is this org's self-hosted Renovate runner. The bracketed
-// forms are kept too, as defense against any non-GraphQL-sourced PR data
-// (fixtures, hand-written cache rows).
-const DEPENDENCY_BOT_LOGINS = new Set<string>([
-  'dependabot',
-  'dependabot[bot]',
-  'renovate',
-  'renovate[bot]',
-  'renovate-bot',
-  'renovate-bot[bot]',
-]);
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
@@ -139,7 +119,7 @@ export interface Facets {
 export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
-  const checks = runAll(pr);
+  const checks = runAll(pr, undefined, { now: ctx.now });
   const flags = computeFlags(pr, checks, ctx);
   const reasons: string[] = [];
 
@@ -281,18 +261,8 @@ function isReviewRequestedOnViewer(pr: PullRequest, viewer: string): boolean {
   return pr.reviewRequests.some((r) => r.kind === 'user' && sameLogin(r.login, viewer));
 }
 
-function isBotAuthor(pr: PullRequest): boolean {
-  if (!pr.author) return false;
-  if (pr.author.typename === 'Bot') return true;
-  // GraphQL doesn't emit a `[bot]`-suffixed login in practice; this guards
-  // non-GraphQL-sourced PR data (fixtures, hand-written cache rows) where
-  // typename might be 'User' but the login still carries the suffix.
-  return pr.author.login.endsWith('[bot]');
-}
-
 function isDependencyBot(pr: PullRequest): boolean {
-  if (!pr.author) return false;
-  return DEPENDENCY_BOT_LOGINS.has(pr.author.login.toLowerCase());
+  return isDependencyBotAuthor(pr.author?.login);
 }
 
 function isFirstTimeContributor(pr: PullRequest): boolean {

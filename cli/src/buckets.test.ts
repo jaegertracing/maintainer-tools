@@ -406,3 +406,46 @@ test('priority-author issue flags use case-insensitive membership', () => {
 
   assert.equal(classify(pr, context).flags.includes('SELF-FILED'), false);
 });
+
+test('the stale check uses the injected clock, not the wall clock', () => {
+  const past = new Date('2020-01-10T00:00:00Z');
+  const pr = pullRequest({
+    createdAt: '2020-01-01T00:00:00Z',
+    updatedAt: '2020-01-09T00:00:00Z',
+    comments: [],
+  });
+  const fresh = classify(pr, { ...context, now: past });
+  assert.ok(!fresh.facets.hideReasons.includes('hide:stale_on_author'));
+  const later = classify(pr, { ...context, now: new Date('2020-03-01T00:00:00Z') });
+  assert.ok(later.facets.hideReasons.includes('hide:stale_on_author'));
+});
+
+test('unbracketed bot logins such as codecov and release-please are classified as bot-authored', () => {
+  const prCodecov = pullRequest({
+    author: { login: 'codecov', typename: 'User' },
+  });
+  const classifiedCodecov = classify(prCodecov, context);
+  assert.equal(classifiedCodecov.bucket, 'hidden');
+  assert.ok(classifiedCodecov.reasons.includes('bot-authored'));
+
+  const prReleasePlease = pullRequest({
+    author: { login: 'release-please', typename: 'User' },
+  });
+  const classifiedReleasePlease = classify(prReleasePlease, context);
+  assert.equal(classifiedReleasePlease.bucket, 'hidden');
+  assert.ok(classifiedReleasePlease.reasons.includes('bot-authored'));
+});
+
+test('dependency bot logins such as renovate and dependabot land in dependency-bots bucket', () => {
+  const prRenovate = pullRequest({
+    author: { login: 'renovate', typename: 'User' },
+  });
+  const classifiedRenovate = classify(prRenovate, context);
+  assert.equal(classifiedRenovate.bucket, 'dependency-bots');
+
+  const prRenovateBot = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+  });
+  const classifiedRenovateBot = classify(prRenovateBot, context);
+  assert.equal(classifiedRenovateBot.bucket, 'dependency-bots');
+});

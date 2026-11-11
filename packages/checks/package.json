@@ -21,6 +21,18 @@
     "./digest": {
       "types": "./dist/digest.d.ts",
       "default": "./dist/digest.js"
+    },
+    "./logins": {
+      "types": "./dist/logins.d.ts",
+      "default": "./dist/logins.js"
+    },
+    "./actor": {
+      "types": "./dist/actor.d.ts",
+      "default": "./dist/actor.js"
+    },
+    "./dashboard": {
+      "types": "./dist/render/dashboard.d.ts",
+      "default": "./dist/render/dashboard.js"
     }
   },
   "files": [
@@ -30,6 +42,7 @@
     "build": "tsc -p tsconfig.json",
     "tsc-lint": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test \"src/**/*.test.ts\"",
+    "posttest": "tsx src/preview.ts --if-summary",
     "preview:dashboard": "tsx src/preview.ts"
   },
   "dependencies": {

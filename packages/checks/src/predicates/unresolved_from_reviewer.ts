@@ -5,17 +5,6 @@ import type { CheckResult, PullRequest } from '../types.js';
 // author's court on that thread regardless of what else has happened
 // elsewhere in the PR.
 
-function isBotOrDeleted(login: string | null | undefined): boolean {
-  if (!login) return true;
-  const l = login.toLowerCase();
-  return l.endsWith('[bot]') || l === 'dependabot' || l === 'renovate' || l === 'renovate-bot';
-}
-
-function sameLogin(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (!a || !b) return false;
-  return a.toLowerCase() === b.toLowerCase();
-}
-
 export function unresolvedFromReviewer(pr: PullRequest): CheckResult {
   const threads = pr.reviewThreads ?? [];
   const authorLogin = pr.author?.login;
@@ -23,12 +12,10 @@ export function unresolvedFromReviewer(pr: PullRequest): CheckResult {
 
   const offenders = threads.filter((t) => {
     if (t.isResolved || t.comments.length === 0) return false;
-    const humanComments = t.comments.filter((c) => !isBotOrDeleted(c.author));
-    if (humanComments.length === 0) return false;
-    const latest = humanComments.reduce((a, b) =>
+    const latest = t.comments.reduce((a, b) =>
       Date.parse(b.createdAt) > Date.parse(a.createdAt) ? b : a,
     );
-    return !sameLogin(latest.author, authorLogin);
+    return latest.author !== authorLogin;
   });
 
   const triggered = offenders.length > 0;

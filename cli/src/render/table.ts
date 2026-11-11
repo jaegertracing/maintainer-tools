@@ -18,6 +18,7 @@ import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
 import { sameLogin } from '../logins.js';
 import { diffSummary, renderDiff } from './diff.js';
+import { escape } from './escape.js';
 import { ageInDays, formatAge, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';
 
 export interface TableOptions {
@@ -159,6 +160,7 @@ export function renderTableView(classified: ClassifiedPR[], opts: TableOptions):
     </div>
   </div>
   <div id="triage-table"></div>
+  <div id="hscroll" hidden><div></div></div>
 </section>
 <script type="application/json" id="table-rows">${jsonForScript(rows)}</script>
 <script>${TABLE_SCRIPT}</script>`;
@@ -186,7 +188,7 @@ export const TABLE_CSS = `
   body.table-mode .table-total { display: inline; }
   body.table-mode .categorized-total { display: none; }
   header .toolbar .view-switch button[aria-pressed="true"] { background: #1f2328; color: white; border-color: #1f2328; }
-  .table-panels { display: flex; flex-direction: column; gap: 0.5em; margin-bottom: 0.8em; }
+  .table-panels { display: flex; flex-direction: column; gap: 0.5em; padding-bottom: 0.8em; position: sticky; top: 0; z-index: 13; background: white; }
   .panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em; padding: 0.5em 0.7em; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; font-size: 0.85em; }
   .panel-label { font-weight: 600; margin-right: 0.4em; }
   .panel-hint { color: #8c959f; margin-left: auto; }
@@ -199,20 +201,37 @@ export const TABLE_CSS = `
   .chip .dir { color: #57606a; }
   #clear-filters { font-size: 1em; padding: 0.15em 0.6em; border: 1px solid #d0d7de; border-radius: 12px; background: white; cursor: pointer; }
   #triage-table { font-size: 0.85em; border: 1px solid #d0d7de; border-radius: 6px; }
+  /* The page is the only vertical scroller: the table takes its full height,
+     and the header sticks to the top of the viewport. Tabulator's own
+     overflow: hidden would otherwise make the table box the scrollport the
+     header sticks to. */
+  #triage-table.tabulator { overflow: visible; }
+  #triage-table .tabulator-header { position: sticky; top: var(--panels-height, 0px); z-index: 12; border-radius: 5px 5px 0 0; }
   #triage-table .tabulator-header .tabulator-col .tabulator-header-filter input { font-size: 0.9em; padding: 0.15em 0.3em; }
   #triage-table .cell-flags .flag { white-space: nowrap; }
   #triage-table .cell-diff { white-space: normal; }
   #triage-table .cell-diff [data-tip] { cursor: default; }
   #triage-table .cell-diff [data-tip]:hover::after { display: none; }
-  #triage-table .tabulator-tableholder { overflow-x: scroll; }
-  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track outside the rows. */
-  #triage-table .tabulator-tableholder::-webkit-scrollbar { width: 14px; height: 14px; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-track { background: #f6f8fa; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
-  #triage-table .tabulator-tableholder::-webkit-scrollbar-thumb:hover { background: #57606a; }
+  /* The table's own horizontal scrollbar would sit below the last row, out of
+     reach in a long report, so it is hidden and #hscroll stands in for it at
+     the bottom of the viewport. Trackpad gestures over the rows still scroll
+     the hidden one; the script keeps the two in step. */
+  #triage-table .tabulator-tableholder { overflow-x: auto; scrollbar-width: none; }
+  #triage-table .tabulator-tableholder::-webkit-scrollbar { display: none; }
+  #hscroll { position: sticky; bottom: 0; overflow-x: scroll; overflow-y: hidden; height: 14px; background: #f6f8fa; border-top: 1px solid #d0d7de; }
+  #hscroll[hidden] { display: none; }
+  #hscroll > div { height: 1px; }
+  /* Explicit dimensions give Chromium and WebKit scrollbars a persistent track. */
+  #hscroll::-webkit-scrollbar { width: 14px; height: 14px; }
+  #hscroll::-webkit-scrollbar-track { background: #f6f8fa; }
+  #hscroll::-webkit-scrollbar-thumb { background: #8c959f; border: 3px solid #f6f8fa; border-radius: 7px; }
+  #hscroll::-webkit-scrollbar-thumb:hover { background: #57606a; }
   #triage-table .tabulator-cell a { color: #0969da; text-decoration: none; }
   #triage-table .tabulator-cell a:hover { text-decoration: underline; }
   #triage-table .tabulator-row.row-hidden { color: #8c959f; }
+  #triage-table .copy-link { margin-left: 0.35em; padding: 0 0.15em; border: 0; background: none; color: #8c959f; cursor: pointer; vertical-align: middle; line-height: 1; }
+  #triage-table .copy-link:hover { color: #0969da; }
+  #triage-table .copy-link.copied { color: #1f883d; }
   .copilot-green { color: #1f883d; }
   .copilot-yellow { color: #9a6700; }
   .copilot-red { color: #cf222e; }
@@ -227,6 +246,7 @@ const TABLE_SCRIPT = `
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const chips = (values, cls) => values.map((v) => '<span class="flag ' + cls(v) + '">' + esc(v) + '</span>').join(' ');
   const flagClass = (v) => 'flag-' + (v.split(':')[0] || v).trim().replace(/[^A-Za-z0-9-]/g, '-');
+  const COPY_ICON = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path fill="currentColor" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>';
 
   // Tabulator inserts tooltips and list items as HTML, so every value that
   // came from a PR (titles, labels, author logins) is escaped first.
@@ -240,7 +260,14 @@ const TABLE_SCRIPT = `
     itemFormatter: escapedItem,
     autocomplete: true, clearable: true, listOnEmpty: true, freetext: true,
   });
+  // Typed text matches as a substring. A needle wrapped in double quotes
+  // matches a whole value, which is how a label link selects "bug" without
+  // also showing "bugfix".
+  const exactNeedle = (needle) => /^"(.*)"$/.exec(String(needle))?.[1];
   const listFilter = (needle, values) => {
+    const exact = exactNeedle(needle);
+    if (exact === '') return true;
+    if (exact !== undefined) return values.some((v) => String(v).toLowerCase() === exact.toLowerCase());
     const n = String(needle).toLowerCase();
     return values.some((v) => String(v).toLowerCase().includes(n));
   };
@@ -328,8 +355,12 @@ const TABLE_SCRIPT = `
       sorter: (a, b, aRow, bRow) => aRow.getData().repoOrder - bRow.getData().repoOrder,
     }),
     num('PR', 'number', {
-      frozen: true, width: 70, headerFilterPlaceholder: '#',
-      formatter: (cell) => '<a href="' + esc(cell.getRow().getData().url) + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>',
+      frozen: true, width: 88, headerFilterPlaceholder: '#',
+      formatter: (cell) => {
+        const url = esc(cell.getRow().getData().url);
+        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">#' + cell.getValue() + '</a>'
+          + '<button type="button" class="copy-link" data-url="' + url + '" title="Copy PR link" aria-label="Copy PR link">' + COPY_ICON + '</button>';
+      },
     }),
     en('author', 'author', {
       maxInitialWidth: 160, tooltip: (e, cell) => esc(cell.getValue()),
@@ -412,7 +443,7 @@ const TABLE_SCRIPT = `
       data: ROWS,
       columns,
       layout: 'fitDataStretch',
-      height: '78vh',
+      renderVertical: 'basic',
       columnHeaderSortMulti: true,
       columnDefaults: {
         headerWordWrap: true,
@@ -431,9 +462,96 @@ const TABLE_SCRIPT = `
         { column: 'repo', dir: 'asc' },
       ],
     });
+    // One listener on the table rather than one per cell: a formatter that
+    // returns a string cannot attach a handler, and Tabulator regenerates the
+    // cell elements when a column is moved.
+    document.getElementById('triage-table').addEventListener('click', (e) => {
+      const btn = e.target.closest('.copy-link');
+      if (!btn) return;
+      // The clipboard API is absent outside a secure context and rejects when
+      // the document is not focused; the icon then stays unchanged.
+      Promise.resolve()
+        .then(() => navigator.clipboard.writeText(btn.dataset.url))
+        .then(() => {
+          btn.classList.add('copied');
+          setTimeout(() => btn.classList.remove('copied'), 1200);
+        })
+        .catch((err) => console.warn('copy failed', err));
+    });
     table.on('dataSorted', renderSortChips);
     table.on('dataFiltered', renderFilterChips);
-    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); });
+    table.on('tableBuilt', () => { renderSortChips(); renderFilterChips(); bindHscroll(); bindStickyPanels(); });
+    table.on('renderComplete', syncHscroll);
+    table.on('columnResized', syncHscroll);
+    window.addEventListener('resize', syncHscroll);
+  }
+
+  // The panels stick to the top of the viewport and the table header sticks
+  // right under them, so the header's offset follows the panels' height as
+  // their chips wrap.
+  // The height is rounded down so the header tucks under the panels rather
+  // than leaving a sub-pixel slit for the rows to show through.
+  const panels = document.querySelector('.table-panels');
+  function syncStickyTop() {
+    const height = Math.floor(panels.getBoundingClientRect().height);
+    table.element.style.setProperty('--panels-height', height + 'px');
+  }
+  function bindStickyPanels() {
+    syncStickyTop();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncStickyTop).observe(panels);
+  }
+
+  // --- Sticky horizontal scrollbar, mirroring the table holder's scroll range.
+  const hscroll = document.getElementById('hscroll');
+  const holder = () => table.element.querySelector('.tabulator-tableholder');
+  // The holder sits inside the table border, so the two elements differ in
+  // width; sizing the spacer by the holder's overflow gives both the same
+  // scroll range.
+  const sizeMirror = (h) => {
+    hscroll.hidden = h.scrollWidth <= h.clientWidth;
+    hscroll.firstElementChild.style.width = h.scrollWidth - h.clientWidth + hscroll.clientWidth + 'px';
+  };
+  function syncHscroll() {
+    const h = holder();
+    if (!h) return;
+    sizeMirror(h);
+    hscroll.scrollLeft = h.scrollLeft;
+  }
+  // A programmatic scroll fires its event a frame later, so each side ignores
+  // the one echo of the value it wrote; otherwise a stale echo would undo a
+  // wheel movement made in between. The marker is cleared once the echo has
+  // arrived, so a later genuine scroll to the same offset still propagates.
+  // Offsets and ranges are compared with a one-pixel tolerance because a
+  // zoomed page rounds each element's scroll metrics separately. The marker
+  // records the value the counterpart actually took, which may be clamped,
+  // and any event from that side consumes it.
+  function bindHscroll() {
+    const h = holder();
+    let wroteToMirror = -1;
+    let wroteToHolder = -1;
+    const same = (a, b) => Math.abs(a - b) <= 1;
+    const follow = (from, to, pending, setPending) => {
+      if (pending >= 0 && same(from.scrollLeft, pending)) return;
+      if (!same(to.scrollLeft, from.scrollLeft)) {
+        to.scrollLeft = from.scrollLeft;
+        setPending(to.scrollLeft);
+      }
+    };
+    h.addEventListener('scroll', () => {
+      // A column drag widens the holder before columnResized fires; a mirror
+      // with a stale, shorter range would clamp the write and pull the holder
+      // back, so the range is checked first.
+      if (!same(h.scrollWidth - h.clientWidth, hscroll.scrollWidth - hscroll.clientWidth)) sizeMirror(h);
+      const pending = wroteToHolder;
+      wroteToHolder = -1;
+      follow(h, hscroll, pending, (v) => { wroteToMirror = v; });
+    });
+    hscroll.addEventListener('scroll', () => {
+      const pending = wroteToMirror;
+      wroteToMirror = -1;
+      follow(hscroll, h, pending, (v) => { wroteToHolder = v; });
+    });
+    syncHscroll();
   }
 
   // --- Sort panel: chips in priority order (primary first). Tabulator keeps
@@ -494,16 +612,33 @@ const TABLE_SCRIPT = `
   }
   clearBtn.addEventListener('click', () => table.clearHeaderFilter());
 
-  // Summary links filter by repository, buckets, or both in Table view.
-  // Total links clear prior filters so the displayed rows match the summary count.
+  // Summary links filter by repository, buckets, label, or a combination in
+  // Table view. Each click replaces the prior filters so the displayed rows
+  // match the number clicked, then scrolls the Sort panel to the top so the
+  // filtered rows are in view. A label count has no section in the
+  // Categorized view, so clicking one there switches to the Table view first.
+  // Tabulator builds its columns on a timer after construction, so until it
+  // reports itself initialized the filters wait for tableBuilt or they would
+  // be dropped. Handlers run in registration order, so the last click wins.
+  const sortPanel = document.getElementById('sort-panel');
   document.querySelectorAll('.summary-table a[data-repo], .summary-table a[data-buckets]').forEach((a) => {
     a.addEventListener('click', (e) => {
-      if (!document.body.classList.contains('table-mode')) return;
+      const applyFilters = () => {
+        table.clearHeaderFilter();
+        if (a.dataset.repo) table.setHeaderFilterValue('repo', a.dataset.repo);
+        const buckets = a.dataset.buckets ? JSON.parse(a.dataset.buckets) : a.dataset.bucket ? [a.dataset.bucket] : [];
+        if (buckets.length) table.setHeaderFilterValue('bucket', buckets);
+        if (a.dataset.label) table.setHeaderFilterValue('labels', '"' + a.dataset.label + '"');
+      };
+      if (!document.body.classList.contains('table-mode')) {
+        if (!a.dataset.label) return;
+        show('table');
+        if (table.initialized) applyFilters(); else table.on('tableBuilt', applyFilters);
+      } else {
+        applyFilters();
+      }
       e.preventDefault();
-      table.clearHeaderFilter();
-      if (a.dataset.repo) table.setHeaderFilterValue('repo', a.dataset.repo);
-      const buckets = a.dataset.buckets ? JSON.parse(a.dataset.buckets) : a.dataset.bucket ? [a.dataset.bucket] : [];
-      if (buckets.length) table.setHeaderFilterValue('bucket', buckets);
+      sortPanel.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
   });
 

@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
-import { classify, type ClassifyContext } from '../buckets.js';
+import { BUCKET_ORDER, classify, type ClassifyContext } from '../buckets.js';
 import { renderHtml } from './html.js';
 
 const now = new Date('2026-09-20T12:00:00Z');
@@ -125,8 +125,8 @@ test('dependency bots get their own excluded row and are dropped from the subtot
 
   assert.match(
     html,
-    /<tr class="grand"><th scope="row">subtotal<\/th><td>1<\/td><td class="row-total"><span[^>]*>1<\/span><a[^>]*>1<\/a><\/td><\/tr>/,
-    'subtotal must count only the fyi PR',
+    /<tr class="grand"><th scope="row">subtotal<\/th><td><a[^>]*data-repo="acme\/widgets"[^>]*data-buckets="([^"]*)"[^>]*>1<\/a><\/td><td class="row-total"><span[^>]*>1<\/span><a[^>]*data-buckets="\1"[^>]*>1<\/a><\/td><\/tr>/,
+    'subtotal must count only the fyi PR, and its repo cell selects the same buckets as the row total',
   );
   assert.match(
     html,
@@ -140,7 +140,7 @@ test('dependency bots get their own excluded row and are dropped from the subtot
   );
   assert.match(
     html,
-    /<tr class="all-total"><th scope="row">Total<\/th><td>3<\/td><td class="row-total"><span[^>]*>3<\/span><a[^>]*>3<\/a><\/td><\/tr>/,
+    /<tr class="all-total"><th scope="row">Total<\/th><td><a[^>]*>3<\/a><\/td><td class="row-total"><span[^>]*>3<\/span><a[^>]*>3<\/a><\/td><\/tr>/,
     'Total must add the subtotal, Blocked-on-author, and Dependency-bots counts back together',
   );
 });
@@ -165,7 +165,7 @@ test('subtotal/excluded/Total math lines up per repo when only some repos have b
 
   assert.match(
     html,
-    /<tr class="grand"><th scope="row">subtotal<\/th><td>1<\/td><td>1<\/td><td class="row-total"><span[^>]*>2<\/span><a[^>]*>2<\/a><\/td><\/tr>/,
+    /<tr class="grand"><th scope="row">subtotal<\/th><td><a[^>]*>1<\/a><\/td><td><a[^>]*>1<\/a><\/td><td class="row-total"><span[^>]*>2<\/span><a[^>]*>2<\/a><\/td><\/tr>/,
     'each repo contributes its own fyi PR to the subtotal, in column order',
   );
   assert.match(
@@ -180,9 +180,114 @@ test('subtotal/excluded/Total math lines up per repo when only some repos have b
   );
   assert.match(
     html,
-    /<tr class="all-total"><th scope="row">Total<\/th><td>2<\/td><td>2<\/td><td class="row-total"><span[^>]*>4<\/span><a[^>]*>4<\/a><\/td><\/tr>/,
+    /<tr class="all-total"><th scope="row">Total<\/th><td><a[^>]*>2<\/a><\/td><td><a[^>]*>2<\/a><\/td><td class="row-total"><span[^>]*>4<\/span><a[^>]*>4<\/a><\/td><\/tr>/,
     "each column's Total is that repo's subtotal plus its own excluded counts, not the other repo's",
   );
+});
+
+test('summary label columns count actionable PRs across repos and open the Table view', () => {
+  const classified = [
+    pullRequest({
+      number: 1,
+      labels: ['bug', 'area/storage', 'changelog:bugfix-or-minor-feature', 'ci:parallel'],
+    }),
+    pullRequest({ number: 2, repo: { owner: 'other', name: 'repo2' }, labels: ['Bug'] }),
+    pullRequest({ number: 3, isDraft: true, labels: ['bug', 'stale'] }), // hidden
+    pullRequest({
+      number: 4,
+      author: { login: 'renovate-bot', typename: 'User' },
+      labels: ['dependencies'],
+    }), // dependency-bots
+  ].map((pr) => classify(pr, context));
+  const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
+  const summary = html.slice(
+    html.indexOf('<table class="summary-table">'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
+  );
+
+  assert.match(
+    summary,
+    /<tr class="groups"><th class="bucket" scope="col" rowspan="2">bucket<\/th><th scope="colgroup" colspan="3">repository<\/th><th scope="colgroup" colspan="2" class="labels">label<\/th><\/tr>/,
+    'the header groups the repo columns plus total apart from the label columns',
+  );
+  assert.match(
+    summary,
+    /<th scope="col">total<\/th><th scope="col" class="labels">area\/storage<\/th><th scope="col">bug<\/th><\/tr>/,
+    'label columns follow the total alphabetically; changelog, ci, stale and bot-only labels are left out',
+  );
+  assert.match(
+    summary,
+    /<th scope="row">subtotal<\/th>.*<td class="labels"><a href="#table" data-buckets="([^"]*)" data-label="area\/storage">1<\/a><\/td><td><a href="#table" data-buckets="\1" data-label="bug">2<\/a><\/td><\/tr>/,
+    'a subtotal label cell counts the label across repos and spellings in the actionable buckets only',
+  );
+  assert.match(
+    summary,
+    /Blocked on author<span class="note"> \(excluded\)<\/span><\/th>.*<td class="zero labels">0<\/td><td><a href="#table" data-buckets="\[&quot;Blocked on author&quot;\]" data-label="bug">1<\/a><\/td><\/tr>/,
+    'an excluded row still counts its own labelled PRs',
+  );
+  assert.match(
+    summary,
+    /<th scope="row">Total<\/th><td><a href="#repo-acme-widgets" data-repo="acme\/widgets" data-buckets="\[\]">3<\/a><\/td><td><a href="#repo-other-repo2" data-repo="other\/repo2" data-buckets="\[\]">1<\/a><\/td>/,
+    'per-repo totals link to the repo heading and select the repo with no bucket filter',
+  );
+  const totalBug =
+    /<th scope="row">Total<\/th>.*<td><a href="#table" data-buckets="([^"]*)" data-label="bug">3<\/a>/.exec(
+      summary,
+    );
+  assert.ok(totalBug, 'the Total row counts the label over every bucket, hidden included');
+  assert.equal(
+    JSON.parse(totalBug![1]!.replaceAll('&quot;', '"')).length,
+    BUCKET_ORDER.length,
+    'a Total label cell selects every bucket so the filtered rows match the count',
+  );
+});
+
+test('summary label columns skip priority labels and count across priority groups', () => {
+  const classified = [
+    pullRequest({ number: 1, labels: ['priority:high', 'a<b>"c"'] }),
+    pullRequest({ number: 2, labels: ['a<b>"c"'] }),
+    pullRequest({ number: 3, labels: ['priority:low', 'docs'] }),
+  ].map((pr) => classify(pr, context));
+  const html = renderHtml(classified, {
+    viewer: 'maintainer-a',
+    now,
+    authorOpenCounts: new Map(),
+    priorityLabels: ['priority:high', 'priority:low'],
+  });
+  const summary = html.slice(
+    html.indexOf('<table class="summary-table">'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
+  );
+  assert.doesNotMatch(
+    summary,
+    /<th scope="col"[^>]*>priority:|data-label="priority:/,
+    'priority labels already group the Categorized view',
+  );
+  assert.match(
+    summary,
+    /<th scope="col" class="labels">a&lt;b&gt;&quot;c&quot;<\/th><th scope="col">docs<\/th><\/tr>/,
+    'label names are escaped in the header',
+  );
+  assert.match(
+    summary,
+    /<th scope="row">subtotal<\/th>.*data-label="a&lt;b&gt;&quot;c&quot;">2<\/a><\/td><td><a[^>]*data-label="docs">1<\/a><\/td><\/tr>/,
+    'a label is counted across the priority groups it is spread over',
+  );
+});
+
+test('the summary has no label columns when no actionable PR carries a topic label', () => {
+  const classified = [
+    pullRequest({ number: 1, labels: ['changelog:skip', 'waiting-for-author'] }),
+    pullRequest({ number: 2, isDraft: true, labels: ['bug'] }),
+  ].map((pr) => classify(pr, context));
+  const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
+  const summary = html.slice(
+    html.indexOf('<table class="summary-table">'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
+  );
+  assert.match(summary, /<thead>\s*<tr><th class="bucket" scope="col">bucket<\/th>/);
+  assert.ok(!summary.includes('class="labels"'));
+  assert.ok(!summary.includes('data-label='));
 });
 
 test('summary totals select matching buckets across repositories in Table view', () => {
@@ -195,7 +300,7 @@ test('summary totals select matching buckets across repositories in Table view',
   const html = renderHtml(classified, { viewer: 'maintainer-a', now, authorOpenCounts: new Map() });
   const summary = html.slice(
     html.indexOf('<table class="summary-table">'),
-    html.indexOf('</table>'),
+    html.indexOf('</table>', html.indexOf('<table class="summary-table">')),
   );
   const links = [
     ...summary.matchAll(/<a class="table-total" href="#table" data-buckets="([^"]*)">(\d+)<\/a>/g),

@@ -211,7 +211,7 @@ export interface ActorClassification {
   isDependencyBot: boolean;
   reason: string;
   turnStartedAt: string;
-  isTruncated?: boolean;
+  warnings?: string[];
 }
 
 export type DashboardSectionKey =

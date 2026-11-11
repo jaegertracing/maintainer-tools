@@ -4,7 +4,7 @@
     "number": 101,
     "title": "chore(deps): bump opentelemetry-go to 1.30.0",
     "url": "https://github.com/jaegertracing/jaeger/pull/101",
-    "author": { "login": "dependabot[bot]", "typename": "Bot" },
+    "author": { "login": "dependabot", "typename": "Bot" },
     "authorAssociation": "NONE",
     "isDraft": false,
     "mergeable": "MERGEABLE",
