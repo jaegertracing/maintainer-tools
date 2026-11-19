@@ -184,7 +184,7 @@ const SUBTOTAL_EXCLUDED_BUCKETS: Bucket[] = ['dependency-bots', 'hidden'];
 // `changelog:` labels only classify the release notes, the `ci:` labels only
 // steer workflows, and the configured priority labels already group the
 // Categorized view.
-const FLAG_LABELS = new Set(['stale', 'waiting-for-author', 'pr-quota-reached']);
+const FLAG_LABELS = new Set(['stale', 'waiting-for-author', 'pr-quota-reached', 'missing-issue']);
 const CONTROL_LABEL_PREFIXES = ['changelog:', 'ci:'];
 
 function prsInBucket(block: RepoBlock, bucket: Bucket): ClassifiedPR[] {
@@ -543,7 +543,7 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   'NEEDS-LABEL':
     'CI is failing only on a label-gate check (e.g. a missing changelog/kind label) — otherwise mergeable.',
   'NO-ISSUE':
-    'PR description does not reference a linked issue via `Fixes #N` / `Closes #N` / `Resolves #N`.',
+    'PR description does not reference a linked issue via `Fixes #N` / `Closes #N` / `Resolves #N`, or the PR carries the `missing-issue` label.',
   'NO-TESTS': 'Source files changed, but no test files were added or modified alongside them.',
   UNRESOLVED:
     'An unresolved review thread exists and the author has pushed new commits since the last reviewer comment.',

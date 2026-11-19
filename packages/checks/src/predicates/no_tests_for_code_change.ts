@@ -58,8 +58,7 @@ function isCodeFile(path: string): boolean {
   return ext !== undefined && CODE_EXTENSIONS.has(ext);
 }
 
-// Same exemption list as `no_linked_issue` — doc/CI/trivial PRs don't
-// need tests.
+// Doc/CI/trivial PRs don't need tests.
 const EXEMPT_LABELS = new Set(['docs', 'documentation', 'ci', 'trivial', 'chore']);
 
 export function noTestsForCodeChange(pr: PullRequest): CheckResult {

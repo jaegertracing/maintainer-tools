@@ -187,10 +187,24 @@ test('a review request makes a blocked priority-author PR actionable', () => {
   assert.equal(classify(pr, { ...context, ignoreReviewRequestedOnYou: true }).bucket, 'hidden');
 });
 
+test('a missing-issue PR carries the NO-ISSUE flag although its body references an issue', () => {
+  const result = classify(pullRequest({ labels: ['missing-issue'] }), context);
+
+  assert.ok(result.flags.includes('NO-ISSUE'));
+});
+
+test('the no-issue-needed label exempts a PR without an issue reference', () => {
+  const pr = pullRequest({ body: 'A fix for a typo.', labels: ['no-issue-needed'] });
+
+  assert.equal(classify(pr, context).flags.includes('NO-ISSUE'), false);
+  assert.ok(classify({ ...pr, labels: [] }, context).flags.includes('NO-ISSUE'));
+});
+
 const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   ['draft', { isDraft: true }, 'draft'],
   ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],
   ['merge conflict', { mergeable: 'CONFLICTING' }, 'hide:merge_conflict'],
+  ['missing issue', { labels: ['missing-issue'] }, 'hide:no_linked_issue'],
   [
     'requested changes still await the author',
     {
