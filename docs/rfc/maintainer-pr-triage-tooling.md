@@ -159,7 +159,7 @@ Each predicate declares which surface(s) it publishes to (Check = GitHub Checks 
 | `ci_failing` | Status check rollup is FAILURE | reads | yes | — | yes |
 | `merge_conflict` | `mergeable === CONFLICTING` | fail | yes | — | no |
 | `description_empty` | PR body empty or only template stubs | fail | yes | — | yes |
-| `no_linked_issue` | No `Fixes/Closes/Resolves #N` and PR not labeled `docs`/`ci`/`trivial` | neutral | gentle | — | no |
+| `no_linked_issue` | PR labeled `missing-issue`, or no `Fixes/Closes/Resolves #N` and PR not labeled `docs`/`ci`/`trivial`/`no-issue-needed` | neutral | gentle | — | only when labeled `missing-issue` |
 | `no_tests_for_code_change` | Source files changed but no `*_test.*` / `*.test.*` changes | neutral | gentle | — | no |
 | `unresolved_from_reviewer` | A reviewer's comment is unresolved and the author has pushed since | neutral | gentle | — | no |
 | `resolved_without_reply` | Author marked a conversation resolved with no reply to the reviewer | — | — | — | flag in triage |
