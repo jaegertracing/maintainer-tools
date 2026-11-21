@@ -8,7 +8,7 @@
 import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
 
 import { type CopilotReview, copilotReview } from './copilot.js';
-import { hasLogin, sameLogin } from './logins.js';
+import { hasLogin, isBotActor, isBotAuthor, isDependencyBotAuthor, sameLogin } from './logins.js';
 
 export type Bucket =
   | 'priority-authors'
@@ -61,26 +61,6 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
   'dependency-bots': 'Opened by a recognized dependency-update bot (Dependabot, Renovate).',
   hidden: 'Not actionable right now — draft, blocked, or flagged as waiting on the author.',
 };
-
-// Logins treated as "dependency bots" — PRs they open are reviewable
-// merges, just authored by a service account. They always land in their
-// own bucket, regardless of draft state, CI status, or merge conflicts, so
-// they never drown out human-authored PRs in CODEOWNERS hits / FYI and
-// never inflate Blocked-on-author with noise nobody needs to triage.
-// GraphQL's `login` field omits the `[bot]` suffix even for an installed
-// GitHub App — Renovate's own App reports as plain `renovate` — so the
-// unbracketed forms are what this GraphQL-only CLI actually sees.
-// `renovate-bot` is this org's self-hosted Renovate runner. The bracketed
-// forms are kept too, as defense against any non-GraphQL-sourced PR data
-// (fixtures, hand-written cache rows).
-const DEPENDENCY_BOT_LOGINS = new Set<string>([
-  'dependabot',
-  'dependabot[bot]',
-  'renovate',
-  'renovate[bot]',
-  'renovate-bot',
-  'renovate-bot[bot]',
-]);
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
@@ -166,7 +146,9 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const hideReasons: string[] = [];
   if (pr.isDraft) hideReasons.push('draft');
   hideReasons.push(...hiddenByChecks.map((c) => `hide:${c.id}`));
-  if (pr.labels.includes('waiting-for-author')) hideReasons.push('waiting-for-author');
+  if (pr.labels.some((label) => label.trim().toLowerCase() === 'waiting-for-author')) {
+    hideReasons.push('waiting-for-author');
+  }
   if (changesRequestedPending) hideReasons.push('changes-requested');
   if (isBotAuthor(pr) && !isDependencyBot(pr)) hideReasons.push('bot-authored');
   const facets: Facets = {
@@ -211,7 +193,10 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
       hiddenByChecks.map((c) => `hide:${c.id}`),
     );
   }
-  if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
+  if (
+    pr.labels.some((label) => label.trim().toLowerCase() === 'waiting-for-author') &&
+    !explicitlyRequested
+  ) {
     return mk('hidden', ['waiting-for-author']);
   }
   // The mirror of `changes-requested-revised` below: the viewer asked for
@@ -281,18 +266,8 @@ function isReviewRequestedOnViewer(pr: PullRequest, viewer: string): boolean {
   return pr.reviewRequests.some((r) => r.kind === 'user' && sameLogin(r.login, viewer));
 }
 
-function isBotAuthor(pr: PullRequest): boolean {
-  if (!pr.author) return false;
-  if (pr.author.typename === 'Bot') return true;
-  // GraphQL doesn't emit a `[bot]`-suffixed login in practice; this guards
-  // non-GraphQL-sourced PR data (fixtures, hand-written cache rows) where
-  // typename might be 'User' but the login still carries the suffix.
-  return pr.author.login.endsWith('[bot]');
-}
-
 function isDependencyBot(pr: PullRequest): boolean {
-  if (!pr.author) return false;
-  return DEPENDENCY_BOT_LOGINS.has(pr.author.login.toLowerCase());
+  return isDependencyBotAuthor(pr.author?.login);
 }
 
 function isFirstTimeContributor(pr: PullRequest): boolean {
@@ -315,17 +290,24 @@ function hasMaintainerActivity(pr: PullRequest, maintainers: Set<string>): boole
   for (const c of pr.comments) {
     if (c.author && hasLogin(maintainers, c.author)) return true;
   }
+  for (const thread of pr.reviewThreads ?? []) {
+    for (const c of thread.comments) {
+      if (c.author && hasLogin(maintainers, c.author)) return true;
+    }
+  }
   return false;
 }
 
-// State of the viewer's most recent submitted review. GitHub keeps the whole
-// history, and a later APPROVED or COMMENTED supersedes an earlier
-// CHANGES_REQUESTED, so only the newest one says where the PR stands.
+// State of the viewer's most recent authoritative submitted review. COMMENTED
+// and PENDING are discussion/workflow states, not review decisions, so they
+// cannot clear an active CHANGES_REQUESTED review.
 function latestReviewState(
   reviews: PullRequest['reviews'],
 ): PullRequest['reviews'][number]['state'] | null {
   let latest: PullRequest['reviews'][number] | undefined;
   for (const r of reviews) {
+    if (r.state === 'COMMENTED' || r.state === 'PENDING') continue;
+    if (!r.submittedAt || Number.isNaN(Date.parse(r.submittedAt))) continue;
     if (!latest || Date.parse(r.submittedAt) > Date.parse(latest.submittedAt)) latest = r;
   }
   return latest?.state ?? null;
@@ -336,26 +318,60 @@ function authorActedSinceViewerReview(
   viewerReviews: PullRequest['reviews'],
   viewer: string,
 ): boolean {
+  // Review decisions determine the bucket state, but every submitted review
+  // is reviewer activity and therefore moves the revision baseline.
   const latest = viewerReviews
     .map((r) => Date.parse(r.submittedAt))
+    .filter((timestamp) => Number.isFinite(timestamp))
     .reduce((a, b) => Math.max(a, b), 0);
-  if (!latest) return false;
+  let latestActivity = latest;
+  for (const comment of pr.comments) {
+    if (comment.author && sameLogin(comment.author, viewer)) {
+      const timestamp = Date.parse(comment.createdAt);
+      if (Number.isFinite(timestamp)) latestActivity = Math.max(latestActivity, timestamp);
+    }
+  }
+  for (const thread of pr.reviewThreads ?? []) {
+    for (const comment of thread.comments) {
+      if (comment.author && sameLogin(comment.author, viewer)) {
+        const timestamp = Date.parse(comment.createdAt);
+        if (Number.isFinite(timestamp)) latestActivity = Math.max(latestActivity, timestamp);
+      }
+    }
+  }
+  if (!Number.isFinite(latestActivity) || latestActivity <= 0) return false;
   // Did the author push commits after the viewer's review?
   const authorLogin = pr.author?.login;
   if (!authorLogin) return false;
-  const headCommittedAt = Date.parse(
-    pr.commits[pr.commits.length - 1]?.committedDate ?? pr.updatedAt,
+  const hasAuthorRevision = pr.commits.some(
+    (commit) =>
+      commit.authorLogin &&
+      sameLogin(commit.authorLogin, authorLogin) &&
+      Date.parse(commit.committedDate) > latestActivity,
   );
-  if (headCommittedAt > latest) return true;
+  if (hasAuthorRevision) {
+    return true;
+  }
   // Or commented since?
   for (const c of pr.comments) {
     if (
       c.author &&
       sameLogin(c.author, authorLogin) &&
-      Date.parse(c.createdAt) > latest &&
+      Date.parse(c.createdAt) > latestActivity &&
       !sameLogin(c.author, viewer)
     ) {
       return true;
+    }
+  }
+  for (const thread of pr.reviewThreads ?? []) {
+    for (const c of thread.comments) {
+      if (
+        c.author &&
+        sameLogin(c.author, authorLogin) &&
+        Date.parse(c.createdAt) > latestActivity
+      ) {
+        return true;
+      }
     }
   }
   return false;
@@ -366,18 +382,27 @@ function authorActedSinceViewerReview(
 // style paths. We don't implement negation or character classes — neither
 // is needed for the triage use case.
 export function matchesGlob(path: string, pattern: string): boolean {
-  const re = new RegExp(
-    '^' +
-      pattern
-        .split(/(\*\*|\*)/)
-        .map((token) => {
-          if (token === '**') return '.*';
-          if (token === '*') return '[^/]*';
-          return escapeRegex(token);
-        })
-        .join('') +
-      '$',
-  );
+  const rooted = pattern.startsWith('/');
+  const withoutRoot = rooted ? pattern.slice(1) : pattern;
+  const directoryPattern = withoutRoot.endsWith('/');
+  const core = directoryPattern ? withoutRoot.slice(0, -1) : withoutRoot;
+  const hasSlash = core.includes('/');
+  const doubleStarDirectory = core.startsWith('**/');
+  const source = directoryPattern ? `${core}/**` : doubleStarDirectory ? core.slice(3) : core;
+  const prefix = doubleStarDirectory ? '^(?:.*/)?' : rooted || hasSlash ? '^' : '^(?:.*/)?';
+  const tokens = source.split(/(\*\*|\*)/);
+  const patternRegex = tokens
+    .map((token, index) => {
+      if (token === '**' && tokens[index + 1]?.startsWith('/')) return '(?:.*/)?';
+      if (index > 0 && tokens[index - 1] === '**' && token.startsWith('/')) {
+        return escapeRegex(token.slice(1));
+      }
+      if (token === '**') return '.*';
+      if (token === '*') return '[^/]*';
+      return escapeRegex(token);
+    })
+    .join('');
+  const re = new RegExp(prefix + patternRegex + '$');
   return re.test(path);
 }
 
@@ -395,11 +420,22 @@ function computeFlags(pr: PullRequest, checks: CheckResult[], ctx: ClassifyConte
   flags.push(...issueFlags(pr, ctx));
   if (pr.isDraft) flags.push('DRAFT');
   if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT');
-  if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
+  if (
+    pr.labels.some((label) => {
+      const normalized = label.trim().toLowerCase();
+      return normalized === 'release-blocker' || normalized === 'blocker';
+    })
+  ) {
+    flags.push('BLOCKER');
+  }
   if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
   if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');
-  if (pr.labels.includes('awaiting-maintainer-input')) flags.push('QUESTION');
-  if (pr.labels.includes('waiting-for-author')) flags.push('WAITING-FOR-AUTHOR');
+  if (pr.labels.some((label) => label.trim().toLowerCase() === 'awaiting-maintainer-input')) {
+    flags.push('QUESTION');
+  }
+  if (pr.labels.some((label) => label.trim().toLowerCase() === 'waiting-for-author')) {
+    flags.push('WAITING-FOR-AUTHOR');
+  }
 
   // P3 predicates: each fires as a visible row flag when triggered, so a
   // maintainer can spot it at a glance in the triage table. A predicate that
@@ -441,7 +477,7 @@ function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
   if (author && !isPriorityAuthor(ctx, author)) {
     for (const ref of refs) {
       const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];
-      if (m && !m.isPullRequest && m.author === author) {
+      if (m && !m.isPullRequest && sameLogin(m.author, author)) {
         flags.push('SELF-FILED');
         break;
       }
@@ -469,12 +505,15 @@ function countResolvedWithoutReply(pr: PullRequest): number {
   if (!authorLogin) return 0;
   let n = 0;
   for (const t of pr.reviewThreads ?? []) {
-    if (!t.isResolved || t.resolvedBy !== authorLogin) continue;
-    const reviewerComments = t.comments.filter((c) => c.author && c.author !== authorLogin);
+    if (!t.isResolved || !sameLogin(t.resolvedBy, authorLogin)) continue;
+    const reviewerComments = t.comments.filter(
+      (c) =>
+        c.author && !sameLogin(c.author, authorLogin) && !isBotActor(c.authorTypename, c.author),
+    );
     if (reviewerComments.length === 0) continue;
     const latest = Math.max(...reviewerComments.map((c) => Date.parse(c.createdAt)));
     const replied = t.comments.some(
-      (c) => c.author === authorLogin && Date.parse(c.createdAt) > latest,
+      (c) => sameLogin(c.author, authorLogin) && Date.parse(c.createdAt) >= latest,
     );
     if (!replied) n++;
   }

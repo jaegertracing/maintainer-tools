@@ -23,7 +23,12 @@
       "@jaegertracing/maintainer-tools-checks/comments": [
         "./packages/checks/src/comments/index.ts"
       ],
-      "@jaegertracing/maintainer-tools-checks/digest": ["./packages/checks/src/digest.ts"]
+      "@jaegertracing/maintainer-tools-checks/digest": ["./packages/checks/src/digest.ts"],
+      "@jaegertracing/maintainer-tools-checks/logins": ["./packages/checks/src/logins.ts"],
+      "@jaegertracing/maintainer-tools-checks/actor": ["./packages/checks/src/actor.ts"],
+      "@jaegertracing/maintainer-tools-checks/dashboard": [
+        "./packages/checks/src/render/dashboard.ts"
+      ]
     }
   },
   "include": [
