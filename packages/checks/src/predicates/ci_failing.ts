@@ -1,4 +1,5 @@
-import type { CheckResult, PullRequest } from '../types.js';
+import type { BaseFactValue } from '../rules/model.js';
+import type { PullRequest } from '../types.js';
 
 // Check names that are purely pre-merge label gates — they fail only because
 // a changelog/kind/release label has not been applied yet, which is a
@@ -11,24 +12,14 @@ function isLabelGate(name: string): boolean {
   return LABEL_GATE_PATTERNS.some((re) => re.test(name));
 }
 
-export function ciFailing(pr: PullRequest): CheckResult {
-  const rollup = pr.statusCheckRollup;
-  const triggered = rollup === 'FAILURE' || rollup === 'ERROR';
+function isRollupFailing(pr: PullRequest): boolean {
+  return pr.statusCheckRollup === 'FAILURE' || pr.statusCheckRollup === 'ERROR';
+}
 
-  if (!triggered) {
-    return {
-      id: 'ci_failing',
-      triggered: false,
-      summary: rollup ? `CI status rollup is ${rollup}` : 'No CI status checks reported',
-      publishesCheck: false,
-      inDigest: false,
-      hidesFromTriage: false,
-    };
-  }
-
-  // Determine whether the only failing checks are label gates. When
-  // headCheckRuns is absent (legacy cache entry), we can't tell — treat it
-  // as a real CI failure to avoid surfacing broken PRs.
+// Whether the only failing checks of a PR with a failing rollup are label
+// gates. When headCheckRuns is absent (legacy cache entry), we can't tell —
+// treat it as a real CI failure to avoid surfacing broken PRs.
+function isLabelOnlyFailure(pr: PullRequest): boolean {
   const runs = pr.headCheckRuns;
   // Conclusions that mean "this check is actively broken". null means
   // in-progress/skipped/neutral — not a failure. 'success' is not failing.
@@ -51,24 +42,30 @@ export function ciFailing(pr: PullRequest): CheckResult {
   // the same as absent data — assume a real CI failure. jaeger PRs reach 145
   // check contexts against a page size of 100, so this is reachable, not
   // hypothetical.
-  const labelOnlyFailure =
+  return (
     failingRuns !== undefined &&
     failingRuns.length > 0 &&
     pr.headCheckRunsTruncated !== true &&
-    failingRuns.every((r) => isLabelGate(r.name));
+    failingRuns.every((r) => isLabelGate(r.name))
+  );
+}
 
+export function ciFailingPredicate(pr: PullRequest): BaseFactValue {
+  const rollup = pr.statusCheckRollup;
+  if (!isRollupFailing(pr)) {
+    return {
+      holds: false,
+      summary: rollup ? `CI status rollup is ${rollup}` : 'No CI status checks reported',
+    };
+  }
   return {
-    id: 'ci_failing',
-    triggered: true,
-    summary: labelOnlyFailure
+    holds: true,
+    summary: isLabelOnlyFailure(pr)
       ? 'CI only failing on label gate check(s)'
       : `CI status rollup is ${rollup}`,
-    publishesCheck: false,
-    inDigest: !labelOnlyFailure,
-    // Label-only failures do NOT hide from triage — the PR is still
-    // actionable by a maintainer who can apply the label. Real CI failures
-    // do hide because the contributor needs to fix them first.
-    hidesFromTriage: !labelOnlyFailure,
-    labelOnlyFailure,
   };
+}
+
+export function labelOnlyFailurePredicate(pr: PullRequest): boolean {
+  return isRollupFailing(pr) && isLabelOnlyFailure(pr);
 }

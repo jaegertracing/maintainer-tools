@@ -1,4 +1,5 @@
-import type { CheckResult, PullRequest } from '../types.js';
+import type { BaseFactValue } from '../rules/model.js';
+import type { PullRequest } from '../types.js';
 
 // Two independent signals:
 //   - `pr-quota-reached` label, set by the upstream pr-quota-manager workflow
@@ -13,23 +14,16 @@ import type { CheckResult, PullRequest } from '../types.js';
 // The CLI runs both and OR's them.
 const QUOTA_LABEL = 'pr-quota-reached';
 
-export function quotaExceeded(pr: PullRequest): CheckResult {
+export function quotaExceededPredicate(pr: PullRequest): BaseFactValue {
   const byLabel = pr.labels.includes(QUOTA_LABEL);
   const byCompute = pr.computed?.quotaExceeded === true;
   const triggered = byLabel || byCompute;
   const reason = byLabel && byCompute ? 'label+computed' : byLabel ? 'label' : 'computed';
 
   return {
-    id: 'quota_exceeded',
-    triggered,
+    holds: triggered,
     summary: triggered
       ? `PR on hold — author has reached the new-contributor open-PR quota (${reason})`
       : 'PR not quota-blocked',
-    // The action posts its own explanatory comment on the PR; no Check Run
-    // and no separate digest line. Hide from triage so quota-blocked PRs
-    // (especially first-timers) don't crowd out reviewable work.
-    publishesCheck: false,
-    inDigest: false,
-    hidesFromTriage: triggered,
   };
 }
