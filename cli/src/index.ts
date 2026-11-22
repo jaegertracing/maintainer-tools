@@ -14,16 +14,14 @@ import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
 import { type ClassifiedPR, BUCKET_ORDER, BUCKET_LABELS } from './buckets.js';
 import { loadConfigInteractive } from './config-setup.js';
 import { log } from './log.js';
-import { enrichIssueState } from './issues.js';
-import { enrichQuotaState } from './quota.js';
 import { renderExplain } from './render/explain.js';
 import { renderHtml } from './render/html.js';
 import { renderJson } from './render/json.js';
 import { renderXlsx } from './render/xlsx.js';
-import { makeClient, scanRepos } from './scan.js';
-import { snapshotSource, sourceSavingSnapshot, type TriageSource } from './snapshot.js';
+import { makeClient } from './scan.js';
+import { gatherSnapshot, readSnapshot, type TriageSnapshot, writeSnapshot } from './snapshot.js';
 import { resolveToken } from './token.js';
-import { buildTriagePolicy, classifyAll } from './triage-policy.js';
+import { buildTriagePolicy, classifySnapshot } from './triage-policy.js';
 import { runNudge } from './nudge.js';
 
 const HELP = `Usage: maintainer-tools <command> [options]
@@ -58,12 +56,11 @@ Options:
   --no-cache          Bypass the SQLite cache for this run.
   --save-snapshot <path>
                       Save the snapshot of this run to a file: everything
-                      that the run fetched from GitHub, and the clock. The
-                      run bypasses the SQLite cache, as with --no-cache.
+                      that was gathered from GitHub, and the clock.
   --snapshot <path>   Classify a snapshot written by --save-snapshot
-                      instead of fetching from GitHub. Needs no token and
-                      no cache, and excludes the flags that control what
-                      the run fetches: --save-snapshot, --no-cache,
+                      instead of gathering one from GitHub. Needs no
+                      token and no cache, and excludes the flags that
+                      control the gathering: --save-snapshot, --no-cache,
                       --no-quota, --no-issues, --limit, --pr, --viewer.
   --no-quota          Skip the per-author quota computation. Faster, but
                       relies solely on the \`pr-quota-reached\` label for
@@ -150,58 +147,37 @@ async function runTriage(argv: string[]): Promise<void> {
     `config: ${cfg.repos.length} repo(s), ${cfg.maintainers.length} maintainer(s), ${cfg.interns.length} intern(s), ${cfg.priorityAuthors.length} priority author(s)`,
   );
 
-  const source = chooseSource(values, cfg);
-  const { client } = source;
-
-  const cache = await openCacheIfEnabled(cfg.cachePath, !source.useCache);
-  log(cache ? `cache: ${cfg.cachePath}` : 'cache: disabled');
-
-  let viewer = source.viewer;
-  if (viewer) {
-    log(`viewer: @${viewer} (from config)`);
+  let snapshot: TriageSnapshot;
+  if (values.snapshot) {
+    log(`snapshot: ${values.snapshot}`);
+    snapshot = readSnapshot(values.snapshot, cfg.repos);
   } else {
-    log('viewer: fetching...');
-    viewer = await client.fetchViewerLogin();
-    log(`viewer: @${viewer}`);
+    const { token, source } = resolveToken();
+    log(`token: ${source}`);
+    const cache = await openCacheIfEnabled(cfg.cachePath, values['no-cache']);
+    log(cache ? `cache: ${cfg.cachePath}` : 'cache: disabled');
+    snapshot = await gatherSnapshot(makeClient(token), cache, {
+      repos: cfg.repos,
+      viewer: values.viewer ?? cfg.viewer,
+      singlePr: values.pr ? parsePrSpec(values.pr, cfg.repos) : undefined,
+      limit,
+      quotaExemptLogins: policy.priorityAuthors,
+      skipQuota: values['no-quota'],
+      skipIssues: values['no-issues'],
+    });
+    cache?.close();
   }
-
-  let prs: PullRequest[];
-  if (values.pr) {
-    const ref = parsePrSpec(values.pr, cfg.repos);
-    log(`single PR mode: ${ref.owner}/${ref.repo}#${ref.number} (bypassing list query)`);
-    const fresh = await client.fetchPullRequest(ref.owner, ref.repo, ref.number);
-    cache?.put(fresh);
-    prs = [fresh];
-  } else {
-    log(
-      `scanning ${cfg.repos.length} repo(s): ${cfg.repos.join(', ')}` +
-        (limit !== undefined ? ` (limit ${limit} per repo)` : ''),
-    );
-    const result = await scanRepos(cfg.repos, client, cache, { limit });
-    log(
-      `scan complete: ${result.prs.length} open PR(s) — ${result.cacheHits} cached, ${result.cacheMisses} fetched`,
-    );
-    prs = result.prs;
+  // The classification annotates the pull requests of the snapshot, so the
+  // file is written before it.
+  if (values['save-snapshot']) {
+    writeSnapshot(values['save-snapshot'], snapshot);
+    log(`wrote snapshot ${resolve(values['save-snapshot'])}`);
   }
-
-  if (source.skipQuota) {
-    log('quota: computation skipped; label-only mode');
-  } else {
-    await enrichQuotaState(prs, client, { exemptLogins: policy.priorityAuthors, cache });
-  }
-
-  if (source.skipIssues) {
-    log('issues: enrichment skipped');
-  } else {
-    await enrichIssueState(prs, client, { cache });
-  }
-
-  cache?.close();
 
   log('classifying PRs into buckets');
-  const now = source.clock();
-  const classified = classifyAll(prs, viewer, policy, now);
-  source.saveSnapshot?.(viewer, now);
+  const classified = classifySnapshot(snapshot, policy);
+  const { viewer, pullRequests: prs } = snapshot;
+  const now = new Date(snapshot.now);
 
   if (values.explain) {
     process.stdout.write(renderExplain(classified[0]!, now));
@@ -233,9 +209,9 @@ async function runTriage(argv: string[]): Promise<void> {
 }
 
 function rejectConflictingSnapshotFlags(values: Record<string, unknown>, output: string): void {
-  // A run that loads the snapshot from a file fetches nothing, so a flag
-  // that controls what the run fetches would be silently ignored.
-  const fetchFlag = [
+  // A run that loads the snapshot from a file gathers nothing, so a flag that
+  // controls the gathering would be silently ignored.
+  const gatheringFlag = [
     'save-snapshot',
     'no-cache',
     'no-quota',
@@ -244,8 +220,8 @@ function rejectConflictingSnapshotFlags(values: Record<string, unknown>, output:
     'pr',
     'viewer',
   ].find((flag) => values[flag]);
-  if (values.snapshot && fetchFlag) {
-    throw new Error(`--snapshot cannot be combined with --${fetchFlag}.`);
+  if (values.snapshot && gatheringFlag) {
+    throw new Error(`--snapshot cannot be combined with --${gatheringFlag}.`);
   }
   // The JSON report is named triage.json by default, which is also a natural
   // name for a snapshot, and the report would overwrite it.
@@ -258,36 +234,6 @@ function rejectConflictingSnapshotFlags(values: Record<string, unknown>, output:
   ) {
     throw new Error(`The snapshot and the report cannot be the same file: ${resolve(output)}.`);
   }
-}
-
-// chooseSource() is the only place that knows whether the run reads GitHub or
-// a snapshot file. Every later step reads the returned source.
-function chooseSource(
-  flags: {
-    snapshot?: string;
-    'save-snapshot'?: string;
-    viewer?: string;
-    'no-cache': boolean;
-    'no-quota': boolean;
-    'no-issues': boolean;
-  },
-  config: { viewer?: string; repos: string[] },
-): TriageSource {
-  if (flags.snapshot) {
-    log(`snapshot: ${flags.snapshot}`);
-    return snapshotSource(flags.snapshot, config.repos);
-  }
-  const { token, source: tokenSource } = resolveToken();
-  log(`token: ${tokenSource}`);
-  const source: TriageSource = {
-    client: makeClient(token),
-    clock: () => new Date(),
-    viewer: flags.viewer ?? config.viewer,
-    useCache: !flags['no-cache'],
-    skipQuota: flags['no-quota'],
-    skipIssues: flags['no-issues'],
-  };
-  return flags['save-snapshot'] ? sourceSavingSnapshot(source, flags['save-snapshot']) : source;
 }
 
 async function renderReport(

@@ -4,125 +4,116 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
-import {
-  type GitHubAnswers,
-  recordingClient,
-  snapshotClient,
-  snapshotSource,
-  sourceSavingSnapshot,
-  type TriageSnapshot,
-} from './snapshot.js';
+import { type GatherOptions, gatherSnapshot, readSnapshot, writeSnapshot } from './snapshot.js';
 
-function pullRequest(repo: string, number: number, labels: string[] = []): PullRequest {
+function pullRequest(number: number, login: string, body: string): PullRequest {
   return {
-    repo: { owner: 'example', name: repo },
+    repo: { owner: 'example', name: 'repo' },
     number,
-    updatedAt: `2026-05-0${number}T00:00:00Z`,
-    commits: [{ sha: `sha-${number}` }],
-    statusCheckRollup: 'SUCCESS',
-    labels,
+    author: { login, typename: 'User' },
+    body,
   } as PullRequest;
 }
 
+const pullRequests = [
+  pullRequest(1, 'alice', 'Closes #10'),
+  pullRequest(2, 'alice', 'Closes #11'),
+  pullRequest(3, 'bob', ''),
+  pullRequest(4, 'maintainer-b', ''),
+  pullRequest(5, 'maintainer-b', ''),
+];
+
 const issue10 = { author: 'bob', state: 'OPEN', title: 'A bug', isPullRequest: false } as const;
 
-const snapshot: TriageSnapshot = {
-  now: '2026-06-01T12:00:00.000Z',
-  viewer: 'maintainer-a',
-  pullRequests: [
-    pullRequest('repo', 2),
-    pullRequest('other', 3),
-    pullRequest('repo', 1, ['waiting-for-author']),
-  ],
-  mergedCounts: { 'example/repo|alice': 2 },
-  issues: { 'example/repo#10': issue10 },
+// GitHub resolves issue #10 and does not resolve issue #11.
+const github: GraphqlClient = {
+  fetchViewerLogin: async () => 'maintainer-a',
+  listOpenPRs: async () =>
+    pullRequests.map((pr) => ({
+      number: pr.number,
+      updatedAt: '2026-05-01T00:00:00Z',
+      headSha: 'abc',
+      headRollup: 'SUCCESS',
+    })),
+  listOpenPRsByLabel: async () => [],
+  fetchPullRequest: async (_owner, _repo, number) =>
+    structuredClone(pullRequests.find((pr) => pr.number === number)!),
+  countMergedPRs: async (_owner, _repo, author) => (author === 'alice' ? 2 : 99),
+  fetchIssues: async () => new Map([['example/repo#10', issue10]]),
 };
 
-test('the snapshot client answers each lookup from the data of the snapshot', async () => {
-  const client = snapshotClient(snapshot);
+const options: GatherOptions = {
+  repos: ['example/repo'],
+  quotaExemptLogins: new Set(['maintainer-b']),
+  skipQuota: false,
+  skipIssues: false,
+};
 
-  assert.equal(await client.fetchViewerLogin(), 'maintainer-a');
-  assert.deepEqual(await client.listOpenPRs('example', 'repo'), [
-    { number: 2, updatedAt: '2026-05-02T00:00:00Z', headSha: 'sha-2', headRollup: 'SUCCESS' },
-    { number: 1, updatedAt: '2026-05-01T00:00:00Z', headSha: 'sha-1', headRollup: 'SUCCESS' },
-  ]);
-  assert.deepEqual(
-    (await client.listOpenPRsByLabel('example', 'repo', 'waiting-for-author')).map((s) => s.number),
-    [1],
-  );
-  assert.deepEqual(await client.listOpenPRs('example', 'absent'), []);
-  assert.equal(await client.fetchPullRequest('example', 'other', 3), snapshot.pullRequests[1]);
-  assert.equal(await client.countMergedPRs('example', 'repo', 'alice'), 2);
+test('the snapshot holds everything that the run takes from GitHub', async () => {
+  const startMs = Date.now();
+  const snapshot = await gatherSnapshot(github, null, options);
+
+  assert.equal(snapshot.viewer, 'maintainer-a');
+  assert.deepEqual(snapshot.pullRequests, pullRequests);
+  // Only alice can exceed a quota: bob has one open pull request, and
+  // maintainer-b is exempt.
+  assert.deepEqual(snapshot.mergedCounts, { 'example/repo|alice': 2 });
+  assert.deepEqual(snapshot.issues, { 'example/repo#10': issue10 });
+  assert.ok(Date.parse(snapshot.now) >= startMs && Date.parse(snapshot.now) <= Date.now());
 });
 
-test('the snapshot client leaves out an issue that GitHub did not resolve', async () => {
-  const issues = await snapshotClient(snapshot).fetchIssues([
-    { owner: 'example', repo: 'repo', number: 10 },
-    { owner: 'example', repo: 'repo', number: 11 },
-  ]);
+test('the snapshot has no merged counts when the run skips the quota', async () => {
+  const snapshot = await gatherSnapshot(
+    { ...github, countMergedPRs: async () => assert.fail('the merged counts are skipped') },
+    null,
+    { ...options, skipQuota: true },
+  );
 
-  assert.deepEqual([...issues], [['example/repo#10', issue10]]);
+  assert.equal(snapshot.mergedCounts, undefined);
+  assert.deepEqual(snapshot.issues, { 'example/repo#10': issue10 });
 });
 
-test('the snapshot client rejects a lookup that the snapshot cannot answer', async () => {
-  const client = snapshotClient(snapshot);
+test('the snapshot has no issues when the run skips them', async () => {
+  const snapshot = await gatherSnapshot(
+    { ...github, fetchIssues: async () => assert.fail('the issues are skipped') },
+    null,
+    { ...options, skipIssues: true },
+  );
 
-  await assert.rejects(
-    client.countMergedPRs('example', 'repo', 'carol'),
-    /the snapshot has no merged-PR count for @carol in example\/repo/,
-  );
-  await assert.rejects(
-    client.fetchPullRequest('example', 'repo', 3),
-    /the snapshot has no pull request example\/repo#3/,
-  );
+  assert.deepEqual(snapshot.mergedCounts, { 'example/repo|alice': 2 });
+  assert.equal(snapshot.issues, undefined);
 });
 
-const REPOS = ['example/repo', 'example/other'];
-
-test('a run from a snapshot skips the passes that the saving run skipped', (t) => {
+test('readSnapshot returns the pull requests in the order of the config repositories', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'snapshot-'));
   t.after(() => rmSync(dir, { recursive: true }));
+  const path = join(dir, 'snapshot.json');
+  const pullRequestInRepo = (name: string, number: number) => ({
+    ...pullRequest(number, 'alice', ''),
+    repo: { owner: 'example', name },
+  });
+  writeSnapshot(path, {
+    now: '2026-06-01T12:00:00.000Z',
+    viewer: 'maintainer-a',
+    pullRequests: [pullRequestInRepo('b', 2), pullRequestInRepo('a', 3), pullRequestInRepo('b', 1)],
+  });
 
-  for (const skippedPasses of [
-    { skipQuota: true, skipIssues: false },
-    { skipQuota: false, skipIssues: true },
-  ]) {
-    const path = join(dir, 'snapshot.json');
-    const savingSource = sourceSavingSnapshot(
-      {
-        client: snapshotClient(snapshot),
-        clock: () => new Date(),
-        useCache: true,
-        ...skippedPasses,
-      },
-      path,
-    );
-    savingSource.saveSnapshot!('maintainer-a', new Date(snapshot.now));
+  const snapshot = readSnapshot(path, ['example/a', 'example/b']);
 
-    const { skipQuota, skipIssues } = snapshotSource(path, REPOS);
-    assert.deepEqual({ skipQuota, skipIssues }, skippedPasses);
-  }
+  assert.deepEqual(
+    snapshot.pullRequests.map((pr) => `${pr.repo.name}#${pr.number}`),
+    ['a#3', 'b#2', 'b#1'],
+  );
 });
 
-test('recordingClient stores every answer that a snapshot needs', async () => {
-  const github = snapshotClient(structuredClone(snapshot));
-  const answers: GitHubAnswers = { pullRequests: [], mergedCounts: {}, issues: {} };
-  const client = recordingClient(github, answers);
+test('a viewer from the command line or the config is not asked from GitHub', async () => {
+  const snapshot = await gatherSnapshot(
+    { ...github, fetchViewerLogin: async () => assert.fail('the viewer is configured') },
+    null,
+    { ...options, viewer: 'maintainer-c' },
+  );
 
-  const fetchedPR = await client.fetchPullRequest('example', 'repo', 1);
-  // A run annotates the pull request that it fetched.
-  fetchedPR.computed = { quotaExceeded: true };
-  await client.countMergedPRs('example', 'repo', 'alice');
-  await client.fetchIssues([
-    { owner: 'example', repo: 'repo', number: 10 },
-    { owner: 'example', repo: 'repo', number: 11 },
-  ]);
-
-  assert.deepEqual(answers, {
-    pullRequests: [pullRequest('repo', 1, ['waiting-for-author'])],
-    mergedCounts: snapshot.mergedCounts,
-    issues: snapshot.issues,
-  });
+  assert.equal(snapshot.viewer, 'maintainer-c');
 });

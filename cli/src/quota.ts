@@ -9,9 +9,10 @@
 //   merged = 2  -> quota = 3
 //   merged >= 3 -> quota = 10  (effectively unlimited)
 //
-// For each (owner/repo, author) bucket with > 1 open PR, we fetch the
-// merged count, calculate the quota, sort the author's open PRs by
-// createdAt (oldest first), and mark anything beyond the quota as
+// For each (owner/repo, author) bucket with > 1 open PR, fetchMergedCounts()
+// fetches the merged count while the snapshot is gathered. From those
+// counts markQuotaExceeded() calculates the quota, sorts the author's open
+// PRs by createdAt (oldest first), and marks anything beyond the quota as
 // `computed.quotaExceeded = true`. Authors with a single open PR are
 // trivially in-quota regardless of tier and skipped.
 //
@@ -44,10 +45,7 @@ const DEFAULT_MERGED_COUNT_TTL_MS = 24 * 60 * 60 * 1000;
 // without tripping secondary rate limits.
 const FETCH_CONCURRENCY = 6;
 
-export interface QuotaEnrichOptions {
-  // Logins whose PRs are always in-quota and shouldn't even cost a query
-  // (maintainers, interns, and configured priority authors).
-  exemptLogins: Set<string>;
+export interface MergedCountFetchOptions {
   // Optional cache for merged-PR counts, keyed by (repo, author). Omit (or
   // pass null) to always query fresh, e.g. for --no-cache.
   cache?: PrCache | null;
@@ -72,17 +70,24 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export async function enrichQuotaState(
-  prs: PullRequest[],
-  client: GraphqlClient,
-  opts: QuotaEnrichOptions,
-): Promise<void> {
+interface QuotaCandidate {
+  // `owner/repo|login`, the key of the author's merged count in the snapshot.
+  key: string;
+  owner: string;
+  repo: string;
+  login: string;
+  authorPRs: PullRequest[];
+}
+
+// `exemptLogins` are the logins whose PRs are always in-quota and shouldn't
+// even cost a query (maintainers, interns, and configured priority authors).
+function quotaCandidates(prs: PullRequest[], exemptLogins: Set<string>): QuotaCandidate[] {
   // Group by (repo, author).
   const groups = new Map<string, PullRequest[]>();
   for (const pr of prs) {
     const login = pr.author?.login;
     if (!login) continue;
-    if (hasLogin(opts.exemptLogins, login)) continue;
+    if (hasLogin(exemptLogins, login)) continue;
     const key = `${pr.repo.owner}/${pr.repo.name}|${login}`;
     let arr = groups.get(key);
     if (!arr) {
@@ -93,10 +98,25 @@ export async function enrichQuotaState(
   }
 
   // Skip authors with one open PR — they can't exceed any quota tier.
-  const candidates = [...groups.entries()].filter(([, arr]) => arr.length > 1);
+  return [...groups.entries()]
+    .filter(([, arr]) => arr.length > 1)
+    .map(([key, authorPRs]) => {
+      const [slug, login] = key.split('|') as [string, string];
+      const [owner, repo] = slug.split('/') as [string, string];
+      return { key, owner, repo, login, authorPRs };
+    });
+}
+
+export async function fetchMergedCounts(
+  prs: PullRequest[],
+  client: GraphqlClient,
+  exemptLogins: Set<string>,
+  opts: MergedCountFetchOptions = {},
+): Promise<Record<string, number>> {
+  const candidates = quotaCandidates(prs, exemptLogins);
   if (candidates.length === 0) {
     log('quota: no multi-PR authors to evaluate; skipping');
-    return;
+    return {};
   }
 
   log(`quota: evaluating ${candidates.length} multi-PR author(s)`);
@@ -104,42 +124,40 @@ export async function enrichQuotaState(
   const ttlMs = opts.mergedCountTtlMs ?? DEFAULT_MERGED_COUNT_TTL_MS;
   const cache = opts.cache ?? null;
 
-  interface Candidate {
-    key: string;
-    owner: string;
-    repo: string;
-    login: string;
-    authorPRs: PullRequest[];
-  }
-  const parsed: Candidate[] = candidates.map(([key, authorPRs]) => {
-    const [slug, login] = key.split('|') as [string, string];
-    const [owner, repo] = slug.split('/') as [string, string];
-    return { key, owner, repo, login, authorPRs };
-  });
-
   // Cache lookups are synchronous and cheap; split into hits (no network
   // needed) and misses (need a countMergedPRs call) up front.
-  const merged = new Map<string, number>();
-  const misses: Candidate[] = [];
-  for (const c of parsed) {
-    const cached = cache?.getMergedCount(c.owner, c.repo, c.login, ttlMs) ?? null;
+  const merged: Record<string, number> = {};
+  const misses: QuotaCandidate[] = [];
+  for (const candidate of candidates) {
+    const cached =
+      cache?.getMergedCount(candidate.owner, candidate.repo, candidate.login, ttlMs) ?? null;
     if (cached !== null) {
-      merged.set(c.key, cached);
+      merged[candidate.key] = cached;
     } else {
-      misses.push(c);
+      misses.push(candidate);
     }
   }
 
   if (misses.length > 0) {
-    await mapWithConcurrency(misses, FETCH_CONCURRENCY, async (c) => {
-      const count = await client.countMergedPRs(c.owner, c.repo, c.login);
-      merged.set(c.key, count);
-      cache?.putMergedCount(c.owner, c.repo, c.login, count);
+    await mapWithConcurrency(misses, FETCH_CONCURRENCY, async (candidate) => {
+      const count = await client.countMergedPRs(candidate.owner, candidate.repo, candidate.login);
+      merged[candidate.key] = count;
+      cache?.putMergedCount(candidate.owner, candidate.repo, candidate.login, count);
     });
   }
   log(
-    `quota: merged-count cache — ${parsed.length - misses.length} hit(s), ${misses.length} fetched`,
+    `quota: merged-count cache — ${candidates.length - misses.length} hit(s), ${misses.length} fetched`,
   );
+  return merged;
+}
+
+export function markQuotaExceeded(
+  prs: PullRequest[],
+  mergedCounts: Record<string, number>,
+  exemptLogins: Set<string>,
+): void {
+  const candidates = quotaCandidates(prs, exemptLogins);
+  if (candidates.length === 0) return;
 
   interface Row {
     repo: string;
@@ -151,10 +169,16 @@ export async function enrichQuotaState(
   }
   const rows: Row[] = [];
 
-  for (const c of parsed) {
-    const mergedCount = merged.get(c.key)!;
+  for (const candidate of candidates) {
+    const mergedCount = mergedCounts[candidate.key];
+    if (mergedCount === undefined) {
+      throw new Error(
+        `the snapshot has no merged-PR count for @${candidate.login} in ${candidate.owner}/${candidate.repo}; ` +
+          'it was gathered with a config that exempts this author from the quota',
+      );
+    }
     const quota = calculateQuota(mergedCount);
-    const sorted = [...c.authorPRs].sort(
+    const sorted = [...candidate.authorPRs].sort(
       (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
     );
     const exceeded = sorted.slice(quota);
@@ -163,11 +187,11 @@ export async function enrichQuotaState(
       pr.computed.quotaExceeded = true;
     }
     rows.push({
-      repo: `${c.owner}/${c.repo}`,
-      login: c.login,
+      repo: `${candidate.owner}/${candidate.repo}`,
+      login: candidate.login,
       merged: mergedCount,
       quota,
-      open: c.authorPRs.length,
+      open: candidate.authorPRs.length,
       exceeded: exceeded.length,
     });
   }

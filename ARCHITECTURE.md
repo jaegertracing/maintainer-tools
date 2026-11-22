@@ -253,27 +253,35 @@ publisher just does POST / PATCH / SKIP.
 - Secondary-rate-limit handling: **not yet**. Will batch using `node-octokit`
   throttling plugin once we have a multi-PR consumer (CLI).
 
-## Triage CLI: comparing two versions of the classifier
+## Triage CLI: gathering and deciding
 
-A `TriageSnapshot` (`cli/src/snapshot.ts`) is everything that a triage run
-takes from GitHub and from the clock: the open PRs as fetched, the merged-PR
-counts of the authors that can exceed a quota, the metadata of the issues
-that the PRs claim to close, the viewer, and the time of the run.
+A triage run is two layers with one data structure between them:
 
-`triage --save-snapshot <file>` writes the snapshot of its run. The run wraps
-the GraphQL client with `recordingClient()`, which stores each answer of
-GitHub, and it bypasses the SQLite cache, because an answer from the cache
-does not pass through the client.
+```
+GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──▶ classifySnapshot() ──▶ renderers
+                         cli/src/snapshot.ts                      cli/src/triage-policy.ts
+```
 
-`triage --snapshot <file>` asks GitHub nothing. It runs the same code as a
-run against GitHub, with `snapshotClient()` in place of the GraphQL client:
-an implementation of `GraphqlClient` that looks each answer up in the
-snapshot by the repository, the PR number, the author or the issue. The
-viewer and the clock of the run come from the file as well.
+- **Gathering** is the only layer that talks to GitHub, uses the SQLite
+  cache or reads the clock. `gatherSnapshot()` returns a `TriageSnapshot`:
+  the open PRs as fetched, the merged-PR counts of the authors that can
+  exceed a quota, the metadata of the issues that the PRs claim to close,
+  the viewer, and the time of the run.
+- **Deciding** is `classifySnapshot()`, a function of the snapshot and the
+  config. It computes the quota tiers and the issue collisions, and it
+  classifies every PR.
 
-A change that must not alter the report is therefore checked against real
-data: one run saves its snapshot, and each version of the code classifies
-that file and writes the JSON report:
+`quota.ts` and `issues.ts` each have a part in both layers, so each has one
+function for each layer: `fetchMergedCounts()` and `markQuotaExceeded()`,
+`fetchIssueMeta()` and `attachIssueState()`.
+
+### Comparing two versions of the classifier
+
+`triage --save-snapshot <file>` writes the snapshot, and
+`triage --snapshot <file>` skips the gathering and decides from the file. A
+change that must not alter the report is therefore checked against real data:
+one run saves its snapshot, and each version of the code classifies that file
+and writes the JSON report:
 
 ```bash
 make triage ARGS="--save-snapshot /tmp/snapshot.json"
@@ -290,10 +298,9 @@ the report, because it is in the snapshot. Repositories, PRs and object keys
 are sorted, and the report carries no time of the run, so an empty `diff`
 means that both versions classified every PR the same way. Both runs must use
 the same config, because the maintainers, the priority authors and the
-CODEOWNERS paths are inputs of the classification, and the repositories and
-the priority authors decide what the run looks up in the snapshot. A run with
-`--snapshot` needs no token and no cache, and it rejects the flags that
-control what a run asks GitHub, such as `--limit` and `--pr`.
+CODEOWNERS paths are inputs of the classification. A run with `--snapshot`
+needs no token and no cache, and it rejects the flags that control the
+gathering, such as `--limit` and `--pr`.
 
 ## Triage CLI: bucket classifier
 

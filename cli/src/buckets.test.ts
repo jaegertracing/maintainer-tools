@@ -5,7 +5,7 @@ import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools
 
 import { classify, type ClassifyContext } from './buckets.js';
 import type { TriageConfig } from './config.js';
-import { enrichQuotaState } from './quota.js';
+import { fetchMergedCounts, markQuotaExceeded } from './quota.js';
 import { renderHtml } from './render/html.js';
 import { buildTriagePolicy, classifyAll } from './triage-policy.js';
 
@@ -89,7 +89,8 @@ test('triage policy wires every priority source into classification and quota', 
     },
   } as unknown as GraphqlClient;
 
-  await enrichQuotaState(prs, client, { exemptLogins: policy.priorityAuthors });
+  const mergedCounts = await fetchMergedCounts(prs, client, policy.priorityAuthors);
+  markQuotaExceeded(prs, mergedCounts, policy.priorityAuthors);
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
@@ -348,12 +349,21 @@ test('priority-author quota exemptions are case-insensitive', async () => {
     },
   } as unknown as GraphqlClient;
 
-  await enrichQuotaState(prs, client, { exemptLogins: new Set(['Priority-Author']) });
+  const exemptLogins = new Set(['Priority-Author']);
+  markQuotaExceeded(prs, await fetchMergedCounts(prs, client, exemptLogins), exemptLogins);
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
     prs.map((pr) => classify(pr, context).bucket),
     ['priority-authors', 'priority-authors'],
+  );
+});
+
+test('a snapshot without the merged count of a quota candidate is rejected', () => {
+  const prs = [pullRequest({ number: 1 }), pullRequest({ number: 2 })];
+  assert.throws(
+    () => markQuotaExceeded(prs, {}, new Set()),
+    /no merged-PR count for @contributor in example\/repo/,
   );
 });
 

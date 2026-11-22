@@ -30,7 +30,7 @@ import { log } from './log.js';
 // same day free.
 const DEFAULT_ISSUE_TTL_MS = 6 * 60 * 60 * 1000;
 
-export interface IssueEnrichOptions {
+export interface IssueFetchOptions {
   cache?: PrCache | null;
   issueTtlMs?: number;
 }
@@ -39,51 +39,68 @@ function prKey(pr: PullRequest): string {
   return `${pr.repo.owner}/${pr.repo.name}#${pr.number}`;
 }
 
-export async function enrichIssueState(
+function issueRefsOf(pr: PullRequest): IssueRef[] {
+  return extractIssueRefs(pr.body ?? '', pr.repo.owner, pr.repo.name);
+}
+
+// Returns the metadata of every issue that a PR claims to close, keyed by
+// `refKey()`. An issue that GitHub did not resolve has no entry.
+export async function fetchIssueMeta(
   prs: PullRequest[],
   client: GraphqlClient,
-  opts: IssueEnrichOptions = {},
-): Promise<void> {
+  opts: IssueFetchOptions = {},
+): Promise<Record<string, IssueMeta>> {
   const ttl = opts.issueTtlMs ?? DEFAULT_ISSUE_TTL_MS;
   const cache = opts.cache ?? null;
 
-  // Pass 1: parse refs out of every body. Pure, no network.
   const wanted = new Map<string, IssueRef>();
+  let withRefs = 0;
   for (const pr of prs) {
-    const refs = extractIssueRefs(pr.body ?? '', pr.repo.owner, pr.repo.name);
-    pr.computed = { ...pr.computed, issueRefs: refs };
+    const refs = issueRefsOf(pr);
+    if (refs.length > 0) withRefs++;
     for (const ref of refs) wanted.set(refKey(ref), ref);
   }
-  const withRefs = prs.filter((p) => (p.computed?.issueRefs?.length ?? 0) > 0).length;
   log(
     `issues: ${withRefs}/${prs.length} PR(s) reference an issue; ${wanted.size} distinct issue(s)`,
   );
-  if (wanted.size === 0) return;
+  if (wanted.size === 0) return {};
 
-  // Pass 2: resolve metadata, cache first.
-  const meta = new Map<string, IssueMeta>();
+  // Resolve metadata, cache first.
+  const meta: Record<string, IssueMeta> = {};
   const misses: IssueRef[] = [];
   for (const [key, ref] of wanted) {
     const hit = cache?.getIssue(ref.owner, ref.repo, ref.number, ttl);
-    if (hit) meta.set(key, hit);
+    if (hit) meta[key] = hit;
     else misses.push(ref);
   }
+  let fetchedCount = 0;
   if (misses.length > 0) {
     const fetched = await client.fetchIssues(misses);
+    fetchedCount = fetched.size;
     for (const [key, m] of fetched) {
-      meta.set(key, m);
+      meta[key] = m;
       const ref = wanted.get(key);
       if (ref && cache) cache.putIssue(ref.owner, ref.repo, ref.number, m);
     }
   }
   log(
     `issues: metadata — ${wanted.size - misses.length} cached, ${misses.length} fetched` +
-      (misses.length > meta.size - (wanted.size - misses.length)
-        ? `, ${misses.length - (meta.size - (wanted.size - misses.length))} unresolved`
-        : ''),
+      (misses.length > fetchedCount ? `, ${misses.length - fetchedCount} unresolved` : ''),
   );
+  return meta;
+}
 
-  // Pass 3: attach metadata and compute collisions across the scanned set.
+export function attachIssueState(prs: PullRequest[], issues: Record<string, IssueMeta>): void {
+  // Pass 1: parse refs out of every body.
+  let hasIssueRefs = false;
+  for (const pr of prs) {
+    const refs = issueRefsOf(pr);
+    pr.computed = { ...pr.computed, issueRefs: refs };
+    if (refs.length > 0) hasIssueRefs = true;
+  }
+  if (!hasIssueRefs) return;
+
+  // Pass 2: attach metadata and compute collisions across the scanned set.
   const byIssue = new Map<string, string[]>();
   for (const pr of prs) {
     for (const ref of pr.computed?.issueRefs ?? []) {
@@ -101,8 +118,8 @@ export async function enrichIssueState(
     const others = new Set<string>();
     for (const ref of refs) {
       const key = refKey(ref);
-      const m = meta.get(key);
-      if (m) metaForPr[key] = m;
+      const issueMeta = issues[key];
+      if (issueMeta) metaForPr[key] = issueMeta;
       for (const other of byIssue.get(key) ?? []) {
         if (other !== prKey(pr)) others.add(other);
       }
