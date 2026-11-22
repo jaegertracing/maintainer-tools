@@ -13,6 +13,7 @@ Everything in this repo orbits a single shared TypeScript module:
 packages/checks/                  shared predicate library
 ├── src/types.ts                  CheckResult + PullRequest shape
 ├── src/predicates/*.ts           pure functions: (PR) → CheckResult
+├── src/rules/*.ts                the rule form: policy, evaluator, startup check
 ├── src/graphql.ts                Octokit GraphQL data layer
 └── src/cache.ts                  SQLite cache via node:sqlite (CLI use, see below)
 ```
@@ -34,6 +35,77 @@ Both consumers share **one** TypeScript definition of every check predicate
 property of the architecture: a contributor-facing nudge and a
 maintainer-facing triage bucket are computed from the same code path, so
 they can't drift.
+
+## Vocabulary of the rule form
+
+The rule form in `src/rules/` states as data which facts of a pull request
+lead to which output. This section defines each of its terms, and the code
+and the comments in `src/rules/` use the terms with these meanings only. The
+type that carries a term is named after it, and the comment on the type
+repeats the definition.
+
+- **Base fact** (`BaseFact`): a named boolean of one pull request whose value
+  comes from a predicate.
+- **Predicate** (`Predicate`): the function that reads a pull request and
+  returns the value of one base fact. The predicates are the only code in a
+  policy.
+- **Derived fact** (`DerivedFact`): a named boolean of one pull request that
+  rules decide from other facts. "Fact" alone means a base fact or a derived
+  fact.
+- **Output** (`Output`): a decision that the rules make about a pull request
+  and that one tool acts on. When the output `triage_hidden` holds for a pull
+  request, the triage CLI lists it in the Hidden bucket of the report. When
+  `weekly_digest` holds, the `pr-weekly-digest` action has something to list
+  in the comment that reminds the author of a quiet pull request. Rules
+  decide an output, and no rule reads one. An output is not a fact, so a fact
+  and an output may have the same name.
+- **Rule** (`Rule`): one `.when()` or `.unless()` call, recorded as data. It
+  names a list of facts, which are its **premises**, and one derived fact or
+  output, which is its **conclusion** (`Conclusion`). `hidden.when(draft)`
+  records the rule "if `draft` holds, `hidden` holds". No single rule decides
+  its conclusion: the evaluator reads all the rules of one conclusion.
+- **Reason** and **veto**: the two kinds of rule. A reason makes its
+  conclusion hold, and a veto stops its conclusion from holding, whatever
+  reasons hold. `.when(a, b)` declares a reason with the premises `a` and
+  `b`, and `.unless(a)` declares a veto.
+  Only a derived fact and an output have these two methods, and the function
+  that records a rule is private to the policy, which passes it only to
+  them. A rule therefore cannot decide a base fact or have a conclusion that
+  the policy does not declare. The two methods accept facts only, so a rule
+  cannot read an output.
+- **Holds**: a base fact holds when its predicate returns true. A rule holds
+  when all of its premises hold. A derived fact or an output holds when at
+  least one of its reasons holds and none of its vetoes does.
+- **Change source** (`ChangeSource`): who can change the value of a base
+  fact: the author, a maintainer, or time.
+- **Policy** (`Policy`): the container of the base facts, the derived facts,
+  the outputs and the rules.
+- **Rule set** (`RuleSet`): a policy that `loadRuleSet()` has loaded for
+  evaluation.
+- **Verdict** (`Verdict`): the result of a rule set for one pull request. It
+  names the facts that hold (`factsThatHold`) and the outputs that hold
+  (`outputsThatHold`), and it lists the rules that hold (`rulesThatHold`).
+  `holds(fact)` returns whether one fact holds. It takes the fact object and
+  not its name, so that a misspelled name does not compile.
+  `reasons(conclusion)` and `vetoes(conclusion)` return the premise texts of
+  the reasons and of the vetoes that held for the conclusion.
+- **Violation** (`RuleSetViolation`): a defect that makes a rule set
+  unusable: a dependency cycle, an output that no person can clear, or a
+  rule that never holds. The startup check rejects a rule set that has one
+  by throwing an
+  `InvalidRuleSetError`, which lists the violations.
+- **Output that no person can clear**: an output that a person cannot stop
+  from holding. The output holds for some values of the base facts that time
+  changes, and with those values it holds whatever values the other base
+  facts take. It is a violation. The startup check therefore rejects
+  `triageHidden.when(monthOld, quiet)` when time is the change source of both
+  facts, because once both hold, nothing that a person does stops the output
+  from holding.
+
+Base fact, derived fact, rule and output are concepts of Datalog, which calls
+them extensional fact, intensional fact, rule and output relation. A policy
+is a Datalog program without recursion. The other terms, predicate included,
+are terms of this package.
 
 ## Predicate model
 
