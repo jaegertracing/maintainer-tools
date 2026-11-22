@@ -1,0 +1,769 @@
+{
+  "now": "2026-06-01T12:00:00.000Z",
+  "viewer": "maintainer-a",
+  "pullRequests": [
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 1,
+      "title": "Add a retry budget to the exporter",
+      "url": "https://github.com/example/repo/pull/1",
+      "author": {
+        "login": "alice",
+        "typename": "User"
+      },
+      "authorAssociation": "FIRST_TIME_CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-30T10:00:00Z",
+      "updatedAt": "2026-05-31T10:00:00Z",
+      "labels": [],
+      "additions": 40,
+      "deletions": 2,
+      "changedFiles": 2,
+      "files": ["src/retry.go", "src/retry_test.go"],
+      "fileStats": [
+        {
+          "path": "src/retry.go",
+          "additions": 12,
+          "deletions": 2,
+          "changeType": "modified"
+        },
+        {
+          "path": "src/retry_test.go",
+          "additions": 28,
+          "deletions": 0,
+          "changeType": "added"
+        }
+      ],
+      "statusCheckRollup": "SUCCESS",
+      "headCheckRunsTruncated": false,
+      "headCheckRuns": [
+        {
+          "name": "unit",
+          "conclusion": "success"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "a000001",
+          "messageHeadline": "Add a retry budget to the exporter",
+          "messageBody": "Signed-off-by: Alice <alice@example.com>",
+          "authorEmail": "alice@example.com",
+          "committedDate": "2026-05-31T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "The exporter retried without a limit. This change adds a budget.\n\nFixes #100",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 2,
+      "title": "Limit the exporter retries",
+      "url": "https://github.com/example/repo/pull/2",
+      "author": {
+        "login": "newcomer",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-20T10:00:00Z",
+      "updatedAt": "2026-05-30T10:00:00Z",
+      "labels": [],
+      "additions": 9,
+      "deletions": 1,
+      "changedFiles": 1,
+      "files": ["src/exporter.go"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000002",
+          "messageHeadline": "Limit the exporter retries",
+          "messageBody": "Signed-off-by: Newcomer <newcomer@example.com>",
+          "authorEmail": "newcomer@example.com",
+          "committedDate": "2026-05-30T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [
+        {
+          "author": "maintainer-b",
+          "createdAt": "2026-05-21T10:00:00Z"
+        }
+      ],
+      "body": "Stops the exporter after five attempts.\n\nResolves #100 and relates to other/repo#7.\n\nCloses other/repo#7",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 3,
+      "title": "Fix a typo in the exporter log line",
+      "url": "https://github.com/example/repo/pull/3",
+      "author": {
+        "login": "newcomer",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-31T09:00:00Z",
+      "updatedAt": "2026-05-31T11:00:00Z",
+      "labels": [],
+      "additions": 1,
+      "deletions": 1,
+      "changedFiles": 1,
+      "files": ["src/exporter.go"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000003",
+          "messageHeadline": "Fix a typo in the exporter log line",
+          "messageBody": "Signed-off-by: Newcomer <newcomer@example.com>",
+          "authorEmail": "newcomer@example.com",
+          "committedDate": "2026-05-31T11:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "The log line said \"exproter\". This change corrects it.\n\nFixes #101",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 4,
+      "title": "Rework the sampler configuration",
+      "url": "https://github.com/example/repo/pull/4",
+      "author": {
+        "login": "bob",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "createdAt": "2026-05-10T10:00:00Z",
+      "updatedAt": "2026-05-29T10:00:00Z",
+      "labels": ["release-blocker"],
+      "additions": 120,
+      "deletions": 80,
+      "changedFiles": 2,
+      "files": ["src/sampler.ts", "src/sampler.test.ts"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a0000f4",
+          "messageHeadline": "Merge branch 'main' into sampler",
+          "messageBody": "",
+          "authorEmail": "bob@example.com",
+          "committedDate": "2026-05-28T10:00:00Z",
+          "parents": 2
+        },
+        {
+          "sha": "a000004",
+          "messageHeadline": "Rework the sampler configuration",
+          "messageBody": "The sampler read its rate twice.",
+          "authorEmail": "bob@example.com",
+          "committedDate": "2026-05-29T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [
+        {
+          "kind": "user",
+          "login": "Maintainer-A"
+        },
+        {
+          "kind": "team",
+          "login": "sampling"
+        }
+      ],
+      "reviews": [],
+      "comments": [],
+      "body": "The sampler read its rate from two settings. This change keeps one of them.\n\nFixes #102",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 5,
+      "title": "Update the queue",
+      "url": "https://github.com/example/repo/pull/5",
+      "author": {
+        "login": "carol",
+        "typename": "User"
+      },
+      "authorAssociation": "NONE",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "createdAt": "2026-05-27T10:00:00Z",
+      "updatedAt": "2026-05-28T10:00:00Z",
+      "labels": [],
+      "additions": 30,
+      "deletions": 5,
+      "changedFiles": 1,
+      "files": ["src/queue.py"],
+      "statusCheckRollup": null,
+      "commits": [
+        {
+          "sha": "a000005",
+          "messageHeadline": "Update the queue",
+          "messageBody": "",
+          "authorEmail": "carol@example.com",
+          "committedDate": "2026-05-28T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "## What\n\n## Why\n\n<!-- Describe the change above. -->\n",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 6,
+      "title": "Add the queue size metric",
+      "url": "https://github.com/example/repo/pull/6",
+      "author": {
+        "login": "erin",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-15T10:00:00Z",
+      "updatedAt": "2026-05-25T10:00:00Z",
+      "labels": ["awaiting-maintainer-input"],
+      "additions": 60,
+      "deletions": 0,
+      "changedFiles": 2,
+      "files": ["src/queue.go", "src/queue_test.go"],
+      "statusCheckRollup": "FAILURE",
+      "headCheckRunsTruncated": false,
+      "headCheckRuns": [
+        {
+          "name": "check-label",
+          "conclusion": "failure"
+        },
+        {
+          "name": "unit",
+          "conclusion": "success"
+        },
+        {
+          "name": "lint",
+          "conclusion": null
+        }
+      ],
+      "commits": [
+        {
+          "sha": "a000006",
+          "messageHeadline": "Add the queue size metric",
+          "messageBody": "Signed-off-by: Erin <erin@example.com>",
+          "authorEmail": "erin@example.com",
+          "committedDate": "2026-05-25T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [
+        {
+          "author": "maintainer-a",
+          "state": "COMMENTED",
+          "submittedAt": "2026-05-20T10:00:00Z"
+        }
+      ],
+      "comments": [],
+      "body": "The queue did not report its size. This change adds a gauge for it.\n\nCloses #103",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 7,
+      "title": "Batch the span writes",
+      "url": "https://github.com/example/repo/pull/7",
+      "author": {
+        "login": "frank",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "UNKNOWN",
+      "createdAt": "2026-05-24T10:00:00Z",
+      "updatedAt": "2026-05-26T10:00:00Z",
+      "labels": [],
+      "additions": 200,
+      "deletions": 20,
+      "changedFiles": 2,
+      "files": ["src/writer.go", "src/writer_test.go"],
+      "statusCheckRollup": "FAILURE",
+      "headCheckRunsTruncated": false,
+      "headCheckRuns": [
+        {
+          "name": "check-label",
+          "conclusion": "failure"
+        },
+        {
+          "name": "unit",
+          "conclusion": "failure"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "a000007",
+          "messageHeadline": "Batch the span writes",
+          "messageBody": "Signed-off-by: Frank <frank@example.com>",
+          "authorEmail": "frank@example.com",
+          "committedDate": "2026-05-26T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "The writer sent one request for each span. This change sends them in batches.\n\nFixes #104",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 8,
+      "title": "Describe the sampler settings",
+      "url": "https://github.com/example/repo/pull/8",
+      "author": {
+        "login": "grace",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-26T10:00:00Z",
+      "updatedAt": "2026-05-27T10:00:00Z",
+      "labels": ["missing-issue", "docs"],
+      "additions": 14,
+      "deletions": 0,
+      "changedFiles": 1,
+      "files": ["README.md"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000008",
+          "messageHeadline": "Describe the sampler settings",
+          "messageBody": "Signed-off-by: Grace <grace@example.com>",
+          "authorEmail": "grace@example.com",
+          "committedDate": "2026-05-27T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "The README did not list the settings of the sampler. This change adds a table of them.",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 9,
+      "title": "Document the exporter retries",
+      "url": "https://github.com/example/repo/pull/9",
+      "author": {
+        "login": "heidi",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-26T11:00:00Z",
+      "updatedAt": "2026-05-27T11:00:00Z",
+      "labels": ["Documentation"],
+      "additions": 25,
+      "deletions": 3,
+      "changedFiles": 2,
+      "files": ["docs/exporter.md", "src/exporter.go"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000009",
+          "messageHeadline": "Document the exporter retries",
+          "messageBody": "Signed-off-by: Heidi <heidi@example.com>",
+          "authorEmail": "heidi@example.com",
+          "committedDate": "2026-05-27T11:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [
+        {
+          "author": "maintainer-b",
+          "createdAt": "2026-05-27T09:00:00Z"
+        }
+      ],
+      "body": "The exporter page did not say how many times a request is retried. This change adds it.",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 10,
+      "title": "Cache the service names",
+      "url": "https://github.com/example/repo/pull/10",
+      "author": {
+        "login": "ivan",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-04-01T12:00:00Z",
+      "updatedAt": "2026-04-22T12:00:00Z",
+      "labels": ["pr-quota-reached", "waiting-for-author"],
+      "additions": 75,
+      "deletions": 10,
+      "changedFiles": 2,
+      "files": ["src/cache.rs", "src/cache_test.rs"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000010",
+          "messageHeadline": "Cache the service names",
+          "messageBody": "Signed-off-by: Ivan <ivan@example.com>",
+          "authorEmail": "ivan@example.com",
+          "committedDate": "2026-04-22T12:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "The query service read the service names on every request. This change caches them.",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 11,
+      "title": "Validate the collector endpoint",
+      "url": "https://github.com/example/repo/pull/11",
+      "author": {
+        "login": "judy",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-18T10:00:00Z",
+      "updatedAt": "2026-05-22T10:00:00Z",
+      "labels": ["trivial"],
+      "additions": 18,
+      "deletions": 4,
+      "changedFiles": 1,
+      "files": ["src/endpoint.java"],
+      "statusCheckRollup": "PENDING",
+      "commits": [
+        {
+          "sha": "a000011",
+          "messageHeadline": "Validate the collector endpoint",
+          "messageBody": "Signed-off-by: Judy <judy@example.com>",
+          "authorEmail": "judy@example.com",
+          "committedDate": "2026-05-19T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [
+        {
+          "author": "maintainer-a",
+          "state": "CHANGES_REQUESTED",
+          "submittedAt": "2026-05-20T10:00:00Z"
+        }
+      ],
+      "comments": [],
+      "body": "The collector accepted an endpoint without a scheme. This change rejects it at startup.",
+      "reviewThreads": [
+        {
+          "isResolved": false,
+          "resolvedBy": null,
+          "comments": [
+            {
+              "author": "maintainer-a",
+              "createdAt": "2026-05-20T10:00:00Z"
+            },
+            {
+              "author": "judy",
+              "createdAt": "2026-05-21T10:00:00Z"
+            },
+            {
+              "author": "maintainer-a",
+              "createdAt": "2026-05-22T10:00:00Z"
+            }
+          ]
+        },
+        {
+          "isResolved": true,
+          "resolvedBy": "judy",
+          "comments": [
+            {
+              "author": "maintainer-a",
+              "createdAt": "2026-05-20T10:00:00Z"
+            }
+          ]
+        },
+        {
+          "isResolved": true,
+          "resolvedBy": "judy",
+          "comments": [
+            {
+              "author": "maintainer-a",
+              "createdAt": "2026-05-20T10:00:00Z"
+            },
+            {
+              "author": "judy",
+              "createdAt": "2026-05-21T10:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 12,
+      "title": "Update the tracing library to v2",
+      "url": "https://github.com/example/repo/pull/12",
+      "author": {
+        "login": "renovate",
+        "typename": "Bot"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "createdAt": "2026-05-31T12:00:00Z",
+      "updatedAt": "2026-05-31T12:00:00Z",
+      "labels": ["dependencies"],
+      "additions": 4,
+      "deletions": 4,
+      "changedFiles": 2,
+      "files": ["go.mod", "go.sum"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000012",
+          "messageHeadline": "Update the tracing library to v2",
+          "messageBody": "Signed-off-by: Renovate <bot@example.com>",
+          "authorEmail": "bot@example.com",
+          "committedDate": "2026-05-31T12:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "This change updates the tracing library from v1.9.0 to v2.0.0.",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 13,
+      "title": "Sketch the new storage interface",
+      "url": "https://github.com/example/repo/pull/13",
+      "author": {
+        "login": "priority-author",
+        "typename": "User"
+      },
+      "authorAssociation": "MEMBER",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-31T13:00:00Z",
+      "updatedAt": "2026-05-31T13:00:00Z",
+      "labels": [],
+      "additions": 300,
+      "deletions": 0,
+      "changedFiles": 1,
+      "files": ["src/storage.go"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000013",
+          "messageHeadline": "Sketch the new storage interface",
+          "messageBody": "Signed-off-by: Priority Author <priority@example.com>",
+          "authorEmail": "priority@example.com",
+          "committedDate": "2026-05-31T13:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [],
+      "comments": [],
+      "body": "This draft shows the storage interface that the design document proposes.",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 14,
+      "title": "Remove the unused storage flag",
+      "url": "https://github.com/example/repo/pull/14",
+      "author": {
+        "login": "Priority-Author",
+        "typename": "User"
+      },
+      "authorAssociation": "MEMBER",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-31T14:00:00Z",
+      "updatedAt": "2026-05-31T14:00:00Z",
+      "labels": ["chore"],
+      "additions": 0,
+      "deletions": 12,
+      "changedFiles": 1,
+      "files": ["src/flags.go"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000014",
+          "messageHeadline": "Remove the unused storage flag",
+          "messageBody": "Signed-off-by: Priority Author <priority@example.com>",
+          "authorEmail": "priority@example.com",
+          "committedDate": "2026-05-31T14:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [
+        {
+          "author": "copilot-pull-request-reviewer",
+          "state": "COMMENTED",
+          "submittedAt": "2026-05-31T14:05:00Z",
+          "url": "https://github.com/example/repo/pull/14#pullrequestreview-1",
+          "body": "<!-- ccr-overview-v2 -->\n### 🟢 Approval recommended\n\n**Findings:** 1 <img alt=\"Medium severity\"> 2 <img alt=\"Low severity\">"
+        }
+      ],
+      "comments": [],
+      "body": "No code reads the flag since the storage rewrite. This change deletes it.",
+      "reviewThreads": []
+    },
+    {
+      "repo": {
+        "owner": "example",
+        "name": "repo"
+      },
+      "number": 15,
+      "title": "Bound the span batch size",
+      "url": "https://github.com/example/repo/pull/15",
+      "author": {
+        "login": "kim",
+        "typename": "User"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "createdAt": "2026-05-15T10:00:00Z",
+      "updatedAt": "2026-05-25T10:00:00Z",
+      "labels": [],
+      "additions": 30,
+      "deletions": 5,
+      "changedFiles": 2,
+      "files": ["src/batch.go", "src/batch_test.go"],
+      "statusCheckRollup": "SUCCESS",
+      "commits": [
+        {
+          "sha": "a000015",
+          "messageHeadline": "Bound the span batch size",
+          "messageBody": "Signed-off-by: Kim <kim@example.com>",
+          "authorEmail": "kim@example.com",
+          "committedDate": "2026-05-25T10:00:00Z",
+          "parents": 1
+        }
+      ],
+      "reviewRequests": [],
+      "reviews": [
+        {
+          "author": "maintainer-a",
+          "state": "CHANGES_REQUESTED",
+          "submittedAt": "2026-05-20T10:00:00Z"
+        }
+      ],
+      "comments": [],
+      "body": "A batch of spans had no upper bound. This change caps it at the configured size.",
+      "reviewThreads": []
+    }
+  ],
+  "mergedCounts": {
+    "example/repo|newcomer": 0
+  },
+  "issues": {
+    "example/repo#100": {
+      "author": "maintainer-b",
+      "state": "OPEN",
+      "title": "Exporter retries without a budget",
+      "isPullRequest": false
+    },
+    "other/repo#7": {
+      "author": "maintainer-a",
+      "state": "OPEN",
+      "title": "Share the retry settings",
+      "isPullRequest": false
+    },
+    "example/repo#101": {
+      "author": "newcomer",
+      "state": "CLOSED",
+      "title": "Typo in the exporter log line",
+      "isPullRequest": false
+    },
+    "example/repo#103": {
+      "author": "erin",
+      "state": "MERGED",
+      "title": "Add the queue size setting",
+      "isPullRequest": true
+    },
+    "example/repo#104": {
+      "author": "maintainer-a",
+      "state": "OPEN",
+      "title": "Sampler drops the first span",
+      "isPullRequest": false
+    }
+  }
+}

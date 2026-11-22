@@ -11,3 +11,6 @@ pr-nudge/dist/
 pr-quota/dist/
 pr-weekly-digest/dist/
 .claude/
+
+# A test compares this file byte for byte with the report that the CLI writes.
+cli/testdata/triage/report.json

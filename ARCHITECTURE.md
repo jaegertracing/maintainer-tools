@@ -253,6 +253,48 @@ publisher just does POST / PATCH / SKIP.
 - Secondary-rate-limit handling: **not yet**. Will batch using `node-octokit`
   throttling plugin once we have a multi-PR consumer (CLI).
 
+## Triage CLI: comparing two versions of the classifier
+
+A `TriageSnapshot` (`cli/src/snapshot.ts`) is everything that a triage run
+takes from GitHub and from the clock: the open PRs as fetched, the merged-PR
+counts of the authors that can exceed a quota, the metadata of the issues
+that the PRs claim to close, the viewer, and the time of the run.
+
+`triage --save-snapshot <file>` writes the snapshot of its run. The run wraps
+the GraphQL client with `recordingClient()`, which stores each answer of
+GitHub, and it bypasses the SQLite cache, because an answer from the cache
+does not pass through the client.
+
+`triage --snapshot <file>` asks GitHub nothing. It runs the same code as a
+run against GitHub, with `snapshotClient()` in place of the GraphQL client:
+an implementation of `GraphqlClient` that looks each answer up in the
+snapshot by the repository, the PR number, the author or the issue. The
+viewer and the clock of the run come from the file as well.
+
+A change that must not alter the report is therefore checked against real
+data: one run saves its snapshot, and each version of the code classifies
+that file and writes the JSON report:
+
+```bash
+make triage ARGS="--save-snapshot /tmp/snapshot.json"
+make triage ARGS="--snapshot /tmp/snapshot.json --format json --output /tmp/before.json"
+# switch to the changed code
+make triage ARGS="--snapshot /tmp/snapshot.json --format json --output /tmp/after.json"
+diff /tmp/before.json /tmp/after.json
+```
+
+The JSON report holds, for each repository, the number of every PR with what
+was decided for it: its bucket, its reasons, its flags, its facets, its
+Copilot verdict and the result of each predicate. The fetched PR is not in
+the report, because it is in the snapshot. Repositories, PRs and object keys
+are sorted, and the report carries no time of the run, so an empty `diff`
+means that both versions classified every PR the same way. Both runs must use
+the same config, because the maintainers, the priority authors and the
+CODEOWNERS paths are inputs of the classification, and the repositories and
+the priority authors decide what the run looks up in the snapshot. A run with
+`--snapshot` needs no token and no cache, and it rejects the flags that
+control what a run asks GitHub, such as `--limit` and `--pr`.
+
 ## Triage CLI: bucket classifier
 
 `cli/src/buckets.ts` is a pure function that lands every open PR in
