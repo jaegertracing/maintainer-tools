@@ -8,11 +8,10 @@ The RFCs follow the conventions of the main Jaeger repository, which its [RFC RE
 
 - The file name is `NNNN-short-slug.md`, with the next number in sequence. The title is `# RFC NNNN: Title`.
 - Files that accompany an RFC, such as test scripts and images, go in a directory `NNNN-short-slug/` next to it.
-- A new RFC adds an entry to the index below, with the marker of its status. A PR that changes the status of an RFC changes the marker.
+- A new RFC adds an entry to the index below.
 
 ## RFCs in This Repository
 
-Each entry is marked with the status of the RFC: ✅ Implemented · 🚧 Partially implemented · 📝 Draft · ♻️ Superseded. The `Status` header of the RFC is the source of truth.
-
-- 🚧 [RFC 0001: Maintainer PR Triage and Nudge Tooling](./0001-maintainer-pr-triage-tooling.md): a shared library of PR predicates behind the triage report and the contributor nudges.
-- 🚧 [RFC 0002: Sharper triage signal](./0002-triage-signal.md): diff composition, referenced issues and ordering in the triage report.
+- [RFC 0001: Maintainer PR Triage and Nudge Tooling](./0001-maintainer-pr-triage-tooling.md): a shared library of PR predicates behind the triage report and the contributor nudges.
+- [RFC 0002: Sharper triage signal](./0002-triage-signal.md): diff composition, referenced issues and ordering in the triage report.
+- [RFC 0003: Automating the Lifecycle of Issues and Pull Requests in Jaeger](./0003-issue-and-pr-lifecycle-automation.md): one reconciler that derives the labels, the comment and the closing of a pull request from declarative rules.
