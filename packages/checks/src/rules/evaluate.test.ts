@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { PullRequest } from '../types.js';
-import { loadRuleSet } from './evaluate.js';
+import { loadRuleSet, supportingFacts } from './evaluate.js';
 import type { Verdict } from './evaluate.js';
 import { OutputName, Policy } from './model.js';
 import type { Conclusion } from './model.js';
@@ -157,3 +157,29 @@ test('a rule is evaluated after the rules of the derived fact that it reads', ()
   assert.deepEqual(verdict.factsThatHold, ['stale', 'blocked']);
   assert.deepEqual(verdict.outputsThatHold, ['triage_hidden']);
 });
+
+// Only `ci_failing` has a summary.
+const SUPPORTING_FACTS_CASES: readonly { name: string; labels: string[]; expected: string[] }[] = [
+  {
+    name: 'a base fact with a summary that a derived fact holds by',
+    labels: ['ci-failing', 'stale'],
+    expected: ['ci_failing'],
+  },
+  {
+    name: 'no fact when the output does not hold',
+    labels: ['ci-failing', 'label-gate'],
+    expected: [],
+  },
+  {
+    name: 'no fact behind a reason that a veto stopped',
+    labels: ['ci-failing', 'label-gate', 'stale'],
+    expected: [],
+  },
+];
+
+for (const { name, labels, expected } of SUPPORTING_FACTS_CASES) {
+  test(`supportingFacts returns ${name}`, () => {
+    const verdict = ruleSet().evaluate(pullRequest(labels), NOW);
+    assert.deepEqual(supportingFacts(verdict, OutputName.TriageHidden), expected);
+  });
+}

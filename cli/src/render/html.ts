@@ -593,7 +593,7 @@ function renderCopilot(c: ClassifiedPR): string {
 // come from the bucket classifier in one of three forms:
 //   - `draft`              -> author opened it as a draft
 //   - `bot-authored`       -> non-dependency bot author
-//   - `hide:<predicate_id>` -> a predicate with hidesFromTriage=true fired
+//   - `hide:<predicate_id>` -> the predicate hides the PR from triage
 // Normalize to a SHORT-DASH-CASE label.
 function renderHideReason(raw: string): string {
   const label = hideReasonLabel(raw);

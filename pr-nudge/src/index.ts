@@ -1,8 +1,9 @@
 // pr-nudge entrypoint.
 //
 // Reads the PR referenced by the triggering event (pull_request /
-// pull_request_target / issue_comment on a PR), runs the requested P0
-// predicates, and publishes one Check Run per `publishesCheck` predicate.
+// pull_request_target / issue_comment on a PR), evaluates the rules, and
+// publishes one Check Run per requested check that has a check run and
+// applies to the PR.
 // Label management for `waiting_for_author` is wired up in P3; for now this
 // action's write surface is limited to Check Runs to keep blast radius small
 // during the P0 bootstrap.
@@ -10,12 +11,14 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {
+  CHECK_FACTS,
   CHECK_IDS,
   type CheckId,
-  type CheckResult,
   createGraphqlClient,
-  runAll,
+  ruleSet,
 } from '@jaegertracing/maintainer-tools-checks';
+
+import { newCheckRun } from './check-runs.js';
 
 const KNOWN_IDS: ReadonlySet<CheckId> = new Set(CHECK_IDS);
 
@@ -71,9 +74,10 @@ async function run(): Promise<void> {
   const pr = await gql.fetchPullRequest(ref.owner, ref.repo, ref.number);
   core.info(`pr-nudge: evaluating ${ref.owner}/${ref.repo}#${ref.number}`);
 
-  const results = runAll(pr, rules);
-  for (const r of results) {
-    logResult(r);
+  const verdict = ruleSet.evaluate(pr, { now: new Date() });
+  for (const id of rules) {
+    const tag = verdict.holds(CHECK_FACTS[id]) ? 'TRIGGERED' : 'ok';
+    core.info(`[${tag}] ${id}: ${verdict.summary(id)!}`);
   }
 
   const octokit = github.getOctokit(token);
@@ -83,31 +87,22 @@ async function run(): Promise<void> {
     return;
   }
 
-  for (const r of results.filter((x) => x.publishesCheck)) {
+  for (const id of rules) {
+    const checkRun = newCheckRun(id, verdict);
+    if (!checkRun) continue;
     if (dryRun) {
-      core.info(`[dry-run] would publish Check Run: ${r.id} -> ${r.checkConclusion}`);
+      core.info(`[dry-run] would publish Check Run: ${id} -> ${checkRun.conclusion}`);
       continue;
     }
     await octokit.rest.checks.create({
       owner: ref.owner,
       repo: ref.repo,
-      name: `maintainer-tools: ${r.id}`,
       head_sha: head.sha,
       status: 'completed',
-      conclusion: r.checkConclusion ?? 'neutral',
-      output: {
-        title: r.summary,
-        summary: r.summary,
-        text: r.details ?? '',
-      },
+      ...checkRun,
     });
-    core.info(`Published Check Run: ${r.id} (${r.checkConclusion})`);
+    core.info(`Published Check Run: ${id} (${checkRun.conclusion})`);
   }
-}
-
-function logResult(r: CheckResult): void {
-  const tag = r.triggered ? 'TRIGGERED' : 'ok';
-  core.info(`[${tag}] ${r.id}: ${r.summary}`);
 }
 
 run().catch((err: unknown) => {

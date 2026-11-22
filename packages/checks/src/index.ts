@@ -5,13 +5,11 @@ export { CHECK_IDS } from './types.js';
 export type {
   CheckId,
   CheckConclusion,
-  CheckResult,
   FileChange,
   IssueMeta,
   IssueRef,
-  PredicateOptions,
   PullRequest,
-  ResolvedPredicateOptions,
+  PredicateContext,
 } from './types.js';
 export {
   classifyPath,
@@ -22,6 +20,21 @@ export {
   type FileClass,
 } from './composition.js';
 export { extractIssueRefs, hasIssueRef, issueUrl, parseRefKey, refKey } from './issue-refs.js';
-export { runAll } from './predicates/index.js';
+export { checkRunConclusion } from './predicates/index.js';
+export {
+  CHECK_FACTS,
+  dcoMissing,
+  labelOnlyFailure,
+  mergeConflict,
+  noLinkedIssue,
+  noTestsForCodeChange,
+  resolvedWithoutReply,
+  ruleSet,
+  staleOnAuthor,
+  unresolvedFromReviewer,
+} from './policy.js';
+export { supportingFacts } from './rules/evaluate.js';
+export type { Verdict } from './rules/evaluate.js';
+export { OutputName } from './rules/model.js';
 export { createGraphqlClient } from './graphql.js';
 export type { GraphqlClient, PrSummary } from './graphql.js';

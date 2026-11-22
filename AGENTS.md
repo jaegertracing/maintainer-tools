@@ -99,8 +99,8 @@ rules of the outputs (`policy.triageHidden.when(...)`,
 `policy.weeklyDigest.when(...)`). A check
 with a check run is listed in `predicates/index.ts`, and `policy.ts` declares
 the fact `<id>_applies` only when the check run is not published for every PR.
-`runAll()` reports them per check as
-`hidesFromTriage`, `inDigest` and `publishesCheck`. The `summary` string that
+The consumers evaluate the rules with
+`ruleSet.evaluate()` and read the verdict. The `summary` string that
 a predicate returns is reused verbatim in the
 Checks panel and the digest — keep it short and self-contained. After a
 change of the rules, run `pnpm run decision-tables` in `packages/checks` and

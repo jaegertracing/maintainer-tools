@@ -5,7 +5,20 @@
 // signal). The Hidden bucket absorbs PRs that aren't actionable until the
 // contributor moves.
 //
-import { type CheckResult, type PullRequest, runAll } from '@jaegertracing/maintainer-tools-checks';
+import {
+  labelOnlyFailure,
+  mergeConflict,
+  noLinkedIssue,
+  noTestsForCodeChange,
+  resolvedWithoutReply,
+  staleOnAuthor,
+  supportingFacts,
+  type PullRequest,
+  ruleSet,
+  OutputName,
+  unresolvedFromReviewer,
+  type Verdict,
+} from '@jaegertracing/maintainer-tools-checks';
 
 import { type CopilotReview, copilotReview } from './copilot.js';
 import { hasLogin, sameLogin } from './logins.js';
@@ -106,8 +119,9 @@ export interface ClassifiedPR {
   bucket: Bucket;
   // Reasons the classifier picked this bucket (for tooltips/debugging).
   reasons: string[];
-  // Predicate results applied for hide rules and per-row flags.
-  checks: CheckResult[];
+  // The facts of the PR, which the hide rules, the row flags and the
+  // renderers read.
+  verdict: Verdict;
   // Inline row flags derived from PR state, not from a single predicate.
   flags: RowFlag[];
   facets: Facets;
@@ -139,11 +153,11 @@ export interface Facets {
 export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
-  const checks = runAll(pr, undefined, { now: ctx.now });
-  const flags = computeFlags(pr, checks, ctx);
+  const verdict = ruleSet.evaluate(pr, { now: ctx.now });
+  const flags = computeFlags(pr, verdict, ctx);
   const reasons: string[] = [];
 
-  // --- Hide rules first. Any predicate that declared hidesFromTriage wins
+  // --- Hide rules first. The `triage_hidden` output of the rules wins
   // unless an explicit "you" signal overrides (review-requested overrides
   // because GitHub's request is the strongest signal a maintainer can send).
   // ignoreReviewRequestedOnYou switches this signal off entirely — GitHub
@@ -157,7 +171,9 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   // A PR can trip more than one hide predicate at once (e.g. stale AND
   // quota-exceeded); report all of them so the report doesn't silently
   // mask one behind whichever predicate happens to run first.
-  const hiddenByChecks = checks.filter((c) => c.triggered && c.hidesFromTriage);
+  const hideReasonsOfFacts = supportingFacts(verdict, OutputName.TriageHidden).map(
+    (fact) => `hide:${fact}`,
+  );
   const changesRequestedPending =
     latestReviewState(viewerReviews) === 'CHANGES_REQUESTED' &&
     !authorActedSinceViewerReview(pr, viewerReviews, ctx.viewer);
@@ -165,7 +181,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
 
   const hideReasons: string[] = [];
   if (pr.isDraft) hideReasons.push('draft');
-  hideReasons.push(...hiddenByChecks.map((c) => `hide:${c.id}`));
+  hideReasons.push(...hideReasonsOfFacts);
   if (pr.labels.includes('waiting-for-author')) hideReasons.push('waiting-for-author');
   if (changesRequestedPending) hideReasons.push('changes-requested');
   if (isBotAuthor(pr) && !isDependencyBot(pr)) hideReasons.push('bot-authored');
@@ -187,7 +203,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     pr,
     bucket,
     reasons,
-    checks,
+    verdict,
     flags,
     facets,
     copilot,
@@ -205,11 +221,8 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (pr.isDraft && !explicitlyRequested) {
     return mk('hidden', ['draft']);
   }
-  if (hiddenByChecks.length > 0 && !explicitlyRequested) {
-    return mk(
-      'hidden',
-      hiddenByChecks.map((c) => `hide:${c.id}`),
-    );
+  if (hideReasonsOfFacts.length > 0 && !explicitlyRequested) {
+    return mk('hidden', hideReasonsOfFacts);
   }
   if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
     return mk('hidden', ['waiting-for-author']);
@@ -390,33 +403,28 @@ function anyFileMatches(files: string[], patterns: string[]): boolean {
   return files.some((f) => patterns.some((p) => matchesGlob(f, p)));
 }
 
-function computeFlags(pr: PullRequest, checks: CheckResult[], ctx: ClassifyContext): RowFlag[] {
+function computeFlags(pr: PullRequest, verdict: Verdict, ctx: ClassifyContext): RowFlag[] {
   const flags: RowFlag[] = [];
   flags.push(...issueFlags(pr, ctx));
   if (pr.isDraft) flags.push('DRAFT');
   if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
-  if (checks.some((c) => c.id === 'merge_conflict' && c.triggered)) flags.push('MERGE-CONFLICT');
-  if (checks.some((c) => c.id === 'stale_on_author' && c.triggered)) flags.push('STALE');
+  if (verdict.holds(mergeConflict)) flags.push('MERGE-CONFLICT');
+  if (verdict.holds(staleOnAuthor)) flags.push('STALE');
   if (pr.labels.includes('awaiting-maintainer-input')) flags.push('QUESTION');
   if (pr.labels.includes('waiting-for-author')) flags.push('WAITING-FOR-AUTHOR');
 
   // P3 predicates: each fires as a visible row flag when triggered, so a
   // maintainer can spot it at a glance in the triage table. A predicate that
-  // also hides the PR does so through its own `hidesFromTriage`.
-  if (checks.some((c) => c.id === 'ci_failing' && c.triggered && c.labelOnlyFailure))
-    flags.push('NEEDS-LABEL');
-  if (checks.some((c) => c.id === 'no_linked_issue' && c.triggered)) flags.push('NO-ISSUE');
-  if (checks.some((c) => c.id === 'no_tests_for_code_change' && c.triggered)) {
-    flags.push('NO-TESTS');
-  }
-  if (checks.some((c) => c.id === 'unresolved_from_reviewer' && c.triggered)) {
-    flags.push('UNRESOLVED');
-  }
-  if (checks.some((c) => c.id === 'resolved_without_reply' && c.triggered)) {
+  // also hides the PR does so through a rule for `triage_hidden`.
+  if (verdict.holds(labelOnlyFailure)) flags.push('NEEDS-LABEL');
+  if (verdict.holds(noLinkedIssue)) flags.push('NO-ISSUE');
+  if (verdict.holds(noTestsForCodeChange)) flags.push('NO-TESTS');
+  if (verdict.holds(unresolvedFromReviewer)) flags.push('UNRESOLVED');
+  if (verdict.holds(resolvedWithoutReply)) {
     // Per the RFC, surface the offender count so a maintainer can decide
     // whether to re-open. Recomputed here from pr.reviewThreads rather
-    // than threaded through CheckResult — same data, no extra plumbing.
+    // than threaded through the verdict — same data, no extra plumbing.
     const count = countResolvedWithoutReply(pr);
     flags.push(`RESOLVED-W/O-REPLY: ${count}`);
   }
