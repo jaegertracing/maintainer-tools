@@ -6,7 +6,7 @@
 and a set of per-tool **GitHub Actions** (consumed via
 `uses: jaegertracing/maintainer-tools/<tool>@vX.Y.Z`) that automate PR triage
 and nudges for the Jaeger org. Design: see
-[`docs/rfc/maintainer-pr-triage-tooling.md`](docs/rfc/maintainer-pr-triage-tooling.md).
+[`docs/rfc/0001-maintainer-pr-triage-tooling.md`](docs/rfc/0001-maintainer-pr-triage-tooling.md).
 
 ## Task Completion Criteria
 
@@ -163,7 +163,7 @@ upgrades are grouped. Patch/digest upgrades to workflows are also disabled.
 
 ## Pointers
 
-- Design: [`docs/rfc/maintainer-pr-triage-tooling.md`](docs/rfc/maintainer-pr-triage-tooling.md)
+- Design: [`docs/rfc/0001-maintainer-pr-triage-tooling.md`](docs/rfc/0001-maintainer-pr-triage-tooling.md)
 - The two JS scripts being migrated currently live at
   `https://github.com/jaegertracing/jaeger/.github/scripts/` (`waiting-for-author.js`,
   `pr-quota-manager.js`).

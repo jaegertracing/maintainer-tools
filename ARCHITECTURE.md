@@ -1,7 +1,7 @@
 # Architecture
 
 A code-level companion to the design doc in
-[`docs/rfc/maintainer-pr-triage-tooling.md`](docs/rfc/maintainer-pr-triage-tooling.md).
+[`docs/rfc/0001-maintainer-pr-triage-tooling.md`](docs/rfc/0001-maintainer-pr-triage-tooling.md).
 The RFC is the _why_; this document is the _how_ — where things live, how
 data flows, and which extension points exist.
 
@@ -318,5 +318,5 @@ collapsed.
 
 ## See also
 
-- [`docs/rfc/maintainer-pr-triage-tooling.md`](docs/rfc/maintainer-pr-triage-tooling.md) — full design rationale, predicate table, implementation phases.
+- [`docs/rfc/0001-maintainer-pr-triage-tooling.md`](docs/rfc/0001-maintainer-pr-triage-tooling.md) — full design rationale, predicate table, implementation phases.
 - [`AGENTS.md`](AGENTS.md) — contributor and AI-agent instructions: build/lint commands, commit conventions, DCO sign-off requirement.

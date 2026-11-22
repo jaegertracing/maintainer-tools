@@ -1,4 +1,4 @@
-# RFC: Maintainer PR Triage and Nudge Tooling
+# RFC 0001: Maintainer PR Triage and Nudge Tooling
 
 * **Status**: RFC
 * **Last Updated**: 2026-09-20

@@ -467,7 +467,7 @@ cache, so they're unaffected.
 
 ## Further reading
 
-- [`docs/rfc/maintainer-pr-triage-tooling.md`](docs/rfc/maintainer-pr-triage-tooling.md)
+- [`docs/rfc/0001-maintainer-pr-triage-tooling.md`](docs/rfc/0001-maintainer-pr-triage-tooling.md)
   — the design document, including phase roadmap and trade-offs.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — how the repo is laid out
   internally, the data flow, the publisher decision tree, and extension

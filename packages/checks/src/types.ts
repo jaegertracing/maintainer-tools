@@ -3,7 +3,7 @@
 // Every check is a pure function `(pr: PullRequest) => CheckResult`. A
 // CheckResult declares which surfaces (Checks panel, weekly digest, triage
 // report) it publishes to, independently of whether the check `triggered`.
-// See the RFC: docs/rfc/maintainer-pr-triage-tooling.md ("Predicate library").
+// See the RFC: docs/rfc/0001-maintainer-pr-triage-tooling.md ("Predicate library").
 
 export type CheckId =
   | 'dco_missing'

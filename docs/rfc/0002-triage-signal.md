@@ -1,8 +1,8 @@
-# RFC: Sharper triage signal
+# RFC 0002: Sharper triage signal
 
 **Status:** Phase 1 implemented; phase 2 not started
 **Date:** 2026-08-14
-**Extends:** [`maintainer-pr-triage-tooling.md`](maintainer-pr-triage-tooling.md)
+**Extends:** [`0001-maintainer-pr-triage-tooling.md`](0001-maintainer-pr-triage-tooling.md)
 
 Delivered by [#51](https://github.com/jaegertracing/maintainer-tools/pull/51)
 (diff composition, referenced issues, source-line ordering),

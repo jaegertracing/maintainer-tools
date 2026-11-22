@@ -2,7 +2,7 @@ name: 'Jaeger maintainer-tools PR Nudge'
 description: >
   Computes PR predicates (DCO, CI rollup, merge conflict, staleness) and
   publishes results to the GitHub Checks panel + manages a small set of state
-  labels. P0 scope; see docs/rfc/maintainer-pr-triage-tooling.md.
+  labels. P0 scope; see docs/rfc/0001-maintainer-pr-triage-tooling.md.
 author: 'Jaeger maintainers'
 inputs:
   github-token:
