@@ -42,9 +42,7 @@ for (const status of [500, 502, 503, 504]) {
 }
 
 for (const error of [
-  ...[400, 401, 403, 404, 422, 429].map((status) =>
-    Object.assign(new Error('rejected'), { status }),
-  ),
+  ...[400, 401, 403, 404, 422].map((status) => Object.assign(new Error('rejected'), { status })),
   new Error('GraphQL validation failed'),
   Object.assign(new Error('aborted'), { name: 'AbortError', status: 500 }),
 ]) {

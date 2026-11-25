@@ -64,17 +64,24 @@ export interface PullRequest {
   number: number;
   title: string;
   url: string;
-  author: { login: string; typename: AuthorTypename } | null;
+  headRefOid?: string;
+  // Commit OID of the base branch ref against which the PR is targeted.
+  baseRefOid?: string;
+  author: { login: string; typename: AuthorTypename | null } | null;
   authorAssociation: AuthorAssociation;
   isDraft: boolean;
   mergeable: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   createdAt: string;
   updatedAt: string;
   labels: string[];
+  labelsTruncated?: boolean;
   additions: number;
   deletions: number;
   changedFiles: number;
-  files: string[]; // first 100 paths
+  files: string[];
+  // Optional for legacy cache entries; undefined is treated as incomplete by
+  // consumers that need an exhaustive file list.
+  filesTruncated?: boolean;
   // Per-file line counts for the same first-100 files. Optional because
   // entries cached before the field existed don't have it; consumers fall
   // back to the whole-PR `additions`/`deletions` totals. Path-only consumers
@@ -92,25 +99,46 @@ export interface PullRequest {
     messageHeadline: string;
     messageBody: string;
     authorEmail: string | null;
+    authorLogin?: string | null;
+    authorTypename?: AuthorTypename | null;
     committedDate: string;
     parents: number;
+    parentOids?: string[];
+    parentsTruncated?: boolean;
+    changedFilesIfAvailable?: number | null;
   }>;
-  // Pending requests (no review submitted yet). Users + teams.
-  reviewRequests: Array<{ kind: 'user' | 'team'; login: string }>;
+  commitsTruncated?: boolean;
+  // Pending requests (no review submitted yet). Users, teams, and enterprise teams.
+  reviewRequests: Array<
+    | { kind: 'user'; login: string }
+    | { kind: 'team'; login: string }
+    | { kind: 'enterprise_team'; login: string; enterpriseSlug?: string }
+  >;
+  reviewRequestsTruncated?: boolean;
   // Submitted reviews (most recent per reviewer is typically what matters).
   reviews: Array<{
+    id?: string;
     author: string | null;
+    authorTypename?: AuthorTypename | null;
     state: ReviewState;
     submittedAt: string;
+    commitOid?: string | null;
     // Review URL and body. Only the triage CLI reads them (GitHub Copilot's
     // review overview); the actions carry them because the query is shared.
     // Optional so consumers degrade gracefully when they are absent.
     url?: string;
     body?: string;
   }>;
+  reviewsTruncated?: boolean;
   // Issue-style PR comments (last 50). Used by triage to decide whether a
   // maintainer has responded yet; not used by predicates.
-  comments: Array<{ author: string | null; createdAt: string }>;
+  comments: Array<{
+    author: string | null;
+    authorTypename?: AuthorTypename | null;
+    authorAssociation?: AuthorAssociation;
+    createdAt: string;
+  }>;
+  commentsTruncated?: boolean;
 
   // PR description body. Used by `description_empty` and `no_linked_issue`.
   // May be empty string (PR opened with no body) or undefined (legacy
@@ -122,12 +150,28 @@ export interface PullRequest {
   // `unresolved_from_reviewer` and `resolved_without_reply`. Optional for
   // the same legacy-cache reason as `body`.
   reviewThreads?: Array<{
+    path?: string;
     isResolved: boolean;
     // Login of the user who resolved the thread, if resolved. Used by
     // `resolved_without_reply` to detect author-resolved-without-reply.
     resolvedBy: string | null;
-    comments: Array<{ author: string | null; createdAt: string }>;
+    commentsTruncated?: boolean;
+    comments: Array<{
+      author: string | null;
+      authorTypename: AuthorTypename | null;
+      authorAssociation: AuthorAssociation;
+      createdAt: string;
+      commitOid?: string | null;
+      originalCommitOid?: string | null;
+      pullRequestReview?: {
+        id?: string;
+        state: ReviewState;
+        submittedAt: string | null;
+        commitOid?: string | null;
+      } | null;
+    }>;
   }>;
+  reviewThreadsTruncated?: boolean;
 
   // Individual check runs on the head commit. Populated from the GitHub
   // CheckRun / StatusContext contexts on the head commit's statusCheckRollup.
@@ -200,3 +244,48 @@ export interface IssueMeta {
 // Subset of GraphQL Actor __typename we care about.
 export type AuthorTypename =
   'User' | 'Bot' | 'EnterpriseUserAccount' | 'Mannequin' | 'Organization';
+
+// Neutral next-actor assignment for public triage.
+export type NextActor = 'author' | 'reviewer' | 'maintainer' | 'bot';
+
+export interface ActorClassification {
+  nextActor: NextActor;
+  isDraft: boolean;
+  isBotAuthored: boolean;
+  isDependencyBot: boolean;
+  reason: string;
+  turnStartedAt: string;
+  warnings?: string[];
+}
+
+export type DashboardSectionKey =
+  | 'ready_to_merge'
+  | 'waiting_on_reviewers'
+  | 'waiting_on_authors'
+  | 'draft_prs'
+  | 'dependency_updates';
+
+export interface DashboardItem {
+  pr: PullRequest;
+  classification: ActorClassification;
+  waitingDurationMs: number;
+  isInactiveAuthor?: boolean;
+}
+
+export interface DashboardSection {
+  key: DashboardSectionKey;
+  title: string;
+  items: DashboardItem[];
+  totalCount: number;
+  omittedCount: number;
+  inactiveAuthorCount?: number;
+}
+
+export interface DashboardData {
+  repo: { owner: string; name: string };
+  sections: DashboardSection[];
+  generatedAt: string;
+}
+
+export type MaintainerConfig =
+  { status: 'available'; logins: ReadonlySet<string> } | { status: 'unavailable' };

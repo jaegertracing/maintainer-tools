@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
-import { classify, type ClassifyContext } from './buckets.js';
+import { classify, matchesGlob, type ClassifyContext } from './buckets.js';
 import type { TriageConfig } from './config.js';
 import { enrichQuotaState } from './quota.js';
 import { renderHtml } from './render/html.js';
@@ -25,7 +25,7 @@ const context: ClassifyContext = {
 };
 
 function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
-  return {
+  const result: PullRequest = {
     repo: { owner: 'example', name: 'repo' },
     number: 1,
     title: 'Test priority-author classification',
@@ -57,6 +57,14 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
     comments: [],
     body: 'This pull request has a complete description.\n\nCloses #1',
     ...overrides,
+  };
+  return {
+    ...result,
+    commits: result.commits.map((commit) =>
+      commit.authorLogin === undefined
+        ? { ...commit, authorLogin: result.author?.login ?? null }
+        : commit,
+    ),
   };
 }
 
@@ -391,6 +399,7 @@ test('author replies are case-insensitive for bottleneck detection', () => {
         messageHeadline: 'Test priority-author classification',
         messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
         authorEmail: 'contributor@example.com',
+        authorLogin: 'contributor',
         committedDate: hoursAgo(4),
         parents: 1,
       },
@@ -432,4 +441,193 @@ test('the stale check uses the injected clock, not the wall clock', () => {
   assert.ok(!fresh.facets.hideReasons.includes('hide:stale_on_author'));
   const later = classify(pr, { ...context, now: new Date('2020-03-01T00:00:00Z') });
   assert.ok(later.facets.hideReasons.includes('hide:stale_on_author'));
+});
+test('unbracketed bot logins such as codecov and release-please are classified as bot-authored', () => {
+  const prCodecov = pullRequest({
+    author: { login: 'codecov', typename: 'User' },
+  });
+  const classifiedCodecov = classify(prCodecov, context);
+  assert.equal(classifiedCodecov.bucket, 'hidden');
+  assert.ok(classifiedCodecov.reasons.includes('bot-authored'));
+
+  const prReleasePlease = pullRequest({
+    author: { login: 'release-please', typename: 'User' },
+  });
+  const classifiedReleasePlease = classify(prReleasePlease, context);
+  assert.equal(classifiedReleasePlease.bucket, 'hidden');
+  assert.ok(classifiedReleasePlease.reasons.includes('bot-authored'));
+});
+
+test('dependency bot logins such as renovate and dependabot land in dependency-bots bucket', () => {
+  const prRenovate = pullRequest({
+    author: { login: 'renovate', typename: 'User' },
+  });
+  const classifiedRenovate = classify(prRenovate, context);
+  assert.equal(classifiedRenovate.bucket, 'dependency-bots');
+
+  const prRenovateBot = pullRequest({
+    author: { login: 'renovate-bot', typename: 'User' },
+  });
+  const classifiedRenovateBot = classify(prRenovateBot, context);
+  assert.equal(classifiedRenovateBot.bucket, 'dependency-bots');
+});
+
+test('a later COMMENTED review does not clear an active changes request', () => {
+  const pr = pullRequest({
+    commits: [
+      {
+        sha: 'abc1234',
+        messageHeadline: 'Existing revision',
+        messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
+        authorEmail: 'contributor@example.com',
+        authorLogin: 'contributor',
+        committedDate: hoursAgo(6),
+        parents: 1,
+      },
+    ],
+    reviews: [
+      { author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(4) },
+      { author: 'maintainer-a', state: 'COMMENTED', submittedAt: hoursAgo(2) },
+    ],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'hidden');
+  assert.ok(classify(pr, context).reasons.includes('changes-requested'));
+});
+
+test('maintainer inline review comments count as maintainer activity', () => {
+  const pr = pullRequest({
+    authorAssociation: 'FIRST_TIME_CONTRIBUTOR',
+    reviewThreads: [
+      {
+        isResolved: false,
+        resolvedBy: null,
+        comments: [
+          {
+            author: 'maintainer-a',
+            authorTypename: 'User',
+            authorAssociation: 'MEMBER',
+            createdAt: hoursAgo(2),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.notEqual(classify(pr, context).bucket, 'first-timer-awaiting');
+});
+
+test('author replies in an inline review thread count as revision activity', () => {
+  const pr = pullRequest({
+    reviews: [{ author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(4) }],
+    reviewThreads: [
+      {
+        isResolved: false,
+        resolvedBy: null,
+        comments: [
+          {
+            author: 'contributor',
+            authorTypename: 'User',
+            authorAssociation: 'CONTRIBUTOR',
+            createdAt: hoursAgo(2),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'changes-requested-revised');
+});
+
+test('an author revision still counts when a later merge commit heads the branch', () => {
+  const pr = pullRequest({
+    commits: [
+      {
+        sha: 'author-revision',
+        messageHeadline: 'Address review feedback',
+        messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
+        authorEmail: 'contributor@example.com',
+        authorLogin: 'contributor',
+        committedDate: hoursAgo(3),
+        parents: 1,
+      },
+      {
+        sha: 'merge-update',
+        messageHeadline: 'Merge latest base',
+        messageBody: '',
+        authorEmail: 'maintainer@example.com',
+        authorLogin: null,
+        committedDate: hoursAgo(2),
+        parents: 2,
+      },
+    ],
+    reviews: [{ author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(4) }],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'changes-requested-revised');
+});
+
+test('a later reviewer comment moves the revision baseline', () => {
+  const pr = pullRequest({
+    commits: [
+      {
+        sha: 'abc1234',
+        messageHeadline: 'Existing revision',
+        messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
+        authorEmail: 'contributor@example.com',
+        committedDate: hoursAgo(6),
+        parents: 1,
+      },
+    ],
+    reviews: [
+      { author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(4) },
+      { author: 'maintainer-a', state: 'COMMENTED', submittedAt: hoursAgo(3) },
+    ],
+    comments: [{ author: 'contributor', createdAt: hoursAgo(3.5) }],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'hidden');
+});
+
+test('resolved-without-reply count excludes unlisted bot comments', () => {
+  const pr = pullRequest({
+    reviewThreads: [
+      {
+        isResolved: true,
+        resolvedBy: 'contributor',
+        commentsTruncated: false,
+        comments: [
+          {
+            author: 'unlisted-bot',
+            authorTypename: 'Bot',
+            authorAssociation: 'NONE',
+            createdAt: hoursAgo(5),
+          },
+        ],
+      },
+      {
+        isResolved: true,
+        resolvedBy: 'contributor',
+        commentsTruncated: false,
+        comments: [
+          {
+            author: 'reviewer',
+            authorTypename: 'User',
+            authorAssociation: 'CONTRIBUTOR',
+            createdAt: hoursAgo(4),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.ok(classify(pr, context).flags.includes('RESOLVED-W/O-REPLY: 1'));
+});
+
+test('CODEOWNERS directory and basename patterns match repository paths', () => {
+  assert.equal(matchesGlob('pkg/main.go', 'pkg/'), true);
+  assert.equal(matchesGlob('pkg/docs/README.md', 'docs/'), true);
+  assert.equal(matchesGlob('docs/README.md', '/docs/'), true);
+  assert.equal(matchesGlob('pkg/main.go', '*.go'), true);
+  assert.equal(matchesGlob('pkg/main.ts', '*.go'), false);
 });

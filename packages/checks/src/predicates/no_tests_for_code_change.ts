@@ -62,6 +62,10 @@ function isCodeFile(path: string): boolean {
 const EXEMPT_LABELS = new Set(['docs', 'documentation', 'ci', 'trivial', 'chore']);
 
 export function noTestsForCodeChange(pr: PullRequest): CheckResult {
+  const fileListIsComplete = pr.filesTruncated !== true && pr.changedFiles <= pr.files.length;
+  if (pr.filesTruncated === true || !fileListIsComplete) {
+    return mk(false, 'Test-coverage check skipped (changed-file list is incomplete)');
+  }
   if (pr.labels.some((l) => EXEMPT_LABELS.has(l.toLowerCase()))) {
     return mk(false, 'Test-coverage check skipped (PR labelled docs/ci/trivial)');
   }

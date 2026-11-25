@@ -82,7 +82,16 @@ interface CacheRow {
 //   6 — reviewThreads is now paginated in full, so entries cached before it
 //       hold at most the first 100 threads
 //   7 — added reviews[].url and reviews[].body for Copilot review verdicts
-const SCHEMA_VERSION = 7;
+//   8 — added commitsTruncated, reviewRequestsTruncated, reviewsTruncated,
+//       reviewThreadsTruncated, nested thread commentsTruncated, authorTypename
+//       on reviews/comments/threads, authorLogin on commits, and enterprise_team
+//       review requests
+//   9 — added baseRefOid, commit parentOids and parentsTruncated, changedFilesIfAvailable,
+//       review commitOid and id, reviewThreads path and comment revision metadata,
+//       and commentsTruncated
+//  10 — added filesTruncated and removed the commit-history cap
+//  11 — added labelsTruncated
+export const SCHEMA_VERSION = 11;
 
 interface CachePayload {
   v: number;

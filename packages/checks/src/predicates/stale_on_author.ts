@@ -14,7 +14,7 @@ export function staleOnAuthor(
   const updated = new Date(pr.updatedAt);
   const ageDays = (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24);
 
-  const hasStaleLabel = pr.labels.includes('stale');
+  const hasStaleLabel = pr.labels.some((label) => label.trim().toLowerCase() === 'stale');
   const triggered = hasStaleLabel || ageDays > staleDays;
 
   return {

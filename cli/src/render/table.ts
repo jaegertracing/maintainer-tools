@@ -635,7 +635,7 @@ const TABLE_SCRIPT = `
         show('table');
         if (table.initialized) applyFilters(); else table.on('tableBuilt', applyFilters);
       } else {
-        applyFilters();
+        if (table.initialized) applyFilters(); else table.on('tableBuilt', applyFilters);
       }
       e.preventDefault();
       sortPanel.scrollIntoView({ block: 'start', behavior: 'smooth' });

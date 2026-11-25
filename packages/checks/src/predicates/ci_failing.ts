@@ -37,6 +37,7 @@ export function ciFailing(pr: PullRequest): CheckResult {
     'action_required',
     'timed_out',
     'cancelled',
+    'stale',
     'startup_failure',
   ]);
   const failingRuns = runs?.filter(
@@ -54,7 +55,7 @@ export function ciFailing(pr: PullRequest): CheckResult {
   const labelOnlyFailure =
     failingRuns !== undefined &&
     failingRuns.length > 0 &&
-    pr.headCheckRunsTruncated !== true &&
+    pr.headCheckRunsTruncated === false &&
     failingRuns.every((r) => isLabelGate(r.name));
 
   return {
