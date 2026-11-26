@@ -1,0 +1,9 @@
+{
+  "repos": ["example/repo"],
+  "maintainers": ["maintainer-a", "maintainer-b"],
+  "interns": [],
+  "priorityAuthors": ["priority-author"],
+  "codeowners": { "example/repo": ["docs/**"] },
+  "priorityLabels": [],
+  "ignoreReviewRequestedOnYou": false
+}

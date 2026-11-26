@@ -1,0 +1,1689 @@
+{
+  "repos": [
+    {
+      "pullRequests": [
+        {
+          "bucket": "first-timer-awaiting",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 1 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR references a linked issue",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Tests were added or modified alongside the source changes",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": true,
+            "hideReasons": [],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "ISSUE-COLLISION: 2"
+          ],
+          "number": 1,
+          "reasons": [
+            "first-time contributor; no maintainer response yet"
+          ]
+        },
+        {
+          "bucket": "fyi",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 2 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR references a linked issue",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add or update tests covering the change. If the change genuinely doesn’t need tests (refactor, dep bump, etc.), apply a `trivial` or `chore` label to skip this check.",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "1 source file(s) changed but no tests were added or modified",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [],
+            "maintainerEngaged": true,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "ISSUE-COLLISION: 2",
+            "NO-TESTS"
+          ],
+          "number": 2,
+          "reasons": [
+            "no stronger signal"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 1 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": true,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR on hold — author has reached the new-contributor open-PR quota (computed)",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR references a linked issue",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add or update tests covering the change. If the change genuinely doesn’t need tests (refactor, dep bump, etc.), apply a `trivial` or `chore` label to skip this check.",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "1 source file(s) changed but no tests were added or modified",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:quota_exceeded"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "SELF-FILED",
+            "ISSUE-CLOSED",
+            "NO-TESTS"
+          ],
+          "number": 3,
+          "reasons": [
+            "hide:quota_exceeded"
+          ]
+        },
+        {
+          "bucket": "review-requested-on-you",
+          "checks": [
+            {
+              "checkConclusion": "failure",
+              "details": "Each non-merge commit must include a `Signed-off-by: Name <email>` trailer. Run `git commit --amend -s` or `git rebase --signoff` and force-push.",
+              "hidesFromTriage": true,
+              "id": "dco_missing",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "DCO missing on 1 commit(s): a000004",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "failure",
+              "details": "Rebase or merge the latest base branch into your branch to resolve conflicts.",
+              "hidesFromTriage": true,
+              "id": "merge_conflict",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "Branch has merge conflicts with the base branch",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 3 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR references a linked issue",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Tests were added or modified alongside the source changes",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:dco_missing",
+              "hide:merge_conflict"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": true,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "BLOCKER",
+            "MERGE-CONFLICT"
+          ],
+          "number": 4,
+          "reasons": [
+            "viewer in reviewRequests"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "failure",
+              "details": "Each non-merge commit must include a `Signed-off-by: Name <email>` trailer. Run `git commit --amend -s` or `git rebase --signoff` and force-push.",
+              "hidesFromTriage": true,
+              "id": "dco_missing",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "DCO missing on 1 commit(s): a000005",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No CI status checks reported",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "failure",
+              "details": "Rebase or merge the latest base branch into your branch to resolve conflicts.",
+              "hidesFromTriage": true,
+              "id": "merge_conflict",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "Branch has merge conflicts with the base branch",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 4 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "failure",
+              "details": "Add a short summary of what changed and why. A PR with no description forces every reviewer to reconstruct the intent from the diff.",
+              "hidesFromTriage": true,
+              "id": "description_empty",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "PR description is empty or only template stubs (0 chars of content)",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add a line like `Fixes #1234` to the PR description so the linked issue closes on merge. Or apply a `docs`/`ci`/`trivial` label if the PR genuinely has no associated issue.",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "PR does not reference an issue with `Fixes #N` / `Closes #N` / `Resolves #N`",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add or update tests covering the change. If the change genuinely doesn’t need tests (refactor, dep bump, etc.), apply a `trivial` or `chore` label to skip this check.",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "1 source file(s) changed but no tests were added or modified",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:dco_missing",
+              "hide:merge_conflict",
+              "hide:description_empty"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "MERGE-CONFLICT",
+            "NO-ISSUE",
+            "NO-TESTS"
+          ],
+          "number": 5,
+          "reasons": [
+            "hide:dco_missing",
+            "hide:merge_conflict",
+            "hide:description_empty"
+          ]
+        },
+        {
+          "bucket": "youre-the-bottleneck",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "labelOnlyFailure": true,
+              "publishesCheck": false,
+              "summary": "CI only failing on label gate check(s)",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 7 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR references a linked issue",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Tests were added or modified alongside the source changes",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [],
+            "maintainerEngaged": true,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": true
+          },
+          "flags": [
+            "ISSUE-CLOSED",
+            "QUESTION",
+            "NEEDS-LABEL"
+          ],
+          "number": 6,
+          "reasons": [
+            "viewer reviewed; author has acted since"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": true,
+              "id": "ci_failing",
+              "inDigest": true,
+              "labelOnlyFailure": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is FAILURE",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 6 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR references a linked issue",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Tests were added or modified alongside the source changes",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:ci_failing"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [],
+          "number": 7,
+          "reasons": [
+            "hide:ci_failing"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 5 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": true,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR is not linked to an open `help wanted` issue (`missing-issue` label)",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Test-coverage check skipped (PR labelled docs/ci/trivial)",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:no_linked_issue"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "NO-ISSUE"
+          ],
+          "number": 8,
+          "reasons": [
+            "hide:no_linked_issue"
+          ]
+        },
+        {
+          "bucket": "codeowners-hits",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 5 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Linked-issue check skipped (exempt label)",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Test-coverage check skipped (PR labelled docs/ci/trivial)",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": true,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [],
+            "maintainerEngaged": true,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [],
+          "number": 9,
+          "reasons": [
+            "PR touches viewer CODEOWNERS paths"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": true,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Author silent for 40 days (threshold: 30)",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": true,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR on hold — author has reached the new-contributor open-PR quota (label)",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add a line like `Fixes #1234` to the PR description so the linked issue closes on merge. Or apply a `docs`/`ci`/`trivial` label if the PR genuinely has no associated issue.",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "PR does not reference an issue with `Fixes #N` / `Closes #N` / `Resolves #N`",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Tests were added or modified alongside the source changes",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:stale_on_author",
+              "hide:quota_exceeded",
+              "waiting-for-author"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "STALE",
+            "WAITING-FOR-AUTHOR",
+            "NO-ISSUE"
+          ],
+          "number": 10,
+          "reasons": [
+            "hide:stale_on_author",
+            "hide:quota_exceeded"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is PENDING",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 10 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Linked-issue check skipped (exempt label)",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Test-coverage check skipped (PR labelled docs/ci/trivial)",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": true,
+              "id": "unresolved_from_reviewer",
+              "inDigest": true,
+              "publishesCheck": false,
+              "summary": "1 review thread(s) unresolved — the reviewer's comment hasn't been replied to",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Author resolved 1 review thread(s) without replying to the reviewer",
+              "triggered": true
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:unresolved_from_reviewer",
+              "changes-requested"
+            ],
+            "maintainerEngaged": true,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": true
+          },
+          "flags": [
+            "UNRESOLVED",
+            "RESOLVED-W/O-REPLY: 1"
+          ],
+          "number": 11,
+          "reasons": [
+            "hide:unresolved_from_reviewer"
+          ]
+        },
+        {
+          "bucket": "dependency-bots",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "failure",
+              "details": "Rebase or merge the latest base branch into your branch to resolve conflicts.",
+              "hidesFromTriage": true,
+              "id": "merge_conflict",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "Branch has merge conflicts with the base branch",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 1 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add a line like `Fixes #1234` to the PR description so the linked issue closes on merge. Or apply a `docs`/`ci`/`trivial` label if the PR genuinely has no associated issue.",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "PR does not reference an issue with `Fixes #N` / `Closes #N` / `Resolves #N`",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No source files changed",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": true,
+            "firstTimer": false,
+            "hideReasons": [
+              "hide:merge_conflict"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "BOT",
+            "MERGE-CONFLICT",
+            "NO-ISSUE"
+          ],
+          "number": 12,
+          "reasons": [
+            "dependency bot"
+          ]
+        },
+        {
+          "bucket": "hidden",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 0 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add a line like `Fixes #1234` to the PR description so the linked issue closes on merge. Or apply a `docs`/`ci`/`trivial` label if the PR genuinely has no associated issue.",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "PR does not reference an issue with `Fixes #N` / `Closes #N` / `Resolves #N`",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add or update tests covering the change. If the change genuinely doesn’t need tests (refactor, dep bump, etc.), apply a `trivial` or `chore` label to skip this check.",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "1 source file(s) changed but no tests were added or modified",
+              "triggered": true
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [
+              "draft"
+            ],
+            "maintainerEngaged": false,
+            "priorityAuthor": true,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [
+            "DRAFT",
+            "NO-ISSUE",
+            "NO-TESTS"
+          ],
+          "number": 13,
+          "reasons": [
+            "draft"
+          ]
+        },
+        {
+          "bucket": "priority-authors",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 0 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Linked-issue check skipped (exempt label)",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Test-coverage check skipped (PR labelled docs/ci/trivial)",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": {
+            "findings": {
+              "high": 0,
+              "low": 2,
+              "medium": 1
+            },
+            "headline": "Approval recommended",
+            "light": "green",
+            "open": null,
+            "submittedAt": "2026-05-31T14:05:00Z",
+            "url": "https://github.com/example/repo/pull/14#pullrequestreview-1"
+          },
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [],
+            "maintainerEngaged": false,
+            "priorityAuthor": true,
+            "reviewRequested": false,
+            "viewerReviewed": false
+          },
+          "flags": [],
+          "number": 14,
+          "reasons": [
+            "priority author"
+          ]
+        },
+        {
+          "bucket": "changes-requested-revised",
+          "checks": [
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "dco_missing",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "DCO present on all non-merge commits",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "ci_failing",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "CI status rollup is SUCCESS",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "merge_conflict",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "No merge conflicts detected",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "stale_on_author",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "Last update 7 days ago",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "quota_exceeded",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "PR not quota-blocked",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "description_empty",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "PR description present",
+              "triggered": false
+            },
+            {
+              "checkConclusion": "neutral",
+              "details": "Add a line like `Fixes #1234` to the PR description so the linked issue closes on merge. Or apply a `docs`/`ci`/`trivial` label if the PR genuinely has no associated issue.",
+              "hidesFromTriage": false,
+              "id": "no_linked_issue",
+              "inDigest": true,
+              "publishesCheck": true,
+              "summary": "PR does not reference an issue with `Fixes #N` / `Closes #N` / `Resolves #N`",
+              "triggered": true
+            },
+            {
+              "checkConclusion": "success",
+              "hidesFromTriage": false,
+              "id": "no_tests_for_code_change",
+              "inDigest": false,
+              "publishesCheck": true,
+              "summary": "Tests were added or modified alongside the source changes",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "unresolved_from_reviewer",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No unresolved review threads awaiting an author reply",
+              "triggered": false
+            },
+            {
+              "hidesFromTriage": false,
+              "id": "resolved_without_reply",
+              "inDigest": false,
+              "publishesCheck": false,
+              "summary": "No author-resolved-without-reply threads",
+              "triggered": false
+            }
+          ],
+          "copilot": null,
+          "facets": {
+            "codeownersHit": false,
+            "dependencyBot": false,
+            "firstTimer": false,
+            "hideReasons": [],
+            "maintainerEngaged": true,
+            "priorityAuthor": false,
+            "reviewRequested": false,
+            "viewerReviewed": true
+          },
+          "flags": [
+            "NO-ISSUE"
+          ],
+          "number": 15,
+          "reasons": [
+            "you requested changes; author has revised since"
+          ]
+        }
+      ],
+      "repo": "example/repo"
+    }
+  ]
+}
