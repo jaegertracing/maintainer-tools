@@ -2,7 +2,7 @@
 
 * **Status**: Draft
 * **Created**: 2026-11-21
-* **Last Updated**: 2026-11-22
+* **Last Updated**: 2026-11-26
 
 ---
 
@@ -12,11 +12,11 @@ The Jaeger repositories enforce their contribution policies with independent Git
 
 This RFC tests the hypothesis that an explicit state machine with stored state, the idea behind the `rustybot` repository [\[1\]](https://github.com/yurishkuro/rustybot), is the fix. The hypothesis holds in one part and fails in the other. It is right that one program must own the whole lifecycle and that the rules must be stated in one place. It is wrong about the mechanism. A PR is not in one state. It has several independent facets (issue link, quota, duplicate, whose turn, idle), and each is a function of facts that GitHub already holds, the clock and the item's own timeline included. Transitions do not need to be written, and a stored state would be a second copy of the truth that can disagree with the facts.
 
-This RFC recommends a declarative design in the manner of a Kubernetes controller or of Terraform. The policies are "invariants": statements of what is true of a correct item, such as "a PR without an approved issue carries `unapproved-issue`" and "a PR whose flag label is at least seven days old is closed". One "reconciler" observes the facts, derives the desired labels, comment and open state from the invariants, compares them with what the item has, and changes only the difference. Time rules are ordinary invariants, because the clock is a fact and an age is derived from it. The lifecycle states are facts that the rules derive. The part that is not declarative is small: creating a comment is not repeatable, the order of changes within one run is fixed in one place, and closing cannot be taken back.
+This RFC recommends a declarative design in the manner of a Kubernetes controller or of Terraform. The policies are "invariants": statements of what is true of a correct item, such as "a PR without an approved issue carries `unapproved-issue`" and "a PR whose flag label is at least seven days old is closed". One "reconciler" observes the inputs, derives the desired labels, comment, check run and open state from the invariants, compares them with what the item has, and changes only the difference. Time rules are ordinary invariants, because the clock is an input and an age is derived from it. The lifecycle states are facts that the rules derive. The part that is not declarative is small: creating a comment is not repeatable, the order of changes within one run is fixed in one place, and closing cannot be taken back.
 
-The design needs no inference engine. The rules are not recursive and the facts form a directed acyclic graph, so one forward pass computes the desired state, and the rest is a set difference and independent API calls. The rules are small, and they are written in TypeScript in a fluent form: `fact('idle').when(...)` gives a fact a reason to hold, and `.unless(doNotExpire)` gives it a veto. One generic combinator decides every fact and every output: it holds when a reason holds and no veto does. A new policy adds statements and edits none. Two rules cannot contradict each other, by construction: the state of an item is split into inputs that the reconciler never changes and outputs that no rule reads, and a veto always wins over a reason. The statements build a table of rules as data, so the reconciler checks the rule set every time it starts, by a graph walk and an enumeration of booleans, and refuses to run on a cycle, a rule that reads an output, two exclusive outputs that can both hold, an output that no person can change, a plan that does not converge, or a rule that can never hold. Generated decision tables show which combinations of facts lead to each output, so the consequences of a new rule are read as a diff. A solver would earn its place only if rules could assert arbitrary actions with priorities among them, which this form excludes.
+The design needs no inference engine. The rules are not recursive and the facts form a directed acyclic graph, so one forward pass computes the desired state, and the rest is a set difference and independent API calls. The rules are small, and they are written in TypeScript in a fluent form: `policy.derivedFact('idle').when(...)` gives a derived fact a reason to hold, and `.unless(doNotExpire)` gives it a veto. One generic combinator decides every derived fact and every output: it holds when a reason holds and no veto does. A new policy adds statements and edits none. Two rules cannot contradict each other, by construction: the state of an item is split into inputs that the reconciler never changes and outputs that no rule reads, and a veto always wins over a reason. The statements record the rules as data, so the reconciler checks the rule set every time it starts, by a graph walk and an enumeration of booleans, and refuses to run on a dependency cycle, a rule that reads an output, two exclusive outputs that can both hold, an output that no person can clear, a plan that does not converge, or a rule that never holds. Generated decision tables show which combinations of facts lead to each output, so the consequences of a new rule are read as a diff. A solver would earn its place only if rules could assert arbitrary actions with priorities among them, which this form excludes.
 
-The reconciler lives in `jaegertracing/maintainer-tools`, which already has pure predicates, a single query per PR and an idempotent comment writer. The rules live there too, are the same for every repository, and are checked in its CI. Each repository calls the reconciler at a pinned version from one workflow, on PR, issue and comment events and on a daily schedule, under one concurrency group for the whole repository. Every run covers all open PRs, so a pending run that GitHub replaces loses nothing. To stay within the API budget, a run fetches in full only the PRs whose facts may have changed, using a cache of observed facts that it keeps between runs as a workflow artifact. The cache is never a source of truth: the reconciler derives the same result from an empty one.
+The reconciler lives in `jaegertracing/maintainer-tools`, which already has pure predicates, a single query per PR and an idempotent comment writer. The rules live there too, are the same for every repository, and are checked in its CI. Each repository calls the reconciler at a pinned version from one workflow, on PR, issue and comment events and on a daily schedule, under one concurrency group for the whole repository. Every run covers all open PRs, so a pending run that GitHub replaces loses nothing. To stay within the API budget, a run fetches in full only the PRs whose inputs may have changed, using a cache of observed inputs that it keeps between runs as a workflow artifact. The cache is never a source of truth: the reconciler derives the same result from an empty one.
 
 A prototype of the reconciler holds the rule form, the PR policies, the startup check and a shadow mode that runs from the CLI. A read-only backtest ran it against the open PRs of jaeger and jaeger-ui. It left no known defect in the rules, it measured the API cost, and it found labels that the existing actions had left wrong. The first step of the migration, which moves the existing checks and the triage report to the rule form, exists as draft PRs. The write path, the workflow and the cache as an artifact do not exist yet.
 
@@ -81,7 +81,7 @@ The table covers every automated actor that changes a label, a comment or the op
 | `waiting-for-author.js` | PR pushed; conversation comment | The event (who commented or pushed), author, commenter permission, head commit message | `waiting-for-author` | Nothing |
 | `maintainer-tools` triage CLI | A maintainer's laptop | `stale`, `pr-quota-reached`, `missing-issue`, `waiting-for-author`, `no-issue-needed`; its own copy of the quota and duplicate computations | Nothing | — |
 
-`pr-changelog-label.yml` and the `block-pr-from-main-branch` action fail a check and change nothing on the PR, so they are gates and not lifecycle actors. `maintainer-tools` also ships a `pr-nudge` action and a `pr-weekly-digest` action; a code search of the organization finds no workflow that calls either.
+`pr-changelog-label.yml` and the `block-pr-from-main-branch` action fail a check and change nothing on the PR, so they are gates and not lifecycle actors. `maintainer-tools` also ships a `pr-nudge` action, which publishes a check run for five of its ten checks on PR events and posts no comment, and a `pr-weekly-digest` action; a code search of the organization finds no workflow that calls either.
 
 The places where two actors meet:
 
@@ -164,7 +164,7 @@ The useful artifact is `issue-manager.yml` as a statement of the intended issue 
 
 **A. Status quo: independent actions with conventions.** The actions of today, with #10257 merged, and conventions such as "the action that flags also closes" and "no action reads the label of another".
 
-**B. Invariants and one reconciler.** The policies are invariants over observed facts. One program observes the facts once, derives the desired labels, comment and open state of each item, and applies the difference. It is idempotent and runs on events and on a schedule. The model is the Kubernetes controller, which compares a desired state with an observed state and acts on the difference, not on the event that woke it, and Terraform, which computes a plan from that difference and then applies it. Prow's Tide component works the same way for merging: it queries GitHub periodically for the PRs that match its criteria [\[7\]](https://github.com/kubernetes-sigs/prow). "The design" section develops this option.
+**B. Invariants and one reconciler.** The policies are invariants over observed inputs. One program observes the inputs once, derives the desired labels, comment, check run and open state of each item, and applies the difference. It is idempotent and runs on events and on a schedule. The model is the Kubernetes controller, which compares a desired state with an observed state and acts on the difference, not on the event that woke it, and Terraform, which computes a plan from that difference and then applies it. Prow's Tide component works the same way for merging: it queries GitHub periodically for the PRs that match its criteria [\[7\]](https://github.com/kubernetes-sigs/prow). "The design" section develops this option.
 
 **C. An explicit state machine with stored state.** The `rustybot` design: a configuration file of states and transitions, one label per state, an engine that fires transitions on events and timeouts.
 
@@ -187,7 +187,7 @@ Legend: 🟢 good · 🟨 partial or caveated · ❌ poor.
 | Interaction bugs between policies | ❌ | 🟢 ⁴ | 🟨 ⁵ | 🟨 ⁶ | 🟢 | 🟨 |
 | Where state lives, and whether it can be rebuilt | 🟨 ⁷ | 🟢 ⁸ | ❌ ⁹ | 🟢 | 🟢 | 🟢 |
 | Testing the interaction of policies | ❌ | 🟢 ¹⁰ | 🟨 ¹¹ | 🟨 | ❌ ¹² | ❌ ¹² |
-| Contradictions in the rule set reported at startup | ❌ ²³ | 🟢 ²⁴ | 🟨 ²⁵ | ❌ ²³ | ❌ | 🟨 ²⁶ |
+| Violations of the rule set reported at startup | ❌ ²³ | 🟢 ²⁴ | 🟨 ²⁵ | ❌ ²³ | ❌ | 🟨 ²⁶ |
 | Cost of adding a rule | ❌ ¹³ | 🟢 | 🟨 | 🟨 | ❌ ¹⁴ | ❌ ¹⁴ |
 | Covers the policies Jaeger has | 🟢 | 🟢 | 🟨 ⁵ | 🟢 | ❌ ¹⁴ | ❌ ¹⁴ |
 | Reuse across repositories | 🟨 ¹⁵ | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
@@ -204,21 +204,21 @@ Legend: 🟢 good · 🟨 partial or caveated · ❌ poor.
 - ⁷ In GitHub, but spread over labels, four comment schemes and an Actions cache entry.
 - ⁸ Recomputed on every run from the item, the clock and the item's timeline. Nothing is kept outside GitHub, and nothing is hidden on the item.
 - ⁹ The state label is authoritative, so a missed event or a hand edit needs a repair path.
-- ¹⁰ Two rules cannot contradict each other by construction. A generated decision table per output shows every combination of observations and its result, and scenario tests assert whole plans.
+- ¹⁰ Two rules cannot contradict each other by construction. A generated decision table per output shows every combination of base facts and its result, and scenario tests assert whole plans.
 - ¹¹ Transitions are testable one at a time. Combinations grow with the product of the states.
 - ¹² The configuration runs only on the vendor's side or on a cluster.
 - ¹³ An action, a workflow, a local script and a jaeger-ui copy: eleven PRs for one rule.
 - ¹⁴ No examined tool has a rule for "links an issue that carries a given label" or for a per-author limit on open PRs. The Prow plugin directory has no plugin for either. Both would be custom code, deployed to a cluster for E and impossible for F.
 - ¹⁵ Composite actions pinned by commit work, at five workflow files and three pins per repository.
 - ¹⁶ No server. A PR that is opened starts five jobs across three workflows, and a push starts four.
-- ¹⁷ No server, and one job per event. Every run covers all open PRs and fetches in full only those whose facts may have changed, from a cache of observed facts kept as a workflow artifact, so that it fits the hourly API budget of the workflow token.
+- ¹⁷ No server, and one job per event. Every run covers all open PRs and fetches in full only those whose inputs may have changed, from a cache of observed inputs kept as a workflow artifact, so that it fits the hourly API budget of the workflow token.
 - ¹⁸ A cluster or a service that somebody has to keep running.
 - ¹⁹ No server, but a third-party application with write access to the organization.
 - ²⁰ Labels and comments are visible, but a PR can collect a comment from each actor, and the check on the PR reports only that a dispatch succeeded.
 - ²¹ The policies of about 1,300 lines of JavaScript are written again as rules, which the prototype has done. The write path and the workflow remain, and the result runs in shadow mode beside the existing actions before one cutover per repository.
 - ²² The engine does not exist, and every policy has to be restated as states and transitions.
 - ²³ There is no rule set to check. The policies are code in separate actors, and their interaction shows on a live PR.
-- ²⁴ The rules are data. A structural check and an enumeration of the boolean observations run at every startup, and a failing rule set does not run.
+- ²⁴ The rules are data. A structural check and an enumeration of the base facts run at every startup, and a failing rule set does not run.
 - ²⁵ A configuration of states and transitions can be checked for unreachable states and missing targets. Two transitions that undo each other across runs are not visible in its structure. `rustybot` validates the schema of the file only.
 - ²⁶ The product validates the syntax of its configuration, not the interplay of the rules.
 
@@ -238,111 +238,125 @@ The rows that B loses are migration cost and one footnote of operational cost. M
 
 ### Inputs, facts and outputs
 
-The design has the shape of a logic program, in the sense of Datalog. It has three layers.
+The design has the shape of a logic program, in the sense of Datalog. It has three layers. Base fact, derived fact, rule and output are concepts of Datalog, which calls them extensional fact, intensional fact, rule and output relation. The correspondence has one exception: a base fact of a PR may be computed from a declared fact of an issue, and an extensional fact of Datalog is never computed from another fact.
 
 - **Inputs** are what the reconciler observes and never changes: the labels that people own, the author and the author's permission, the closing issue references and the state and labels of those issues, the other open PRs, the events of the timeline with their times and actors, and the current time.
-- **Facts** are named booleans: `needs_issue`, `links_open_issue`, `idle`, `flag_expired`, `over_quota`, `is_duplicate`, `blocked`. A fact holds for one of two kinds of reason. An "observation" is a function that computes the fact from the inputs, and observations are the only code in a policy. A rule concludes the fact from other facts. The lifecycle states of the previous section are facts of this kind. Most facts are about a PR. A fact can also be about an issue, such as `has_duplicate_prs`, and the reconciler then evaluates it once for each issue.
-- **Outputs** are what the reconciler owns and changes: each of its labels, its comment, and `should_close`.
+- **Facts** are named booleans: `needs_issue`, `links_open_issue`, `idle`, `flag_expired`, `over_quota`, `is_duplicate`, `blocked`. A fact is of one of two kinds, and never of both. A "base fact" takes its value from a "predicate", a function that computes the value from the inputs, and the predicates are the only code in a policy. A predicate may also read a fact of a lower layer of another item, when it declares that fact; the predicate of `is_duplicate` is the one case, and "No inference is needed" shows it. A "derived fact" is decided by rules from other facts. The lifecycle states of the previous section are derived facts. Most facts are about a PR. A fact can also be about an issue, such as `has_duplicate_prs`, and the reconciler then evaluates it once for each issue.
+- **Outputs** are what the reconciler owns and changes: each of its labels, its comment, `should_close`, and `merge_blocked`, which decides its check run.
 
-The separation of the layers forbids one thing: a rule never reads an output. It does not limit how a fact or an output is defined. Any number of small rules may contribute to the same one.
+The separation of the layers forbids one thing: a rule never reads an output. It does not limit how a derived fact or an output is decided. Any number of small rules may contribute to the same one.
 
 ### Small rules: reasons and vetoes
 
-A rule is one implication with a short condition. There are two kinds. This RFC writes a rule in prose with an arrow.
+A rule is one implication. It decides one derived fact or one output, which is its "conclusion", from a short list of facts, which are its "premises". There are two kinds. This RFC writes a rule in prose with an arrow.
 
-- A **reason** says that a fact holds: `idle_expired ⇒ should_close`.
-- A **veto** says that it does not hold: `do_not_expire ⇒ not should_close`.
+- A **reason** says that its conclusion holds: `idle_expired ⇒ should_close`.
+- A **veto** says that its conclusion does not hold: `do_not_expire ⇒ not should_close`.
 
-One combinator applies to every fact and every output: *it holds when at least one of its reasons holds and none of its vetoes does*. The combinator is generic. It knows nothing of any policy and is never edited. A disjunction is written as several reasons, and an exception as a named veto. A new policy adds statements, and no existing statement changes.
+One combinator applies to every derived fact and every output: *it holds when at least one of its reasons holds and none of its vetoes does*. The combinator is generic. It knows nothing of any policy and is never edited. A disjunction is written as several reasons, and an exception as a named veto. A new policy adds statements, and no existing statement changes.
 
-The rules are written in TypeScript, in a fluent form.
+The rules are written in TypeScript, in a fluent form. The statements are calls on one `Policy` object, which holds the base facts, the derived facts, the outputs and the rules of every policy of the project. Apart from the exception above, that object is a Datalog program without recursion.
 
-- `fact(name)` declares a fact of a PR, and `issueFact(name)` a fact of an issue. `label(name)`, `comment()` and `close()` declare the outputs.
-- `.when(a, b)` adds a reason: the target holds when the facts `a` and `b` both hold.
-- `.when(function, {...})` adds the observation of a fact. The function is the only argument of its `.when`, and a fact has at most one observation. The function returns `{ holds, summary }`: whether the fact holds for the item, and a short text that states what the function found. The summary is present in both states, so a consumer can print it for a fact that holds and for one that does not. The second argument carries `says`, the static wording of the rule, which is the same for every item, and `by`, who can change the value: the author, a maintainer, or time.
+- `policy.baseFact(name, predicate, { changedBy })` declares a base fact of a PR. The predicate returns a boolean, or `{ holds, summary, details }`: whether the fact holds for the PR, a short text that states what the predicate found, and an optional paragraph that tells the author how to make the fact stop holding. The summary is present in both states, so a consumer can print it for a fact that holds and for one that does not. `changedBy` is the "change source" of the fact, which is who can change its value: the author, a maintainer, or time.
+- `policy.derivedFact(name)` declares a derived fact of a PR.
+- `.when(a, b)` adds a reason to a derived fact or to an output: the conclusion holds when the facts `a` and `b` both hold.
 - `.unless(a)` adds a veto.
+- An output is a property of the policy, such as `policy.triageHidden`.
 
-The calls chain. A policy adds a reason or a veto to a fact of another policy with a separate statement. An output cannot be passed to `.when` or `.unless`, because the types of the builder refuse it, so a rule that reads an output does not compile.
+These statements exist in `packages/checks/src/rules`, the rule form that the first step of "Migration Path" adds, and `triage_hidden` is one of its outputs. The sketches of this RFC use more than that rule form has, and the reconciler adds each of the following in the same shape:
 
-The closing rules and the idle policy are two files of the prototype. They read as follows. The examples of this RFC show an observation as the boolean alone and leave its summary out, except in "The comment".
+- `policy.issueBaseFact()` and `policy.issueDerivedFact()`, for the facts of an issue.
+- The outputs `policy.comment`, `policy.shouldClose` and `policy.mergeBlocked`, and `policy.label(name)`, which is a method because each label is an output.
+- `policy.labelAge()`, which declares the age of a label as a base fact, and `policy.exclusive()`, which declares two outputs that must not hold together.
+- Two more options of a base fact. `says` is the static wording of the fact, which is the same for every item. `reads` names the facts of other items that the predicate reads.
+- A second parameter of a predicate that declares `reads`, named `lower` in the sketches, through which the predicate reads those facts.
+
+The calls chain. A policy adds a reason or a veto to a derived fact of another policy with a separate statement. A base fact has no `.when` and no `.unless`, so no rule can decide it. An output cannot be passed to `.when` or `.unless`, because the types of the builder refuse it, so a rule that reads an output does not compile.
+
+The closing rules and the idle policy are two files of the prototype. They read as follows in the form above; the prototype itself declares a base fact and its vetoes in one statement. The examples of this RFC show a predicate that returns the boolean alone and leave its summary out, except in "The comment".
 
 ```ts
 // closing.ts
-export const doNotExpire = fact('do_not_expire').when(
+export const doNotExpire = policy.baseFact(
+  'do_not_expire',
   (pr) => pr.labelsOwnedByPeople.includes('do-not-expire'),
-  { says: 'the pull request carries `do-not-expire`', by: 'maintainer' },
+  { says: 'the pull request carries `do-not-expire`', changedBy: 'maintainer' },
 );
-export const shouldClose = close().unless(doNotExpire);
+policy.shouldClose.unless(doNotExpire);
 
 // stale.ts
 const IDLE_DAYS = 60;
 const NOTICE_DAYS = 14;
 
-export const idle = fact('idle')
-  .when((pr, { now }) => daysSince(pr.lastActivityByPersonAt, now) >= IDLE_DAYS, {
-    says: `no person has acted on the pull request for ${IDLE_DAYS} days`,
-    by: 'author',
-  })
-  .unless(doNotExpire);
+const quietFor60Days = policy.baseFact(
+  'quiet_for_60_days',
+  (pr, { now }) => daysSince(pr.lastActivityByPersonAt, now) >= IDLE_DAYS,
+  { says: `no person has acted on the pull request for ${IDLE_DAYS} days`, changedBy: 'author' },
+);
+export const idle = policy.derivedFact('idle').when(quietFor60Days).unless(doNotExpire);
 
-const staleLabel = label('stale').when(idle);
+const staleLabel = policy.label('stale').when(idle);
 
 // The pull request is closed after a notice, so the notice has to exist.
-policyComment.when(idle);
+policy.comment.when(idle);
 
-const staleLabelOld = labelAge('stale_label_old', {
+const staleLabelOld = policy.labelAge('stale_label_old', {
   of: [staleLabel],
   days: NOTICE_DAYS,
   says: `the \`stale\` label is at least ${NOTICE_DAYS} days old`,
 });
-const idleExpired = fact('idle_expired').when(idle, staleLabelOld);
+const idleExpired = policy.derivedFact('idle_expired').when(idle, staleLabelOld);
 
-shouldClose.when(idleExpired);
+policy.shouldClose.when(idleExpired);
 ```
 
-The linked-issue policy is a third file. It adds its own reason to close with one statement, `shouldClose.when(flagExpired)`, and it changes no line of the two files above.
+The linked-issue policy is a third file. It adds its own reason to close with one statement, `policy.shouldClose.when(flagExpired)`, and it changes no line of the two files above.
 
 ```ts
 // linked-issue.ts
-export const needsIssue = fact('needs_issue')
-  .when((pr) => !pr.linkedIssues.some(isApproved), {
-    says: 'no linked issue is open and carries `help wanted`',
-    by: 'author',
-  })
+const noApprovedIssue = policy.baseFact(
+  'no_approved_issue',
+  (pr) => !pr.linkedIssues.some(isApproved),
+  { says: 'no linked issue is open and carries `help wanted`', changedBy: 'author' },
+);
+export const needsIssue = policy
+  .derivedFact('needs_issue')
+  .when(noApprovedIssue)
   .unless(noIssueNeeded)
   .unless(authorCanWrite)
   .unless(authorIsDependencyBot);
 
-const linksOpenIssue = fact('links_open_issue').when(
+const linksOpenIssue = policy.baseFact(
+  'links_open_issue',
   (pr) => pr.linkedIssues.some((issue) => issue.owner === ORGANIZATION && issue.state === 'OPEN'),
-  { says: 'the pull request links an open issue in a jaegertracing repository', by: 'author' },
+  { says: 'the pull request links an open issue in a jaegertracing repository', changedBy: 'author' },
 );
 
-const unapprovedIssueLabel = label('unapproved-issue').when(needsIssue, linksOpenIssue);
-const missingIssueLabel = label('missing-issue').when(needsIssue).unless(linksOpenIssue);
-exclusive(missingIssueLabel, unapprovedIssueLabel);
+const unapprovedIssueLabel = policy.label('unapproved-issue').when(needsIssue, linksOpenIssue);
+const missingIssueLabel = policy.label('missing-issue').when(needsIssue).unless(linksOpenIssue);
+policy.exclusive(missingIssueLabel, unapprovedIssueLabel);
 
 blocked.when(needsIssue);
 
-const flagLabelOld = labelAge('flag_label_old', {
+const flagLabelOld = policy.labelAge('flag_label_old', {
   of: [missingIssueLabel, unapprovedIssueLabel],
   days: NOTICE_DAYS,
   says: `the flag label is at least ${NOTICE_DAYS} days old`,
 });
-const flagExpired = fact('flag_expired').when(needsIssue, flagLabelOld);
+const flagExpired = policy.derivedFact('flag_expired').when(needsIssue, flagLabelOld);
 
-shouldClose.when(flagExpired);
+policy.shouldClose.when(flagExpired);
 ```
 
-A third reason to close a PR is one more `shouldClose.when(...)`. A new exemption is one more `.unless(...)`. Neither touches the statements of another policy.
+A third reason to close a PR is one more `policy.shouldClose.when(...)`. A new exemption is one more `.unless(...)`. Neither touches the statements of another policy.
 
 Three properties of the form follow from the code.
 
-- **A fact with a veto has one value for every reader.** A rule that names `idle` gets `idle` after `do-not-expire`. No rule can name the observation without the veto.
-- **Negation exists only as a veto.** A negative statement about the inputs, such as "no linked issue is open and carries `help wanted`", is computed inside an observation. `missing-issue` is `needs_issue` with the veto `links_open_issue`.
-- **The statements build a table of rules as data.** `table()` returns one entry for each reason and each veto, such as `{ veto: 'idle', when: ['do_not_expire'] }`, and one for each observation with what it declares. The evaluator, the startup check and the decision tables read that table and nothing else.
+- **A veto reaches every rule that names the derived fact.** A rule that names `idle` gets `idle` after `do-not-expire`. A rule can also name the base fact `quiet_for_60_days`, and it then reads the value before the veto. The form does not prevent that, and the different name is the only thing that shows it to a reviewer.
+- **Negation exists only as a veto.** A negative statement about the inputs, such as "no linked issue is open and carries `help wanted`", is computed inside a predicate. `missing-issue` is `needs_issue` with the veto `links_open_issue`.
+- **The statements record the policy as data.** `policy.rules` holds one entry for each reason and each veto, such as `{ conclusion: 'idle', premises: ['do_not_expire'], isVeto: true }`, and `policy.baseFacts` holds each base fact with what it declares. The evaluator, the startup check and the decision tables read those two lists and nothing else.
 
-A conjunction stays inside one `.when` where it is the meaning of the rule, as in `.when(needsIssue, linksOpenIssue)`. When it grows past two or three terms, part of it gets a name as a fact.
+A conjunction stays inside one `.when` where it is the meaning of the rule, as in `.when(needsIssue, linksOpenIssue)`. When it grows past two or three terms, part of it gets a name as a derived fact.
 
 No rule says "when the issue loses `help wanted`, add the label" or "when the author links an issue, remove it". Those are transitions, and they are not written. A label is present exactly while a reason for it holds and no veto does.
 
@@ -355,32 +369,33 @@ The reason-and-veto form is the one that authorization engines settled on for th
 - **XACML** names the choice a "combining algorithm" and offers several; deny-overrides is the one that corresponds [\[17\]](https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html).
 - **Datalog with stratified negation** writes the default and its exception as `flies(X) :- bird(X), not abnormal(X)`, and defines `abnormal` by its own rules.
 
-Two things differ here. Those engines make one decision, allow or deny, and this design applies the combinator to every named fact, in layers. And the design has one level of precedence only: a veto wins. It has no numbered priorities. An exception to an exception is written by making the veto's condition a fact, which then has reasons and vetoes of its own one layer down.
+Two things differ here. Those engines make one decision, allow or deny, and this design applies the combinator to every derived fact and every output, in layers. And the design has one level of precedence only: a veto wins. It has no numbered priorities. An exception to an exception is written by making the veto's premise a derived fact, which then has reasons and vetoes of its own one layer down.
 
 ### Where an exception attaches
 
-A veto may attach to a fact or to an output, and the two mean different things.
+A veto may attach to a derived fact or to an output, and the two mean different things.
 
-- A veto on a fact says that the fact is not true of this item. `no_issue_needed ⇒ not needs_issue`. Everything that follows from the fact goes with it: the label, the line in the comment, the deadline.
+- A veto on a derived fact says that the fact is not true of this item. `no_issue_needed ⇒ not needs_issue`. Everything that follows from the fact goes with it: the label, the line in the comment, the deadline.
 - A veto on an output says that the fact is true and the action still does not happen. `do_not_expire ⇒ not should_close`. The PR is still flagged, still shows it, and stays open.
 
 Both are allowed. The rule of choice is to attach the veto to the narrowest fact whose meaning the exception changes.
 
 `do-not-expire` shows why both exist. `do_not_expire ⇒ not idle` keeps `stale` off a protected PR, so `stale` always means that the item will be closed. `actions/stale` does the same for an exempt label today. Alone it would not stop the issue-link deadline, because that deadline does not pass through `idle`. This is the gap that #10252 closed. `do_not_expire ⇒ not should_close` stops every reason to close, including the ones that later policies add. The design has both lines, and each can be read without the other.
 
-A veto on an output cancels every reason for it, and the rule form has no veto that is scoped to one reason. An exception to one reason of an output that several policies share is therefore a named fact one layer down. `triage_hidden` is such an output. It belongs to the triage CLI, which leaves a PR out of the attention buckets of its report while the output holds, and each fact that makes a PR not reviewable is a reason for it. Failing CI is one of those reasons, except when the only failing checks are label gates, because a maintainer clears those with a label. The exception is a fact of its own, and `triage_hidden` lists that fact:
+A veto on an output cancels every reason for it, and the rule form has no veto that is scoped to one reason. An exception to one reason of an output that several policies share is therefore a derived fact one layer down. `triage_hidden` is such an output. It belongs to the triage CLI, which leaves a PR out of the attention buckets of its report while the output holds, and each fact that makes a PR not reviewable is a reason for it. Failing CI is one of those reasons, except when the only failing checks are label gates, because a maintainer clears those with a label. The exception is a derived fact of its own, and `triage_hidden` lists that fact:
 
 ```ts
-const ciFailingNotLabelOnly = fact('ci_failing_not_label_only')
+const ciFailingWithoutLabelOnlyFailure = policy
+  .derivedFact('ci_failing_without_label_only_failure')
   .when(ciFailing)
   .unless(labelOnlyFailure);
 
-triageHidden.when(ciFailingNotLabelOnly);
+policy.triageHidden.when(ciFailingWithoutLabelOnlyFailure);
 ```
 
-`triageHidden.unless(labelOnlyFailure)` would be wrong, because it would also show a PR that has a merge conflict.
+`policy.triageHidden.unless(labelOnlyFailure)` would be wrong, because it would also show a PR that has a merge conflict.
 
-The layers stay acyclic by one rule: a rule for a fact, reason or veto alike, reads inputs and facts of lower layers. It never reads the fact that it defines, a fact of the same or a higher layer, or an output. A veto is a negation, and Datalog calls negation that is restricted in this way "stratified"; the restriction is what gives every fact exactly one value. The table records the facts that each rule reads, and an observation that reads a fact of another item declares it. The reconciler orders the layers from those two when it loads the rules, and it fails on a cycle.
+The layers stay acyclic by one rule: a rule, reason or veto alike, reads facts of lower layers. It never reads its own conclusion, a fact of the same or a higher layer, or an output. A veto is a negation, and Datalog calls negation that is restricted in this way "stratified"; the restriction is what gives every fact exactly one value. Each rule records its premises, and a predicate that reads a fact of another item declares it. The reconciler orders the layers from those two when it loads the rules, and it fails on a cycle.
 
 ### What "complete" means
 
@@ -388,13 +403,13 @@ Nothing guarantees that a set of rules is complete, and the word has three meani
 
 - *Every item gets a defined result.* This holds. Evaluation is closed-world: a fact for which no reason holds is false. An item about which no rule says anything gets no label and no comment and stays open. There is no undefined case and no final "else" to forget.
 - *Every situation that the project cares about has a rule.* No formalism guarantees this. A missing rule is silent: the item gets nothing. The design can only make the silence visible, through the decision tables below.
-- *No rule is dead, and outputs that exclude each other never hold together.* Both are checked by enumeration.
+- *Every rule can hold, and outputs that exclude each other never hold together.* Both are checked by enumeration.
 
-A **decision table** is generated for each output. A generator enumerates the combinations of the observations that the output depends on through the layers, evaluates the rules, and writes one row per combination: the result, and the names of the reasons and vetoes of that output that held. Rows that differ only in an observation that does not matter are merged. The tables are committed files. A PR that adds a rule changes them, and the reviewer reads the consequences as a diff: which combinations now close, and which no longer carry a label. A row with no reason is a combination that the rules say nothing about, and it is there to be read.
+A **decision table** is generated for each output. A generator enumerates the combinations of the base facts that the output depends on through the layers, evaluates the rules, and writes one row per combination: the result, and the names of the reasons and vetoes of that output that held. Rows that differ only in a base fact that does not matter are merged. The tables are committed files. A PR that adds a rule changes them, and the reviewer reads the consequences as a diff: which combinations now close, and which no longer carry a label. A row with no reason is a combination that the rules say nothing about, and it is there to be read.
 
-The table of `label:stale` in the prototype is the smallest one:
+The table of `label:stale` in the prototype is the smallest one. It is shown here with the base fact under the name `quiet_for_60_days`:
 
-| idle (observed) | do_not_expire | `label:stale` | reasons that held | vetoes that held |
+| quiet_for_60_days | do_not_expire | `label:stale` | reasons that held | vetoes that held |
 |---|---|---|---|---|
 | yes | yes | no | | |
 | yes | no | **yes** | idle | |
@@ -402,23 +417,23 @@ The table of `label:stale` in the prototype is the smallest one:
 
 Three limits of the tables showed in the prototype.
 
-- **A table stays readable only when it names the rules of its own output.** A table that named every rule that held in the layers below would have a different last column in almost every row, and no rows would merge. `should_close` depends on eight observations, which is 256 combinations, and its table has 24 rows. The table of `comment` has 21.
-- **A table still grows fast.** Each reason that is added to an output roughly doubles its table, because the observations of the new reason combine with the rows that exist.
-- **A table does not cross from an issue to a PR.** The observations are enumerated as independent booleans, and the enumeration cannot follow a fact of an issue into a PR. In the table of `label:duplicate`, `is_duplicate` is one column and `allow-multiple-prs` does not appear. `has_duplicate_prs` has a table of its own.
+- **A table stays readable only when it names the rules of its own output.** A table that named every rule that held in the layers below would have a different last column in almost every row, and no rows would merge. `should_close` depends on eight base facts, which is 256 combinations, and its table has 24 rows. The table of `comment` has 21.
+- **A table still grows fast.** Each reason that is added to an output roughly doubles its table, because the base facts of the new reason combine with the rows that exist.
+- **A table does not cross from an issue to a PR.** The base facts are enumerated as independent booleans, and the enumeration cannot follow a fact of an issue into a PR. In the table of `label:duplicate`, `is_duplicate` is one column and `allow-multiple-prs` does not appear. `has_duplicate_prs` has a table of its own.
 
-The same enumeration runs two checks. A rule that holds in no row, and a fact or output that holds in no row, are reported as dead. A declared exclusion, such as `exclusive(missingIssueLabel, unapprovedIssueLabel)`, fails in any row in which both hold.
+The same enumeration runs two checks. A rule, a derived fact or an output that holds in no row is reported as one that never holds. A declared exclusion, such as `policy.exclusive(missingIssueLabel, unapprovedIssueLabel)`, fails in any row in which both hold.
 
 ### Time and history
 
-A time rule is an invariant like the others. The clock is a base fact, so an age is a fact, and "closed a week after flagging" is `Age ≥ days(7) ⇒ closed`. Nothing counts down and nothing has to fire. The thresholds are inclusive: a PR that has been flagged for exactly 7 days is closed, and one that has been idle for exactly 60 days is stale.
+A time rule is an invariant like the others. The clock is an input, so an age is a function of the inputs, and "closed a week after flagging" is `Age ≥ days(7) ⇒ closed`. Nothing counts down and nothing has to fire. The thresholds are inclusive: a PR that has been flagged for exactly 7 days is closed, and one that has been idle for exactly 60 days is stale.
 
 The question that remains is where the base timestamp comes from. For the deadline it is `flagged_since`: the start of the current unbroken period in which the PR carries a flag label. GitHub records it. Both the REST endpoint `issues/{number}/events` and the GraphQL `timelineItems` connection return a `labeled` and an `unlabeled` event for every label change, with the label name, the actor and a timestamp to the second. On jaeger-ui PR 4815 the two interfaces return the same five label events. The events are kept: issues of jaeger created in 2017 still return theirs. The GraphQL connection filters by event type, so the query costs one small connection per PR.
 
-This replaces the rule of #10257, which takes the time from the creation of a bot comment found through a hidden marker. The label event needs no comment and no marker, and a person can read it in the timeline of the PR. Its cost is that the label now has two roles: it shows the conclusion, and its event time is the base fact of the deadline. A maintainer who removes the label by hand restarts the week when the reconciler puts it back, and a maintainer who applies it by hand starts one. Both are visible in the timeline with the actor's name. The age of a label is also the one thing a rule reads that the reconciler itself produced; "Rules that contradict each other" states why that one case is safe.
+This replaces the rule of #10257, which takes the time from the creation of a bot comment found through a hidden marker. The label event needs no comment and no marker, and a person can read it in the timeline of the PR. Its cost is that the label now has two roles: it shows the conclusion, and its event time is the start of the deadline. A maintainer who removes the label by hand restarts the week when the reconciler puts it back, and a maintainer who applies it by hand starts one. Both are visible in the timeline with the actor's name. The age of a label is also the one thing a rule reads that the reconciler itself produced; "Rules that contradict each other" states why that one case is safe.
 
-The other history facts come from the same timeline:
+The other values that depend on history come from the same timeline:
 
-| Fact | Base facts |
+| Value | Inputs |
 |---|---|
 | `flagged_since` | `labeled` and `unlabeled` events of the two flag labels, which count as one label |
 | The author has acted since a maintainer last passed the turn | The conversation comments and the reviews of the author and of maintainers, and the pushes of the author |
@@ -436,14 +451,16 @@ What was not checked: what the events of a label return after the label is renam
 
 ### The existing policies as invariants
 
-| Policy | Reasons | Vetoes | Fits |
+In the second column an arrow is a reason, and a name with a colon is a base fact with what its predicate tests.
+
+| Policy | Base facts and reasons | Vetoes | Fits |
 |---|---|---|---|
-| Linked issue | no linked issue is open and carries `help wanted` ⇒ `needs_issue` · the PR links an open issue in a `jaegertracing` repository ⇒ `links_open_issue` · `needs_issue ∧ links_open_issue` ⇒ label `unapproved-issue` · `needs_issue` ⇒ label `missing-issue` | `no_issue_needed` ⇒ not `needs_issue` · `author_can_write` ⇒ not `needs_issue` · `author_is_dependency_bot` ⇒ not `needs_issue` · `links_open_issue` ⇒ not label `missing-issue` | Yes |
+| Linked issue | no linked issue is open and carries `help wanted` ⇒ `needs_issue` · `links_open_issue`: the PR links an open issue in a `jaegertracing` repository · `needs_issue ∧ links_open_issue` ⇒ label `unapproved-issue` · `needs_issue` ⇒ label `missing-issue` | `no_issue_needed` ⇒ not `needs_issue` · `author_can_write` ⇒ not `needs_issue` · `author_is_dependency_bot` ⇒ not `needs_issue` · `links_open_issue` ⇒ not label `missing-issue` | Yes |
 | Linked-issue deadline | `needs_issue` ∧ the flag label is at least 7 days old ⇒ `flag_expired` · `flag_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `should_close` | Yes. Closing cannot be undone by the next run; see "What is not declarative". |
 | Stale | no person has acted for 60 days ⇒ `idle` · `idle` ⇒ label `stale` · `idle` ∧ the `stale` label is at least 14 days old ⇒ `idle_expired` · `idle_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `idle` | Yes, once activity means activity by a person. `actions/stale` cannot make that distinction. |
-| Duplicates | two or more open PRs close the issue ⇒ `has_duplicate_prs`, a fact of the issue · an older open PR closes a `has_duplicate_prs` issue that the PR closes ⇒ `is_duplicate` · `is_duplicate` ⇒ label `duplicate` | `allow_multiple_prs` ⇒ not `has_duplicate_prs` | Yes. Two open PRs on one issue are duplicates whatever else is true of them: a PR that is flagged, over quota or stale counts like any other. The policy counts issues of the PR's own repository only, as `pr-duplicates` does. The veto attaches to the issue, because a PR can close two issues and only one of them may carry the label. |
-| Author quota | the position of the PR among the author's open PRs, in creation order, exceeds the quota for the author's merged PR count ⇒ `over_quota` · `over_quota` ⇒ label `pr-quota-reached` | None today | Yes. The rule needs a count and a rank. |
-| Waiting for author | a maintainer's latest conversation comment or review that is not an approval is newer than the author's latest comment and latest push ⇒ `authors_turn` · `authors_turn` ⇒ label `waiting-for-author` | None today | Yes. It replaces a reaction to single events. Whether a comment asks for anything is a judgment that neither form has. |
+| Duplicates | two or more open PRs close the issue ⇒ `has_duplicate_prs`, a fact of the issue · `is_duplicate`: an older open PR closes a `has_duplicate_prs` issue that the PR closes · `is_duplicate` ⇒ label `duplicate` | `allow_multiple_prs` ⇒ not `has_duplicate_prs` | Yes. Two open PRs on one issue are duplicates whatever else is true of them: a PR that is flagged, over quota or stale counts like any other. The policy counts issues of the PR's own repository only, as `pr-duplicates` does. The veto attaches to the issue, because a PR can close two issues and only one of them may carry the label. |
+| Author quota | `over_quota`: the position of the PR among the author's open PRs, in creation order, exceeds the quota for the author's merged PR count · `over_quota` ⇒ label `pr-quota-reached` | None today | Yes. The rule needs a count and a rank. |
+| Waiting for author | `authors_turn`: a maintainer's latest conversation comment or review that is not an approval is newer than the author's latest comment and latest push · `authors_turn` ⇒ label `waiting-for-author` | None today | Yes. It replaces a reaction to single events. Whether a comment asks for anything is a judgment that neither form has. |
 | Blocked, and the comment | `needs_issue` ⇒ `blocked` · `over_quota` ⇒ `blocked` · `is_duplicate` ⇒ `blocked` · `blocked` ⇒ the comment exists · `idle` ⇒ the comment exists | None today | Yes, as a statement: for every label of the plan that gives notice, a policy comment exists that was created after the PR got the label. Creating the comment is the non-declarative part. |
 | Changelog label | no `changelog:` label ⇒ the check fails | None | In part. The reconciler can observe that the invariant is broken and cannot restore it, because only a person can choose the label. It remains a failing required check. |
 
@@ -455,7 +472,7 @@ The policies use one definition of a maintainer: a person whom the repository li
 
 The reconciler keeps one comment on a PR. `blocked` is a reason for it, and so is `idle`: a PR is closed two weeks after the `stale` label, so the notice has to exist, and `actions/stale` posts such a notice today.
 
-The name of a rule does not carry the data that a comment needs. The comment of today names the linked issue that is closed and the PR that came first on an issue. A fact therefore has two texts. `says` is the static wording of the rule. The summary is what the observation found on this PR, and the observation returns it with the boolean:
+The name of a rule does not carry the data that a comment needs. The comment of today names the linked issue that is closed and the PR that came first on an issue. A base fact therefore has two texts. `says` is its static wording. The summary is what the predicate found on this PR, and the predicate returns it with the boolean:
 
 ```ts
 (pr, { now }) => {
@@ -467,15 +484,15 @@ The name of a rule does not carry the data that a comment needs. The comment of 
 };
 ```
 
-The comment has one paragraph for each observation that is a reason for it, through `blocked` or directly: the `says` wording of the rule and the summary of the observation. When `should_close` holds, it ends with a sentence that says why the PR is closed, built from the `says` wording of the reasons. The cost of the summary is that it is code that the decision tables do not show: a table says that a PR gets a comment, and not what the comment says.
+The comment has one paragraph for each base fact that leads to it, through `blocked` or directly: the `says` wording of the fact and the summary of its predicate. When `should_close` holds, it ends with a sentence that says why the PR is closed, built from the `says` wording of the reasons. The cost of the summary is that it is code that the decision tables do not show: a table says that a PR gets a comment, and not what the comment says.
 
 ### Plan and apply
 
 The reconciler does four things in one run, and only the last one changes GitHub.
 
-1. **Observe.** It queries the open PRs with the base facts. A query that fails or returns a truncated list ends the run. An absent fact must never be read as a false one, because "no linked issue" leads to a closed PR.
-2. **Derive.** It evaluates the rules for every PR in one forward pass. The result is the "plan": for each PR, the set of labels that the reconciler owns and the PR should carry, the text of the comment, and whether the PR should be closed.
-3. **Compare.** It subtracts what the PR has from the plan. The difference is a list of six kinds of change: add a label, remove a label, create a comment, edit a comment, minimize a comment, close. Minimizing applies to the older comments of the replaced actions and of the reconciler, once a newer comment has taken their place.
+1. **Observe.** It queries the open PRs with their inputs. A query that fails or returns a truncated list ends the run. An absent fact must never be read as a false one, because "no linked issue" leads to a closed PR.
+2. **Derive.** It evaluates the rules for every PR in one forward pass. The result is the "plan": for each PR, the set of labels that the reconciler owns and the PR should carry, the text of the comment, the result and the body of the check run, and whether the PR should be closed.
+3. **Compare.** It subtracts what the PR has from the plan. The difference is a list of seven kinds of change: add a label, remove a label, create a comment, edit a comment, minimize a comment, publish the check run, close. Minimizing applies to the older comments of the replaced actions and of the reconciler, once a newer comment has taken their place.
 4. **Apply.** It makes those changes. A PR whose plan matches its state receives no API call that changes it, so its `updated_at` does not move.
 
 The terms come from Terraform's `plan` and `apply`. A run in shadow mode stops after step 3 and reports the difference.
@@ -488,10 +505,10 @@ Two runs are compared by a JSON report that holds the decisions for each PR and 
 
 The power of Prolog is in finding a proof: unification, backtracking, recursion. This problem uses none of them, and the design builds no engine.
 
-- **The rules are not recursive.** No fact is defined through itself, directly or through other facts. The facts form a directed acyclic graph, shown below.
+- **The rules are not recursive.** No fact is defined through itself, directly or through other facts. The facts form a directed acyclic graph. The figure below shows the layers of that graph and not every fact: it draws `needs_issue` and `idle` without the base facts under them, and it leaves out the facts of the checks and `merge_blocked`.
 - **Nothing is searched for.** A Prolog query asks "for which X does this hold". The reconciler asks a fixed question of every open PR: what are the values of these few named facts. Every rule has a fixed shape, and its inputs are known before it runs.
-- **One forward pass computes the plan.** The facts are evaluated layer by layer, in an order that is known when the rules are written. For each fact the combinator asks two questions of a list: does any reason hold, and does any veto hold. That is a loop over a list and not a search.
-- **Applying the plan involves no planning.** The difference is a set of independent changes. Their order is one constant list, given in "What is not declarative". Nothing chooses among orders.
+- **One forward pass computes the plan.** The facts are evaluated layer by layer, in an order that is known when the rules are written. For each derived fact and each output the combinator asks two questions of a list: does any reason hold, and does any veto hold. That is a loop over a list and not a search.
+- **Applying the plan involves no planning.** The difference is a set of independent changes. Their order is one constant list, given in "What is not declarative". Nothing chooses among orders. The list does not yet say where the check run is published.
 
 ```
 inputs (observed)
@@ -503,24 +520,32 @@ inputs (observed)
                           └─► labels, comment
 ```
 
-One arrow needs a remark. `is_duplicate` is a fact of a PR, and its observation reads `has_duplicate_prs`, a fact of an issue that is computed from every open PR that closes the issue. An observation is therefore not always a function of the inputs alone. Such an observation declares what it reads:
+One arrow needs a remark. `is_duplicate` is a base fact of a PR, and its predicate reads `has_duplicate_prs`, a derived fact of an issue that is computed from every open PR that closes the issue. A predicate is therefore not always a function of the inputs alone. Such a predicate declares what it reads:
 
 ```ts
 // duplicates.ts
-const hasDuplicatePrs = issueFact('has_duplicate_prs')
-  .when((issue, lower) => pullRequestsClosing(issue, lower).length >= 2, {
-    says: 'two or more open pull requests close the issue',
-    by: 'author',
-  })
+const severalPrsCloseIssue = policy.issueBaseFact(
+  'several_prs_close_issue',
+  (issue, lower) => pullRequestsClosing(issue, lower).length >= 2,
+  { says: 'two or more open pull requests close the issue', changedBy: 'author' },
+);
+const hasDuplicatePrs = policy
+  .issueDerivedFact('has_duplicate_prs')
+  .when(severalPrsCloseIssue)
   .unless(allowMultiplePrs);
 
-export const isDuplicate = fact('is_duplicate').when(
+export const isDuplicate = policy.baseFact(
+  'is_duplicate',
   (pr, lower) => issuesWithOlderPullRequest(pr, lower).length > 0,
-  { says: 'an older open pull request closes the same issue', by: 'author', reads: [hasDuplicatePrs] },
+  {
+    says: 'an older open pull request closes the same issue',
+    changedBy: 'author',
+    reads: [hasDuplicatePrs],
+  },
 );
 ```
 
-The declared `reads` gives the observation a place in the layer order, like a rule, and it can take part in a cycle, which the reconciler reports when it loads the rules. This is the only place where a fact of one item is read for another.
+The declared `reads` gives the predicate a place in the layer order, like a rule, and it can take part in a cycle, which the reconciler reports when it loads the rules. This is the only place where a fact of one item is read for another.
 
 The rules over a set range over every PR that is open when the run observes the repository. A PR that the run closes still counts in that run. The next run no longer lists it, and it then frees a place in the author's quota or leaves another PR as the oldest on its issue. Because the set does not depend on the plan, no rule is restricted in what it may conclude from the set: `is_duplicate ⇒ should_close` would be a legal rule.
 
@@ -533,17 +558,17 @@ Rules written by different people at different times can contradict each other. 
 **Answer 1: prevention by construction.** The state of an item is split in two.
 
 - *Inputs* are what the reconciler never changes: linked issues and their labels, the labels that people own (`help wanted`, `no-issue-needed`, `do-not-expire`, `allow-multiple-prs`), authorship and permissions, creation times, comments and pushes by people, and the clock.
-- *Outputs* are what the reconciler owns: its labels, its comment, and the closing of a PR.
+- *Outputs* are what the reconciler owns: its labels, its comment, its check run, and the closing of a PR.
 
-Three construction rules follow. A rule reads inputs and facts of lower layers, and never an output. A rule is a reason or a veto, and nothing else: it cannot say "remove" or "reopen". And one fixed precedence combines them: a veto wins.
+Three construction rules follow. A predicate reads inputs, and it may read a fact of a lower layer of another item when it declares that fact. A rule reads facts of lower layers. Neither reads an output, and the label age below is the one exception. A rule is a reason or a veto, and nothing else: it cannot say "remove" or "reopen". And one fixed precedence combines them: a veto wins.
 
 Under these rules the plan is a function of the inputs, and two rules cannot contradict each other. Two reasons for the same fact add up. Two vetoes add up. A reason and a veto that both hold are not a conflict, because the result is defined before either is written. In the example, `stale` has the reason "no person has acted for 60 days", and closing follows from `idle_expired`, which requires the same `idle` fact. Activity by a person makes `idle` false, so the label loses its reason and the closing loses its reason in the same pass. No rule removes anything, and neither rule reads what the other produced.
 
-What this form gives up is the single place where the whole condition of an output is written. The decision tables take that role.
+What this form gives up is the single place where all the rules of one output are written. The decision tables take that role.
 
 **Answer 2: detection.** Rules may assert any action on an output, each written without knowledge of the others: "add `stale` after 60 idle days", "remove `stale` on activity", "close an item that carries `stale` for 14 days". A conflict is then a property of the rule set, and something has to find it and something has to resolve it. Finding it is the work of a solver or of tests. An SMT solver such as Z3 can prove that no assignment of facts makes two rules demand different values. Datalog with integrity constraints, and Rego, report a conflict when an evaluation produces one: Rego fails an evaluation in which a rule yields two different values. Exhaustive tests over the fact space do the same for every case they enumerate. Resolving it needs priorities between rules, and a priority is the imperative form coming back: "close if stale, but not if this, unless that".
 
-**Does the partition hold for the policies of today?** It holds for the inputs. No automation writes `help wanted`, `no-issue-needed`, `do-not-expire` or `allow-multiple-prs`. Five things break it today or need a decision:
+**Does the partition hold for the policies of today?** It holds for the inputs. No automation writes `help wanted`, `no-issue-needed`, `do-not-expire` or `allow-multiple-prs`. Six things break it today or need a decision:
 
 | What | How it breaks the partition | What the design does |
 |---|---|---|
@@ -552,8 +577,9 @@ What this form gives up is the single place where the whole condition of an outp
 | `waiting-for-author` | The script sets it on an event, and a maintainer can set or clear it by hand. | The label is derived from the timeline. A maintainer who wants the author to act says so in a comment or a review, which is an input. A hand edit does not last. |
 | Open or closed | Both people and the reconciler close PRs, and the set of open PRs is an input to the quota and duplicate rules. | The reconciler concludes "closed" and never "open". The rules over a set range over the PRs that are open when the run observes them, which is an input. A person reopens a PR; if the rules still want it closed, the next run closes it. |
 | A notice period | "Closed seven days after it was flagged" depends on when the reconciler applied its own label. That fact exists only because of an output. | The one permitted exception, below. |
+| Two predicates of the checks | The predicates of `packages/checks` were written before the reconciler, and they receive the whole PR. `ci_failing` reads the status rollup of the head commit, and the `PR policy` check run is part of that rollup. `stale_on_author` reads the `stale` label and `updatedAt` of the PR, and every write of the reconciler moves `updatedAt`. | Each of the two is a predicate that reads an output, which the construction rules forbid. Both change before the reconciler publishes the check run: the rollup that `ci_failing` reads leaves out `PR policy`, and `stale_on_author` reads the facts of the reconciler or leaves the policy. Step 3 of "Migration Path" carries the requirement. |
 
-**The notice exception.** A deadline that runs from a warning cannot be derived from inputs alone, because the warning is an act of the automation. The design permits one form of rule that reads it, the "notice": a reason that names a fact beside the age of that fact's label, as in `fact('idle_expired').when(idle, staleLabelOld)`. `idle_expired` and `flag_expired` are the two instances. `labelAge()` makes the age, and it is the only observation of something that the reconciler wrote: the inputs that an ordinary observation receives leave out the dates of the label periods. The form is safe for three reasons. The rule repeats the fact that gives the label its reason, so the deadline can never expire while the label is unwanted. The label's own rules read nothing of the deadline, so the dependency runs one way. And what is read is the age of the label, which only grows while the label stays.
+**The notice exception.** A deadline that runs from a warning cannot be derived from inputs alone, because the warning is an act of the automation. The design permits one form of rule that reads it, the "notice": a reason that names a fact beside the age of that fact's label, as in `policy.derivedFact('idle_expired').when(idle, staleLabelOld)`. `idle_expired` and `flag_expired` are the two instances. `policy.labelAge()` declares the age as a base fact, and its predicate is the only one that the design allows to read something that the reconciler wrote: the inputs that a predicate of the reconciler receives leave out the dates of the label periods. The two predicates of the checks in the table above also read such things as they stand, and they change before the check run is published. The form is safe for three reasons. The rule repeats the fact that gives the label its reason, so the deadline can never expire while the label is unwanted. The label's own rules read nothing of the deadline, so the dependency runs one way. And what is read is the age of the label, which only grows while the label stays.
 
 The startup check tests the form in two parts, because the first reason has no structural test. The structural part accepts a label age only in a reason, never in a veto, and only beside another fact. It cannot tell whether that fact is the one behind the label when one fact shows as either of two labels, as `needs_issue` does. The enumeration covers the rest: it derives the plan of each row, sets every label age to what the labels of that plan leave, and derives again. A notice whose fact is not the one behind its label gives a second plan that differs from the first.
 
@@ -567,49 +593,49 @@ Legend: 🟢 good · 🟨 partial or caveated · ❌ poor.
 | Oscillation between runs | 🟢 impossible inside the reconciler | 🟨 found for enumerated cases | 🟨 ¹ |
 | A rule can be added without editing the existing ones | 🟢 ² | 🟢 | 🟢 |
 | What a maintainer has to hold in mind | 🟢 small rules and one precedence | ❌ the rule set and its priorities | ❌ the rule set, its priorities and the solver model |
-| Seeing the whole condition of one output | 🟨 ² | ❌ | 🟨 |
+| Seeing all the rules of one output | 🟨 ² | ❌ | 🟨 |
 | A label that people also set | 🟨 ³ | 🟨 | 🟨 |
 | Reported at startup, before any item is touched | 🟢 ⁶ | ❌ ⁷ | 🟨 ⁷ |
 | Tooling to build and keep | 🟢 the test runner | 🟢 the test runner | ❌ ⁴ |
 | An actor outside the reconciler | ❌ ⁵ | ❌ ⁵ | ❌ ⁵ |
 
 - ¹ A solver proves properties of one evaluation. Oscillation is a property of repeated runs, and proving its absence needs a model of how applying a plan changes the facts.
-- ² A new rule is a new statement. The whole condition of an output is then spread over several statements, possibly in several policies, and a veto can silence a reason that somebody else added. The decision table of the output is where both are read.
+- ² A new rule is a new statement. All the rules of one output are then spread over several statements, possibly in several policies, and a veto can silence a reason that somebody else added. The decision table of the output is where both are read.
 - ³ Every design has to decide who wins. Prevention decides it up front: the label has one writer, and a person uses an input.
 - ⁴ The rules exist twice, as code that runs and as formulas that the solver checks, and the two have to be kept the same. Rego avoids the second copy, and it reports a conflict only for the inputs of an evaluation.
 - ⁵ No design constrains `actions/stale`, another bot or a person. The cutover removes every other automated actor on PRs, `actions/stale` included.
-- ⁶ Rules are data over named boolean observations, so the whole check is a graph walk and an enumeration of booleans. It takes about 40 ms for the policies of today.
+- ⁶ Rules are data over base facts, so the whole check is a graph walk and an enumeration of booleans. It takes about 40 ms for the policies of the prototype.
 - ⁷ Rules that assert arbitrary actions are code, and code cannot be enumerated at load time. Tests find the conflict in CI. A solver can report at startup if the rules are also given to it as formulas.
 
 This RFC recommends prevention by construction. It is the only column in which the contradiction and the oscillation cannot occur, and it keeps what detection offers, the freedom to add a rule without editing another. It pays for that with footnote ²: the consequences of a rule are read from a generated table and not from one expression.
 
 The construction rules are checked, at startup and in tests, as the next section describes. The checks guard the construction and show its consequences. They are not the mechanism that resolves conflicts. In summary:
 
-1. **Layering.** The facts are ordered by what each rule and each observation reads. The check fails on a cycle, on a rule that reads an output, and on a rule that reads the age of a label outside the notice form.
-2. **Decision tables.** The generated table of each output, with the dead-rule check and the declared exclusions, as "What complete means" describes.
-3. **Convergence.** For every row of the enumeration the check derives the plan, sets each label age to what the labels of that plan leave, and derives again. The two plans must be equal. Applying a plan changes no other observation, so the label ages are the only path by which one plan can change the next, and a check that applied the whole plan to a stand-in for GitHub would find nothing more for a single PR.
+1. **Layering.** The facts are ordered by what each rule and each predicate reads. The check fails on a cycle, on a rule that reads an output, and on a rule that reads the age of a label outside the notice form.
+2. **Decision tables.** The generated table of each output, with the check for a rule that never holds and the declared exclusions, as "What complete means" describes.
+3. **Convergence.** For every row of the enumeration the check derives the plan, sets each label age to what the labels of that plan leave, and derives again. The two plans must be equal. Once the two predicates of the checks that read an output are changed, applying a plan changes no other base fact, so the label ages are the only path by which one plan can change the next, and a check that applied the whole plan to a stand-in for GitHub would find nothing more for a single PR.
 4. **Scenarios.** A table test names a situation with several PRs, such as two flagged PRs that link the same issue, and asserts the whole plan against an in-memory stand-in for GitHub.
 
-A solver would earn its place under conditions that this design removes. If rules could assert arbitrary actions and carried priorities, as in answer 2, a proof would have to replace the fixed precedence. If each repository could add its own rules on top of shared ones, nobody would read all the tables. If the observations were too many to enumerate, such as interacting numeric thresholds or unbounded sets, the tables would no longer be exhaustive. Cedar ships such an analyzer for its policies, which shows what the real thing looks like. None of the three holds here. The policies of today have 14 observations, no output depends on more than eight of them, and the form of the rules keeps it that way.
+A solver would earn its place under conditions that this design removes. If rules could assert arbitrary actions and carried priorities, as in answer 2, a proof would have to replace the fixed precedence. If each repository could add its own rules on top of shared ones, nobody would read all the tables. If the base facts were too many to enumerate, such as interacting numeric thresholds or unbounded sets, the tables would no longer be exhaustive. Cedar ships such an analyzer for its policies, which shows what the real thing looks like. None of the three holds here. The policies of the prototype have 14 base facts, no output depends on more than eight of them, and the form of the rules keeps it that way.
 
-### Contradictions are reported at startup
+### Violations are reported at startup
 
 The reconciler checks its rule set when it loads, before it queries GitHub and before it changes anything. A rule set that fails the check does not run. The alternative is to learn on a live PR that an item cannot progress, or that two rules keep undoing each other, which is how the motivating case was learned.
 
-A "contradiction" is any property of the rule set, independent of any particular PR, that makes the plan undefined, unstable or impossible to carry out. Six kinds exist for this rule form. The TypeScript compiler refuses part of them before the rules ever load, because the builder's types limit what a statement can name.
+A "violation" is a defect of the rule set, independent of any particular PR, that makes the plan undefined, unstable or impossible to carry out. Six kinds exist for this rule form. The rule form of the first migration step reports four of them. Its evaluator reports the dependency cycle when it loads a policy, and its startup check reports the rule that reads an output, the output that no person can clear, and the rule that never holds. The other two concern labels and label ages, and the reconciler adds them with those outputs. The TypeScript compiler refuses part of them before the rules ever load, because the builder's types limit what a statement can name.
 
 | Kind | Example | Refused by the compiler | Reported when the rule set loads |
 |---|---|---|---|
-| A dependency cycle between facts, through a reason or a veto | `idle_expired ⇒ not idle` together with `idle ∧ stale_label_old ⇒ idle_expired` | In part ¹ | A depth-first walk over what each rule and each observation reads fails with the rules on the cycle |
-| A rule that reads an output | An observation that tests for the `stale` label | An output passed to `.when` or `.unless`, or named in `reads`. The inputs of an ordinary observation do not contain the labels, the comment or the open state that the reconciler owns | A label age outside the notice form, and any rule that reaches the table without the builder |
+| A dependency cycle, through a reason or a veto | `idle_expired ⇒ not idle` together with `idle ∧ stale_label_old ⇒ idle_expired` | In part ¹ | A depth-first walk over what each rule and each predicate reads fails with the rules on the cycle |
+| A rule that reads an output | A predicate that tests for the `stale` label | An output passed to `.when` or `.unless`, or named in `reads`. The inputs of a predicate of the reconciler do not contain the labels, the comment or the open state that the reconciler owns. A predicate of the checks receives the whole PR, so the compiler refuses nothing there | A label age outside the notice form, and any rule that is added to the policy without the builder |
 | Two outputs that exclude each other and both hold | `missing-issue` and `unapproved-issue`; open and closed | Open against closed, because no statement can conclude "open" | Declared pairs, by enumeration: a row in which both hold fails, with the rules that held |
-| An output that no person can change | A `blocked` PR that nothing a person does can unblock | A label that the reconciler does not own | A target that is no output and that nothing reads. By enumeration: an output that holds in a row and still holds for every value of the observations that the author or a maintainer controls |
+| An output that no person can clear | A `blocked` PR that nothing a person does can unblock | A label that the reconciler does not own | A conclusion that is no output and that nothing reads. By enumeration: an output that holds in a row and still holds for every value of the base facts whose change source is the author or a maintainer |
 | Non-convergence: deriving again after the plan is applied gives a different plan | A deadline that reads the age of a label which its own plan removes | No | By enumeration: each row is derived, the label ages are set to what the labels of that plan leave, and the row is derived again |
-| A dead rule | A reason that names a fact which nothing defines; a rule whose condition holds in no row | No | A name that no observation and no rule defines. By enumeration: a rule, a fact or an output that holds in no row |
+| A rule that never holds | A reason that names a fact which nothing declares; a rule whose premises hold together in no row | No | A premise that is no base fact and that no rule decides. By enumeration: a rule, a derived fact or an output that holds in no row |
 
 - ¹ A chained definition can name only constants that are declared above it, so a cycle cannot be written inside the declarations of one module, and modules that import each other in a circle fail at load. A cycle can still be written by a separate statement after the declarations, such as `idle.unless(idleExpired)`, and the load-time check reports it.
 
-The prototype carries seven seeded contradictions, and each stops the load with a message that names the rules:
+The prototype carries seven seeded violations, and each stops the load with a message that names the rules:
 
 ```
 seeded: cycle-through-veto
@@ -621,34 +647,35 @@ seeded: label-age-outside-notice-form
     rules: stale_label_old ⇒ not needs_issue
 ```
 
-**The convergence check is narrow, and that is correct.** The plan is a function of the observations, and applying a plan changes none of them except the label ages. A check that applied each plan to a stand-in for GitHub and derived again would therefore return the same plan for every other observation. The enumeration tests the one path that exists.
+**The convergence check is narrow, and that is correct.** The plan is a function of the base facts. Applying a plan changes none of them except the label ages, once the two predicates of the checks that read an output are changed, as "Rules that contradict each other" requires. A check that applied each plan to a stand-in for GitHub and derived again would therefore return the same plan for every other base fact. The enumeration tests the one path that exists.
 
 **The representation that this requires.** A check at load time cannot look inside a function. The statements of the builder therefore produce data, in two parts.
 
-- An **observation** is a named boolean, such as `idle (observed)` for "no person has acted on the pull request for 60 days". Its function is opaque code. What the check knows about it is declared: who can change it (`by`), which facts of other items it reads (`reads`), and, for a label age, which labels it measures.
-- A **rule** is data: its kind, its target, and the names of the facts that must all hold. It contains no code.
+- A **base fact** is a named boolean, such as `quiet_for_60_days` for "no person has acted on the pull request for 60 days". Its predicate is opaque code. What the check knows about it is declared: its change source (`changedBy`), which facts of other items its predicate reads (`reads`), and, for a label age, which labels it measures.
+- A **rule** is data: its conclusion, its premises, which are the names of the facts that must all hold, and whether it is a veto. It contains no code.
 
-A threshold lives inside an observation, so the check sees booleans only. An observation that reads other items, such as `is_duplicate`, is one free boolean of the enumeration.
+A threshold lives inside a predicate, so the check sees booleans only. A base fact whose predicate reads other items, such as `is_duplicate`, is one free boolean of the enumeration.
 
-One owner per observation is a simplification that the check for a path to change depends on. `needs_issue` is marked `author`, although a maintainer who adds `help wanted` to the issue changes it too.
+One change source per base fact is a simplification that the check for an output that no person can clear depends on. `no_approved_issue` has the change source `author`, although a maintainer who adds `help wanted` to the issue changes it too.
 
-**The size of the space.** The policies of today are 25 rules over 14 observations. The check does not enumerate the full product of 16,384 combinations. It enumerates, for each output and each declared exclusion, only the observations that the output depends on through the layers: eight for `should_close` and eight for `comment`, which is 256 rows each. The cost then grows with the widest single output and not with the number of policies. The structural part and the enumeration together take about 40 ms.
+**The size of the space.** The figures of this paragraph are measured on the prototype. It declares a base fact and its vetoes in one statement, so its count has no reason from `quiet_for_60_days` to `idle`, and it does not hold the facts of the checks. Its policies are 25 rules over 14 base facts. The check does not enumerate the full product of 16,384 combinations. It enumerates, for each output and each declared exclusion, only the base facts that the output depends on through the layers: eight for `should_close` and eight for `comment`, which is 256 rows each. The cost then grows with the widest single output and not with the number of policies. The structural part and the enumeration together take about 40 ms.
 
 Enumeration of booleans is a complete decision procedure at this size, so the check proves what it reports and needs no solver. Both parts therefore run whenever the rule set is loaded: the structural part and, when it passes, the enumeration.
 
 **Where the check runs.** The rules live in `maintainer-tools` and nowhere else, and every repository gets the same rules. The check and the decision-table tests run in the CI of `maintainer-tools` on every change to the rules, and a change that fails them is not merged or released. A calling repository carries no rule definitions and needs no lint action of its own: the version that it pins has already passed. The reconciler runs the same check again when it loads, which costs milliseconds and stops a build that reached a repository without passing CI.
 
-**Per-repository input.** The policies of today need none. The label names, the thresholds, the quota tiers, the dependency bots and the link to the contributing guidelines are the same in jaeger and jaeger-ui, so they are part of the rules. Who is a maintainer and which organization the repository belongs to are observed from GitHub. A calling workflow passes two operational inputs: the token and the mode, shadow or write. The action validates the mode when it starts and stops on a value that it does not know. If a value ever has to differ between repositories, it is added as a named parameter of an observation, with a declared type and range that the action validates at startup, and never as a rule.
+**Per-repository input.** The policies of today need none. The label names, the thresholds, the quota tiers, the dependency bots and the link to the contributing guidelines are the same in jaeger and jaeger-ui, so they are part of the rules. Who is a maintainer and which organization the repository belongs to are observed from GitHub. A calling workflow passes two operational inputs: the token and the mode, shadow or write. The action validates the mode when it starts and stops on a value that it does not know. If a value ever has to differ between repositories, it is added as a named parameter of a predicate, with a declared type and range that the action validates at startup, and never as a rule.
 
-**On failure** the reconciler exits with an error before its first query. The message names the kind of contradiction and the rules involved, and for a failure found by enumeration it prints the row: the value of each observation, and the rules that held.
+**On failure** the reconciler exits with an error before its first query. The message names the kind of violation and the rules involved, and for a failure found by enumeration it prints the row: the value of each base fact, and the rules that held.
 
 **What the check cannot catch:**
 
-- An observation that computes the wrong boolean or the wrong summary from GitHub's data. It is a function, and the types limit what it receives, not what it does. The check trusts the name.
-- An observation that reads a fact which it did not declare. The declared `reads` is enforced when the observation runs, not when the rule set loads.
-- A policy module that nothing imports. Its statements never reach the table, and the check sees a rule set without them.
+- A predicate that computes the wrong boolean or the wrong summary from GitHub's data. It is a function, and the types limit what it receives, not what it does. The check trusts the name.
+- A predicate that reads an output through the data that it receives. A predicate of the checks receives the whole PR, and `ci_failing` and `stale_on_author` read an output in this way.
+- A predicate that reads a fact which it did not declare. The declared `reads` is enforced when the predicate runs, not when the rule set loads.
+- A policy module that nothing imports. Its statements never reach the `Policy` object, and the check sees a rule set without them.
 - A rule that is missing. The decision tables show the rows with no reason, and a person has to judge them.
-- A false alarm in a row that cannot occur. The observations are enumerated as independent, and some are not: a `stale` label cannot be 14 days old on a PR that somebody touched yesterday. Such rows also appear in the decision tables.
+- A false alarm in a row that cannot occur. The base facts are enumerated as independent, and some are not: a `stale` label cannot be 14 days old on a PR that somebody touched yesterday. Such rows also appear in the decision tables.
 - Interactions among several PRs. The check treats "an older open PR closes the same issue" as one free boolean, and its convergence check covers one PR. Sets of PRs are covered by scenario tests, which are not exhaustive.
 - A person or another bot that undoes a change. No rule set contains them.
 
@@ -657,7 +684,7 @@ Enumeration of booleans is a complete decision procedure at this size, so the ch
 Three things remain outside the rules. Each is in the machinery once, not in each policy.
 
 - **Creating a comment cannot be repeated safely.** Adding a label twice is harmless. Creating a comment twice leaves two comments, and each notifies the author. The notification invariant makes a single run correct. Two runs at the same time would both observe that the comment is missing. The reconciler therefore runs under one concurrency group per repository. This is also why the invariant speaks of the creation time of the comment: GitHub notifies for a new comment and not for an edit, so "the author was told about this label" is the fact that a policy comment exists that was created after the PR got the label. The time at which the PR got the label is the start of the current unbroken period of the label in the timeline, and the two flag labels count as one. A label that was removed and applied again has a new period, so the author is told again.
-- **The order of changes within one run.** A run can fail between two changes. The next run observes the half-finished item as it would any other and finishes the work, provided that no intermediate state makes a rule hold by accident. `apply()` therefore uses one fixed order: add labels, remove labels, create or edit the comment, minimize older comments, close. Adding before removing keeps the flagged period unbroken across a swap from `missing-issue` to `unapproved-issue`. The label precedes the comment so that the comment is newer than the label. Closing is last, after the comment has been edited to say that the PR is closed, so the reconciler needs no separate closing comment and cannot post one twice.
+- **The order of changes within one run.** A run can fail between two changes. The next run observes the half-finished item as it would any other and finishes the work, provided that no intermediate state makes a rule hold by accident. `apply()` therefore uses one fixed order: add labels, remove labels, create or edit the comment, minimize older comments, close. The place of the check run in this order is not chosen, as "Limitations" records. Adding before removing keeps the flagged period unbroken across a swap from `missing-issue` to `unapproved-issue`. The label precedes the comment so that the comment is newer than the label. Closing is last, after the comment has been edited to say that the PR is closed, so the reconciler needs no separate closing comment and cannot post one twice.
 - **Closing reaches a person and cannot be taken back.** `should_close` is derived like any other output, but a wrong conclusion has already sent a notification by the time the next run sees better facts. Three guards follow. A run with incomplete facts ends before it derives anything. And the rules never conclude "open": the reconciler does not reopen a PR. A person reopens it, and if it still violates and its label is still at least seven days old, the next run closes it again, as #10257 specifies. A run also fetches fresh, in the same run, every PR that the plan closes from cached facts, and derives the plan again.
 
 ### Reading, explaining and extending the rules
@@ -679,24 +706,29 @@ The same rule in both forms shows the difference. `rustybot` states "an idle iss
 As invariants, for all states at once:
 
 ```ts
-const idle = fact('idle').when(
+const issueIdle = policy.issueBaseFact(
+  'issue_idle',
   (issue, { now }) => daysSince(issue.lastActivityByPersonAt, now) >= 30,
-  { says: 'no person has acted on the issue for 30 days', by: 'author' },
+  { says: 'no person has acted on the issue for 30 days', changedBy: 'author' },
 );
-const staleLabel = label('stale').when(idle);
-const staleLabelOld = labelAge('stale_label_old', {
+const staleLabel = policy.label('stale').when(issueIdle);
+const issueStaleLabelOld = policy.labelAge('issue_stale_label_old', {
   of: [staleLabel],
   days: 30,
   says: 'the `stale` label is at least 30 days old',
 });
-close().when(fact('idle_expired').when(idle, staleLabelOld));
+policy.shouldClose.when(
+  policy.issueDerivedFact('issue_idle_expired').when(issueIdle, issueStaleLabelOld),
+);
 ```
+
+The sketch serves the comparison only. It uses the label and the closing of a PR, because this RFC designs no outputs of an issue, and `actions/stale` stays the idle timer of issues.
 
 | Task | Explicit transitions | Invariants |
 |---|---|---|
-| Read a rule | The reader follows a path: which state, which transition fired, what the previous transition left behind. | The reader reads one statement with a short condition. An observation is a function, and its `says` phrase states what it tests. |
+| Read a rule | The reader follows a path: which state, which transition fired, what the previous transition left behind. | The reader reads one statement with a few premises. A predicate is a function, and the `says` phrase of its base fact states what it tests. |
 | See everything that leads to an output | Every transition that carries the action, in every state. | The decision table of the output. The rules themselves are spread over the policies. |
-| Explain a label to a contributor | "A transition fired at some point"; the reason is in the history. | The `says` wording of the observations behind the label, which the shadow report prints for each PR, and their summaries in the comment. |
+| Explain a label to a contributor | "A transition fired at some point"; the reason is in the history. | The `says` wording of the base facts behind the label, which the shadow report prints for each PR, and their summaries in the comment. |
 | Add an exemption such as `do-not-expire` | A condition on every closing transition in every state: three places in `issue-manager.yml`. | One `.unless(...)`. |
 | Add a policy such as the quota | New states, or a parallel region, and a review of every transition that crosses it. | A new file, and one import of it. No existing statement is edited, and the diff of the decision tables shows what changed. |
 | Remove the effect when the cause goes away | A reverse transition has to be written, and it is the one that gets forgotten. | Nothing. The label is absent when no reason holds. |
@@ -721,7 +753,7 @@ Legend: 🟢 good · 🟨 partial or caveated · ❌ poor.
 | Time arithmetic | 🟢 | 🟢 | 🟨 | 🟨 | 🟢 |
 | Produces the comment text and the decision tables | 🟢 | 🟨 | ❌ | ❌ | ❌ |
 | Enforces the declarative form | 🟨 ⁷ | 🟢 | 🟢 | 🟢 | 🟢 |
-| Reports every kind of contradiction at startup | 🟢 ⁸ | 🟨 ⁹ | 🟨 ¹⁰ | 🟨 ⁹ | ❌ |
+| Reports every kind of violation at startup | 🟢 ⁸ | 🟨 ⁹ | 🟨 ¹⁰ | 🟨 ⁹ | ❌ |
 
 - ¹ Known to part of the CNCF community, but a second language for every contributor to the rules.
 - ² The combinator is a function of ten lines, written once. Rego rejects a combinator that is written once for all facts as recursion, so it needs the same two-line pattern on every fact.
@@ -729,33 +761,35 @@ Legend: 🟢 good · 🟨 partial or caveated · ❌ poor.
 - ⁴ A Cedar policy decides one request about one resource. It cannot define an intermediate fact or relate two PRs, so the facts would be computed in TypeScript and Cedar would see only the last layer.
 - ⁵ Relations are natural. Counting and ranking depend on the library.
 - ⁶ A CEL expression judges one item. It does not derive a relation between items.
-- ⁷ The rules are data and cannot break the form, and the types of the builder refuse an output as a condition. An observation is a function and could keep state; its inputs contain nothing that the reconciler owns.
+- ⁷ The rules are data and cannot break the form, and the types of the builder refuse an output as a premise. A predicate is a function and could keep state. The inputs of a predicate of the reconciler contain nothing that the reconciler owns; a predicate of the checks receives the whole PR, and two of them read an output as they stand ("Rules that contradict each other").
 - ⁸ With a checker of 223 lines that the project owns: a graph walk and an enumeration of booleans.
-- ⁹ The language rejects recursion when it loads the rules, which covers the dependency cycle. Exclusions, outputs with no path to change and non-convergence are not properties that it checks. They need the same enumeration, written as tests in or around the language.
+- ⁹ The language rejects recursion when it loads the rules, which covers the dependency cycle. Exclusions, outputs that no person can clear and non-convergence are not properties that it checks. They need the same enumeration, written as tests in or around the language.
 - ¹⁰ Cedar has an analyzer that proves properties of a policy set with a solver. It sees only what is written in Cedar, which here is the last layer.
 
 Cedar and CEL cannot express the facts or the rules over a set of PRs, and a Datalog or Prolog library costs the most to read. That leaves TypeScript and Rego.
 
-Rego was tried on the same rules and is not used, for three reasons. Its check at load time reported the dependency cycle and none of the other kinds of contradiction, so the enumeration had to be written around it anyway. It rejected a combinator that is written once for all facts as recursion, so the reason-and-veto pattern had to be repeated on every fact. And it evaluated the enumeration more slowly than the TypeScript evaluator. A second language would have bought one of the six checks.
+Rego was tried on the same rules and is not used, for three reasons. Its check at load time reported the dependency cycle and none of the other kinds of violation, so the enumeration had to be written around it anyway. It rejected a combinator that is written once for all facts as recursion, so the reason-and-veto pattern had to be repeated on every fact. And it evaluated the enumeration more slowly than the TypeScript evaluator. A second language would have bought one of the six checks.
 
 With TypeScript a maintainer reads one language, and the rules are the thin middle of the program: observing the inputs, generating the decision tables, writing the comment and applying the difference are TypeScript in any case. The cost is the code around the rules, which the project owns. In the prototype the evaluator, with the combinator and the layer order, is 210 lines, the startup check is 223, and the data types that they share are 114. That code is a loop over a list, a graph walk and a nested loop over booleans. It unifies nothing, searches nothing and does not recurse, so it is not an inference engine. It is still machinery that somebody maintains.
 
-The combinator is this function of the evaluator. It is the same for every target and names no policy:
+The combinator is this function of the evaluator. It is the same for every conclusion and names no policy:
 
 ```ts
-export function decide(
-  rules: readonly DeclaredRule[],
-  target: string,
-  isTrue: (name: string) => boolean,
+export function decideConclusion(
+  rules: readonly Rule[],
+  conclusion: string,
+  factHolds: (name: string) => boolean,
 ): Decision {
-  const held = rules.filter((rule) => targetOf(rule) === target && rule.when.every(isTrue));
-  const reasons = held.filter((rule) => !isVeto(rule)).map(ruleName);
-  const vetoes = held.filter(isVeto).map(ruleName);
+  const heldRules = rules.filter(
+    (rule) => rule.conclusion === conclusion && rule.premises.every(factHolds),
+  );
+  const reasons = heldRules.filter((rule) => !rule.isVeto).map(premiseText);
+  const vetoes = heldRules.filter((rule) => rule.isVeto).map(premiseText);
   return { holds: reasons.length > 0 && vetoes.length === 0, reasons, vetoes };
 }
 ```
 
-The rules stay authored in TypeScript even if a checker is added later. The statements build a table of data, so a SAT or SMT solver can be given the rules as generated formulas, with no second copy to maintain. That is the step to take when one output depends on more observations than enumeration can cover, at roughly 25. At eight observations under the widest output the enumeration is the proof, and it has no dependency.
+The rules stay authored in TypeScript even if a checker is added later. The statements record the rules as data, so a SAT or SMT solver can be given the rules as generated formulas, with no second copy to maintain. That is the step to take when one output depends on more base facts than enumeration can cover, at roughly 25. At eight base facts under the widest output the enumeration is the proof, and it has no dependency.
 
 ### The run model
 
@@ -765,13 +799,13 @@ Each repository has one workflow. It is triggered by `pull_request_target`, by i
 
 **What a run covers.** Every run covers all open PRs. The alternative is to cover the item of the event and the items that depend on it: the author's other open PRs for the quota, and the PRs that close the same issue for duplicates. That alternative breaks the property above, because a replaced pending run takes its event's item with it, and it adds a second place where the dependencies between items have to be right. The whole-repository run needs neither.
 
-The costs of covering everything are latency and API budget. Latency is the wait for the lock plus one run: a change is visible within about two run durations of the event, and a run is dominated by the start of the runner. The budget is handled by a cache of observed facts, described next.
+The costs of covering everything are latency and API budget. Latency is the wait for the lock plus one run: a change is visible within about two run durations of the event, and a run is dominated by the start of the runner. The budget is handled by a cache of observed inputs, described next.
 
 This model replaces the per-PR dispatch and per-PR group of #10234, the repository group of `pr-duplicates`, the author group of `pr-quota-manager` and the scheduled job that sits outside all of them. It has one cost that the dispatch was built to avoid: a pending run that GitHub replaces shows as a cancelled check on the PR whose event queued it. The check is not required, and the run that replaced it does the work.
 
 The daily run covers what no event reports: a deadline that expires, a label change on an issue in another repository, and an issue linked through the sidebar.
 
-### API budget and the cache of observed facts
+### API budget and the cache of observed inputs
 
 **The budget.** The workflow token has 1,000 GraphQL points per hour for the repository [\[18\]](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api). A query costs one point for every hundred requests that its nested connections would need. The backtest measured the cost that GitHub reports, with one run from an empty cache and one from a full cache for each repository:
 
@@ -782,20 +816,22 @@ The daily run covers what no event reports: a deadline that expires, a label cha
 
 The two runs gave the same plan for each of the 263 PRs. The budget allows about 20 runs an hour from an empty cache in jaeger. The lock lets one run follow another without pause, so a busy hour can exceed that without the cache. The backtest ran from a laptop with a maintainer's token, and it did not exercise the load of events.
 
-**The design.** Every run still covers all open PRs, and it fetches the full facts only for the PRs whose facts may have changed. A run makes four kinds of query.
+**The design.** Every run still covers all open PRs, and it fetches the full inputs only for the PRs whose inputs may have changed. A run makes four kinds of query.
 
 | Query | Returns | When |
 |---|---|---|
 | Listing | Every open PR with its author, its creation time, its `updatedAt`, and the repository, state and `updatedAt` of each linked issue | Every run |
 | Collaborators | The permission of everyone who has one on the repository | Every run |
-| Facts, 20 PRs in a query | Labels, linked issues with their labels, label events, conversation comments, reviews, commits and force pushes | For a PR whose cached row is missing or not current |
+| Inputs, 20 PRs in a query | Labels, linked issues with their labels, label events, conversation comments, reviews, commits and force pushes | For a PR whose cached row is missing or not current |
 | Merged counts, 50 authors in a query | The number of merged PRs of an author | For an author with two or more open PRs whose cached count may have changed |
 
-The reconciler has no cache, query builder or refresh loop of its own. It shares one of each with the triage CLI, as "One fact layer for the reconciler, the checks and the triage report" describes: the GraphQL client with its token lookup and retries, the cache of `packages/checks/src/cache.ts`, and the loop that lists the open PRs, compares each with its cached row and fetches the misses. The listing carries what the rules over a set need, which is the author, the creation time and the linked issues of every open PR. One rule says when a cached row is current. Its key holds the signals of the table below, and also the head commit and the check status, which the checks depend on. The cached rows carry a version number, which makes every row a miss when the shape of the facts changes.
+The four queries are those of the backtest, and they do not serve the check run. The facts of the checks need the sign-off of each commit, the status of the head commit, the mergeable state and the review threads of every open PR. The query for those inputs is not designed, and its cost is not measured, as "Limitations" records.
 
-`updatedAt` covers what happens on the PR itself. A label change moves it: on jaeger-ui PR 4815 `updatedAt` equals the time of its last label event. Comments, reviews and pushes move it as well. Five kinds of fact that the rules read do not move it, and each gets its own signal:
+The reconciler has no cache, query builder or refresh loop of its own. It shares one of each with the triage CLI, as "One fact layer for the reconciler, the checks and the triage report" describes: the GraphQL client with its token lookup and retries, the cache of `packages/checks/src/cache.ts`, and the loop that lists the open PRs, compares each with its cached row and fetches the misses. The listing carries what the rules over a set need, which is the author, the creation time and the linked issues of every open PR. One rule says when a cached row is current. Its key holds the signals of the table below, and also the head commit and the check status, which the checks depend on. The check status includes the `PR policy` check run for as long as `ci_failing` reads it, so until that predicate changes, each new result of the check run makes its PR a miss in the next run. The cached rows carry a version number, which makes every row a miss when the shape of the inputs changes.
 
-| Fact that `updatedAt` of the PR does not cover | How a run detects a change |
+`updatedAt` covers what happens on the PR itself. A label change moves it: on jaeger-ui PR 4815 `updatedAt` equals the time of its last label event. Comments, reviews and pushes move it as well. Five kinds of input that the predicates read do not move it, and each gets its own signal:
+
+| Input that `updatedAt` of the PR does not cover | How a run detects a change |
 |---|---|
 | A linked issue: its labels and state, also in another repository | The listing carries, for each PR, its closing issue references with each issue's repository, state and `updatedAt`. These join the freshness key. A different set of issues, or a different `updatedAt` on one of them, makes the PR a miss. |
 | The other PRs on the same issue, and the author's open PRs | Nothing is fetched. The listing carries the author, the creation time and the issue references of every open PR, and the rules over a set are evaluated on the listing and the cached facts in every run. |
@@ -803,7 +839,7 @@ The reconciler has no cache, query builder or refresh loop of its own. It shares
 | The permission of the author and of each commenter | One query returns the collaborators of the repository with their permissions, and every run makes it. The list is not cached, so the next run sees a change of permission. |
 | The passage of time | Nothing is fetched. A deadline is evaluated in every run from the cached timestamps and the current time. |
 
-Two gaps in these keys are known. A label that an issue form applies when the issue is created has an event one to three seconds newer than `updatedAt` of the issue, so the key does not see that label; every other label change that was examined moved `updatedAt` of its issue. And the merged count of an author whose PR was opened and merged between two runs is not fetched again until another PR of that author leaves the listing. Other gaps may exist that nobody has listed. The daily run therefore ignores the cache and fetches everything, which bounds any gap to a day at the cost of one run from an empty cache. A PR that a run is about to close is also fetched fresh in that run, so the one change that cannot be taken back never rests on cached facts.
+Two gaps in these keys are known. A label that an issue form applies when the issue is created has an event one to three seconds newer than `updatedAt` of the issue, so the key does not see that label; every other label change that was examined moved `updatedAt` of its issue. And the merged count of an author whose PR was opened and merged between two runs is not fetched again until another PR of that author leaves the listing. The inputs of the checks add a third gap: a push to the base branch can create a merge conflict on a PR, and no signal of the key covers the mergeable state. Other gaps may exist that nobody has listed. The daily run therefore ignores the cache and fetches everything, which bounds any gap to a day at the cost of one run from an empty cache. A PR that a run is about to close is also fetched fresh in that run, so the one change that cannot be taken back never rests on cached facts.
 
 Who counts as a maintainer, what the last activity was and which comment is a policy comment are derived after the cache, from the cached facts and the collaborators of the run. A change to one of those definitions therefore needs no new cache.
 
@@ -835,11 +871,11 @@ This RFC recommends the artifact of the previous run. The row that decides is th
 
 The cache code of the CLI is backed by `node:sqlite`, and the actions of `maintainer-tools` declare the `node20` runtime, which does not have that module; ARCHITECTURE.md keeps the cache out of their bundles for this reason. The observer sees the cache as a store of JSON values under a scope and a key (the `FactCache` interface), and the CLI backs that store with the SQLite file. The action backs the same interface with a plain JSON file, which is also what an artifact holds, so the action needs no runtime that has the module.
 
-**The invariant that makes this safe.** The stored file is a cache of observed facts and never a source of truth.
+**The invariant that makes this safe.** The stored file is a cache of observed inputs and never a source of truth.
 
 - The reconciler derives the same plan from an empty cache as from a full one. The observer tests derive every scenario both ways and compare the plans, and the backtest did the same for the open PRs of both repositories.
 - A cache that is lost, expired or of an older version costs API calls and nothing else.
-- No decision exists only in the cache. The file holds facts as GitHub returned them, each with the key that says whether it is still current. It holds no plan, no output and no record of what the reconciler did. "Flagged at" is the label event in the timeline, and "notified" is the comment on the PR.
+- No decision exists only in the cache. The file holds inputs as GitHub returned them, each with the key that says whether it is still current. It holds no plan, no output and no record of what the reconciler did. "Flagged at" is the label event in the timeline, and "notified" is the comment on the PR.
 - The file is untrusted input. Its content is public data, so reading it discloses nothing. Writing it is the risk: a false row with a matching key would feed the rules false facts. The reconciler validates the shape of the file, takes it only from a run of its own workflow, and fetches a PR fresh before it closes it. The workflow never checks out or runs code from a PR.
 
 **Measurement under load.** The figures above are for single runs. Shadow mode in Actions runs the reconciler under the real event load in two configurations, with the cache and without it. Each run logs the cost that GitHub reports for its queries, the number of PRs fetched in full, and the points that remain. The cutover waits until the run with the cache stays within the budget on the busiest observed hour.
@@ -852,7 +888,7 @@ The reconciler lives in `jaegertracing/maintainer-tools`, as one action that jae
 
 `maintainer-tools` already has the parts: predicates that are pure functions of the PR with an injected clock, one GraphQL query per PR that feeds all of them, a comment writer that skips an unchanged body, a dry-run mode on every action, and a CLI that runs the same code on a laptop. The reconciler is built on the same fact layer as those consumers, as "One fact layer for the reconciler, the checks and the triage report" describes. The CLI replaces the three local scripts in `jaeger/.github/scripts`. `jaegertracing/jaeger` is a Go repository in which this JavaScript is a guest, and jaeger-ui already pins three of its commits.
 
-This reverses one decision in `maintainer-tools`. Its ARCHITECTURE.md chooses one action per tool, for independent release cadence and narrower permissions [\[14\]](https://github.com/jaegertracing/maintainer-tools/blob/main/ARCHITECTURE.md). The motivating case shows what independent actors cost, and the permission argument does not separate the lifecycle actors: every one of them needs `issues: write` and `pull-requests: write`. The triage CLI and the read-only `pr-nudge` checks stay separate, because they change nothing that the reconciler owns.
+This reverses one decision in `maintainer-tools`. Its ARCHITECTURE.md chooses one action per tool, for independent release cadence and narrower permissions [\[14\]](https://github.com/jaegertracing/maintainer-tools/blob/main/ARCHITECTURE.md). The motivating case shows what independent actors cost, and the permission argument does not separate the lifecycle actors: every one of them needs `issues: write` and `pull-requests: write`. The triage CLI stays separate, because it changes nothing on GitHub. The `pr-nudge` action does not stay: the reconciler publishes the one check run of the policy, as "One check run for the policy" describes, and that adds `checks: write` to its permissions.
 
 The other two homes end as follows:
 
@@ -865,15 +901,64 @@ The cost of this home is that a policy change is made in one repository and take
 
 `maintainer-tools` already derives facts about a PR for two consumers. The `pr-nudge` action publishes check runs, and the triage CLI sorts the open PRs into attention buckets and renders a report. Both run the predicates of `packages/checks`. A predicate is a function of one PR that returns whether it triggered, a summary, and the surfaces that it appears on.
 
-The reconciler is a third consumer. The prototype is not built on that code: it has its own data model and queries, its own definitions of the issue link, the quota, the turn and the duplicates, its own comment writer and its own cache. Merging it in that form would put three definitions of the quota into one repository, and two of every other policy. Separate definitions of one policy are the defect that this RFC removes from the workflows, so the three consumers share one fact layer:
+The reconciler is a third consumer. The prototype is not built on that code: it has its own data model and queries, its own definitions of the issue link, the quota, the turn and the duplicates, its own comment writer and its own cache. Merging it in that form would put three definitions of the quota into one repository, and two of every other policy. Separate definitions of one policy are the defect that this RFC removes from the workflows, so the consumers share one fact layer:
 
-- **A predicate becomes a fact.** A predicate is the function that `.when(fn)` takes. `dco_missing`, `ci_failing`, `merge_conflict` and the others move into the policy that the checks share, and the summary of a predicate is the summary that its observation returns. The rule form is the one that stays, because a predicate cannot express a veto or a fact over several PRs, and the startup check cannot analyze it.
-- **A check run is a rendering of one fact, and it is not an output.** One table next to the predicates lists the checks that have a check run. For each of them `pr-nudge` reads the fact of the check. A check that is exempt for some PRs also has an `applies` fact, and a check without one applies to every PR. When `applies` does not hold, `pr-nudge` publishes nothing. Otherwise the check run fails if the fact of the check holds, and it succeeds if it does not. No rule concludes a check run.
+- **A check becomes a base fact.** The predicate of a check is the function that `policy.baseFact()` takes. `dco_missing`, `ci_failing`, `merge_conflict` and the others move into the policy that the checks share, and the summary of a check is the summary that its predicate returns. The rule form is the one that stays, because a predicate alone cannot express a veto or a fact over several PRs, and the startup check cannot analyze it.
+- **The check runs of `pr-nudge` render one fact each, and no rule concludes them.** One table next to the predicates lists the five checks that have a check run, with the result of each. For each of them `pr-nudge` reads the fact of the check. Such a check run has three states: failing, passing and not published. A check that is exempt for some PRs therefore also has an `applies` fact, and a check without one applies to every PR. When `applies` does not hold, `pr-nudge` publishes nothing. Otherwise the check run fails if the fact of the check holds, and it succeeds if it does not. Step 1 of the migration keeps `pr-nudge` in this form. "One check run for the policy" replaces it with one output of the reconciler.
 - **A triage bucket is not a rule.** A bucket depends on who views the report and on the config: a PR that waits for the review of one maintainer is in a different bucket for every other viewer. A bucket is therefore a presentation for one viewer, and the buckets stay imperative code in the triage CLI. That code reads facts and the output `triage_hidden`. It reads no label and calls no predicate. Where it infers the state of a PR today from `stale`, `pr-quota-reached` and `missing-issue`, and computes the quota and the duplicates itself, it reads `over_quota`, `is_duplicate` and `needs_issue`. Its report is then correct for a repository in which the reconciler does not run.
-- **The consumers read the facts and the outputs directly.** The reconciler, `pr-nudge` and the triage CLI take what one evaluator derived for a PR. A predicate today returns a record for each check, with a boolean for each surface. Step 1 of the migration removes that record, and no view of the facts stands in for it.
+- **The consumers read the facts and the outputs directly.** The triage CLI, the reconciler, and `pr-nudge` for as long as it exists, take what one evaluator derived for a PR. A predicate today returns a record for each check, with a boolean for each surface. Step 1 of the migration removes that record, and no view of the facts stands in for it.
 - **One data model, one query builder, one cache.** One `PullRequest` type has a short field set for the sweep over all open PRs and the full set for one PR. One table holds a PR with one rule for when the row is current, and one refresh loop serves the triage CLI and the reconciler.
 
 The cost is the size of the first step. The predicates and their tests move to the rule form, and `pr-nudge` and the triage CLI move to the facts, before the reconciler adds an output. The triage report is in daily use, so that step must not change it. Gathering and deciding, which "Plan and apply" describes, make the check exact: the code before the step and the code after it decide from one saved snapshot, and their JSON reports must be identical. "Migration Path" makes this the first step.
+
+### One check run for the policy
+
+The reconciler owns one more output: a single check run, named `PR policy`, that it publishes on the head commit of every open PR. The output `merge_blocked` decides it. The check run fails when `merge_blocked` holds, and it succeeds otherwise.
+
+The body of the check run has one line for each base fact that holds for the PR and whose predicate returns a summary. The line carries that summary and the details that tell the author how to make the fact stop holding. A derived fact has no summary, so the body shows `needs_issue` through the base fact that makes it hold, which is `no_approved_issue`. The lines of the base facts behind a reason for `merge_blocked` that holds come first, and the other lines follow as information. A base fact that holds while a veto cancels the derived fact above it is not in the first group. On the PR of a maintainer that links no approved issue, `no_approved_issue` holds, `author_can_write` vetoes `needs_issue`, and the merge is not blocked.
+
+Whether a fact blocks the merge is a rule, so moving a fact from one group to the other is a change of one line:
+
+```ts
+policy.mergeBlocked.when(descriptionEmpty);
+policy.mergeBlocked.when(needsIssue);
+```
+
+**Why one check run.** GitHub blocks a merge through a required check, which the branch protection of a repository names. `pr-nudge` publishes a check run for five of the ten checks, each under its own name, and it publishes none for a PR that is exempt from the check. A required check that is not published stays pending, so requiring such a check would block an exempt PR for good. The one check run is published for every PR, with a failing or a passing result, so an exempt PR gets a passing one. A branch protection names one check, and not one for each fact that blocks the merge. The `applies` facts and the table of results have no use left.
+
+**What the check run costs.**
+
+- The reconciler needs one more permission, `checks: write`.
+- The check run is absent on a new head commit until a run of the reconciler has finished, and it stays absent when that run ends on a failed query. Nothing follows from that while no branch protection requires the check. Once one does, GitHub treats the absent check as pending, so an outage of the reconciler or an exhausted API budget blocks every merge in the repository.
+- The check run shows the state at the last run of the reconciler, and not the present state. A change that sends no event reaches it with the daily run: an issue that the author links through the sidebar, or a change to an issue in another repository ("The run model"). For up to a day the check run can therefore still fail after such a fix, and it can still pass after a linked issue in another repository was closed. "The run model" names `pull_request_target` without its event types, so it is open whether an edit of the description starts a run, and whether a person can start a run by hand.
+
+**A check run belongs to a commit.** GitHub attaches a check run to a commit and not to a PR. Two open PRs with the same head commit, such as one branch that is opened against two base branches, therefore share one `PR policy` check run. When the rules give the two PRs different results, a run publishes both, and the result that it publishes last shows on both PRs. This RFC does not resolve the case.
+
+**Which facts block the merge.** Two do.
+
+| Fact | Blocks the merge | Reason |
+|---|---|---|
+| `dco_missing` | No | The DCO check already blocks the merge. |
+| `ci_failing` | No | The required CI checks already block the merge. |
+| `merge_conflict` | No | GitHub refuses the merge. |
+| `unresolved_from_reviewer` | No | Branch protection has its own setting that requires every conversation to be resolved. |
+| `stale_on_author` | No | The fact says that the PR carries `stale` or has had no update for 30 days, and not whether the code may be merged. `authors_turn` is the fact that says whose turn it is. |
+| `resolved_without_reply` | No | The fact is a heuristic about etiquette, for the maintainer to read. |
+| `no_tests_for_code_change` | No | The fact is a heuristic over file paths, and each false positive would need an override. |
+| `is_duplicate` | No | The maintainer picks which of the PRs on one issue to merge. |
+| `over_quota` | Not in the first version | `over_quota ⇒ merge_blocked` is one statement to add. |
+| `description_empty` | Yes | The author fixes it in a minute. The fact is a heuristic: it holds when the description has fewer than 20 characters that are not whitespace, after headings, empty list markers and HTML comments are removed. A short true description such as `Fix typo in doc` therefore blocks the merge. The fact has no override label and no exemption for an author with write permission, and the author clears it by writing a longer description. |
+| `needs_issue` | Yes | The fact is the issue link policy with its exemptions: `no_issue_needed`, `author_can_write` and `author_is_dependency_bot` are its vetoes, so the merge of an exempt PR is not blocked. |
+
+**The override of the issue link rule is a label.** When `no-issue-needed` is applied to a PR, `needs_issue` stops holding, and its reason for `merge_blocked` clears. The check run succeeds when no other reason for `merge_blocked` holds. The rule reads the label and not the person who applied it, so anyone with the triage role on the repository can waive the rule, and not only a maintainer. The label is the override, and not a bypass of the required check, for three reasons. The label already exists as the exemption of the policy. Applying a label needs only the triage role, and bypassing a required check needs an administrator. And the label event in the timeline of the PR records who waived the rule.
+
+**`merge_blocked` is not `blocked`.** `blocked` is a derived fact. It says that the PR is not reviewable, and it is a reason for the comment. `merge_blocked` is an output, and it says that the PR must not be merged. `over_quota` and `is_duplicate` are reasons for the first and not for the second.
+
+**The check run and the comment.** Only two facts block the merge, and the body lists every base fact of the checks that holds. The main use of the check run is therefore its body: the author sees in the PR what is wrong with it, and no comment is posted for that. The comment keeps the role that "The comment" gives it, which is the notice. A PR is closed only after its author was told, and GitHub tells the author through a new comment. GitHub sends the author no notification for a check run, so the check run cannot give that notice. The comment therefore exists when `blocked`, `idle` or the reminder calls for it, and the check run exists for every PR. A fact can appear in both, as `needs_issue` does: the comment tells the author that the PR will be closed when the deadline passes, and the check run blocks the merge for as long as `needs_issue` holds. Both print the summary of the same base fact. A fact that appears only in the check run reaches the author without a notification. `description_empty` is such a fact: it blocks the merge, no comment is posted for it, and the author learns of it only by opening the PR.
+
+**Rollout.** The check run starts as a check that no branch protection requires. Three open points of "Limitations" are reasons for that: two PRs with the same head commit share the check run, two predicates of the checks read outputs of the reconciler, and `description_empty` has no exemption. A repository makes the check required in its branch protection later. A required check must also report in a merge queue, so a repository with a merge queue then needs a job on the `merge_group` event that reports a check of the same name, as the DCO check has today.
+
+Step 3 of the migration adds the output `merge_blocked`, changes the two predicates that read an output, and deletes the `pr-nudge` action, the `applies` facts and the table of results.
 
 ### The weekly digest and the `nudge` command
 
@@ -897,22 +982,23 @@ The cost is the size of the first step. The predicates and their tests move to t
 
 🟢 good · 🟨 partial · ❌ poor
 
-- ¹ The findings need the sign-off of each commit, the status of the head commit, the mergeable state and the review threads. The sweep query does not return them. A second query for the PRs on which the reminder is due returns them, and those are a small part of the open PRs.
+- ¹ The facts of the checks need the sign-off of each commit, the status of the head commit, the mergeable state and the review threads. The sweep query does not return them. The check run of "One check run for the policy" needs them for every open PR, so the reminder adds no query of its own. The cost of fetching them for every open PR is not measured, as "Limitations" records.
 - ² The action would have to move to the reconciler's clock and stop reading the label, which is most of the work of the policy.
 - ³ The policy is not part of the cutover. The digest runs nowhere, so the cutover has no behaviour of it to preserve.
 
 This RFC recommends the policy. The first two rows rule out the action, and the third is the reason that the digest was written: without it, the first message that the author of a quiet PR gets is the `stale` notice at 60 days. The reminder becomes one more reason for the comment, in the same form as the other policies:
 
 ```ts
-const quietForAWeek = fact('quiet_for_a_week').when(
+const quietForAWeek = policy.baseFact(
+  'quiet_for_a_week',
   (pr, { now }) => daysSince(pr.lastActivityByPersonAt, now) >= REMINDER_DAYS,
-  { says: 'no person has commented, reviewed or pushed for a week', by: 'author' },
+  { says: 'no person has commented, reviewed or pushed for a week', changedBy: 'author' },
 );
-const reminderDue = fact('reminder_due').when(authorsTurn, quietForAWeek);
-policyComment.when(reminderDue);
+const reminderDue = policy.derivedFact('reminder_due').when(authorsTurn, quietForAWeek);
+policy.comment.when(reminderDue);
 ```
 
-The comment prints the summaries of the facts that the checks define, so `packages/checks` stays the one definition of each finding, without `no_linked_issue`, which the issue link policy replaces. The comment does not mention `/awaiting-input`. An author who replies ends their turn, and the reminder goes away with it.
+The comment prints the summaries of the facts that the checks define, so `packages/checks` stays the one definition of each of those facts, without `no_linked_issue`, which the issue link policy replaces. The comment does not mention `/awaiting-input`. An author who replies ends their turn, and the reminder goes away with it.
 
 The step that adds the policy deletes the `pr-weekly-digest` action, `digest.ts` and the `nudge` command. `reconcile` then previews every comment that a PR can receive.
 
@@ -922,17 +1008,17 @@ The step that adds the policy deletes the `pr-weekly-digest` action, `digest.ts`
 
 The migration is one switch-over per repository and not a takeover policy by policy. During an incremental takeover the reconciler would be one more writer among actions that already interfere with each other, and each intermediate state would be a combination that exists only for the migration. The reconciler therefore changes nothing until it replaces all of them at once. Until then the existing setup keeps running, with #10257 merged as it stands, because it removes the `stale` coupling now.
 
-**What exists.** A prototype of the reconciler, the package `packages/lifecycle-rules`, holds the rule form, the PR policies (issue link with its deadline, quota, duplicates, turn, stale and the comment), the evaluator, the startup check with its seeded contradictions, the generated decision tables, the scenario tests against an in-memory stand-in for GitHub, the observer with its cache, the plan, and the difference. Shadow mode is the CLI command `maintainer-tools reconcile --repo <owner/repo>`: it checks the rules, observes, derives and compares, writes a report, and changes nothing. "The backtest" below gives the result of running it against both repositories. The prototype is not merged, because it duplicates the checks and the triage CLI, as "One fact layer for the reconciler, the checks and the triage report" describes. Step 1 below exists as draft PRs.
+**What exists.** A prototype of the reconciler, the package `packages/lifecycle-rules`, holds the rule form, the PR policies (issue link with its deadline, quota, duplicates, turn, stale and the comment), the evaluator, the startup check with its seeded violations, the generated decision tables, the scenario tests against an in-memory stand-in for GitHub, the observer with its cache, the plan, and the difference. Shadow mode is the CLI command `maintainer-tools reconcile --repo <owner/repo>`: it checks the rules, observes, derives and compares, writes a report, and changes nothing. "The backtest" below gives the result of running it against both repositories. The prototype is not merged, because it duplicates the checks and the triage CLI, as "One fact layer for the reconciler, the checks and the triage report" describes. Step 1 below exists as draft PRs.
 
 **What remains.** Steps 1 to 3 are a stack of PRs in `maintainer-tools`, and none of them writes to a PR.
 
 1. **Move the checks and the triage CLI to the fact layer.** This step is a refactoring. It adds no policy and no output of the reconciler. The first PR ([#101](https://github.com/jaegertracing/maintainer-tools/pull/101)) is the foundation for regression testing and changes no production logic. It adds the decisions-only JSON report, `--save-snapshot`, `--snapshot` and a fixture, and its `--snapshot` runs the unchanged fetching and deciding functions against a GitHub client that answers each call by a lookup in the snapshot. The second PR ([#107](https://github.com/jaegertracing/maintainer-tools/pull/107)) is the refactoring into gathering and deciding, which removes that client, and the snapshot comparison of the first PR verifies it. The next PRs add the rule form, the evaluator and the startup check ([#102](https://github.com/jaegertracing/maintainer-tools/pull/102)) and declare the predicates as facts ([#103](https://github.com/jaegertracing/maintainer-tools/pull/103)). The last PR ([#106](https://github.com/jaegertracing/maintainer-tools/pull/106)) makes `pr-nudge` and the triage CLI read the facts directly and removes the result record of each check. Every PR after the first is verified in the same way: the JSON report of the code before it and of the code after it, both decided from one saved snapshot of the open PRs of jaeger and jaeger-ui, must be identical.
 2. **The policies that the triage CLI computes itself.** Quota, duplicates, the turn and the issue link become policies, and the copies in the CLI and in the predicates are deleted. The same comparison of reports guards this PR. A difference is either a defect of the old copy, which the PR description lists, or a defect of the policy.
-3. **The reconciler in shadow mode.** The outputs (labels, the comment, the closing), the plan, the difference and the `reconcile` command, on the facts of steps 1 and 2. `reconcile` saves a snapshot and decides from one as `triage` does. The backtest below is repeated on this code.
-4. **The write path.** `apply()` does not exist: the function of that name stops with an error. It gets the fixed order of changes, the pacing of comment creation, and the behaviour of a run that stops halfway, and it is tested against the in-memory stand-in for GitHub.
+3. **The reconciler in shadow mode.** The outputs (labels, the comment, the closing, and `merge_blocked` with its check run), the plan, the difference and the `reconcile` command, on the facts of steps 1 and 2. `reconcile` saves a snapshot and decides from one as `triage` does. The backtest below is repeated on this code. This step also deletes the `pr-nudge` action, the `applies` facts and the table of results, as "One check run for the policy" describes. The deletion removes the fields `publishesCheck` and `checkConclusion` of each check from the JSON report of the triage CLI, which is why it is not part of step 1. And this step changes the two predicates of the checks that read an output of the reconciler, which has to happen before the check run is published: the rollup that `ci_failing` reads leaves out `PR policy`, and `stale_on_author` reads the facts of the reconciler or leaves the policy.
+4. **The write path.** `apply()` does not exist: the function of that name stops with an error. It gets the fixed order of changes with the place of the check run in it, the pacing of comment creation, and the behaviour of a run that stops halfway, and it is tested against the in-memory stand-in for GitHub.
 5. **The workflow and the action.** One action bundle and one workflow file per repository, with the real triggers, the lock for the whole repository, and the cache as an artifact of the previous run behind the `FactCache` interface. This step also checks that the token of a workflow may list the collaborators of the repository, which the backtest did not show because it used a maintainer's token.
 6. **Shadow mode in Actions, in jaeger and jaeger-ui.** Each repository gets the final workflow in shadow mode. It repeats the backtest on every event and every day, so it shows the event load, the API cost with the cache and without it, and the deadlines as they pass. Every difference is assigned to one of three classes: a defect in the rules, which is fixed; a defect of the existing actions, such as a label that a missed event left wrong; or an intended change of behaviour.
-7. **Cut over each repository in one PR.** When every remaining difference is an intended change, one PR per repository removes the old workflows and actions, restricts `actions/stale` to issues, and switches the reconciler to write mode. jaeger-ui goes first, because it has fewer open PRs and its backfill is already applied. The old actions that jaeger-ui pins by commit stay reachable after jaeger deletes them, so the order is a choice and not a constraint. Replacing `actions/stale` for PRs supersedes the decision of the `maintainer-tools` RFC to keep `stale.yml` as it is [\[8\]](https://github.com/jaegertracing/maintainer-tools/blob/main/docs/rfc/0001-maintainer-pr-triage-tooling.md).
+7. **Cut over each repository in one PR.** When every remaining difference is an intended change, one PR per repository removes the old workflows and actions, restricts `actions/stale` to issues, and switches the reconciler to write mode. The `PR policy` check run appears with that switch, and no branch protection requires it yet. jaeger-ui goes first, because it has fewer open PRs and its backfill is already applied. The old actions that jaeger-ui pins by commit stay reachable after jaeger deletes them, so the order is a choice and not a constraint. Replacing `actions/stale` for PRs supersedes the decision of the `maintainer-tools` RFC to keep `stale.yml` as it is [\[8\]](https://github.com/jaegertracing/maintainer-tools/blob/main/docs/rfc/0001-maintainer-pr-triage-tooling.md).
 8. **The reminder policy.** It replaces the weekly digest and the `nudge` command, as "The weekly digest and the `nudge` command" describes, and it goes through shadow mode like the other policies before it writes.
 9. **Issues and other repositories, if wanted.** The reconciler shows whether an open PR closes an issue. `actions/stale` stays the idle timer for issues. `jaeger-idl` and `documentation` adopt the PR policies by adding the workflow file.
 
@@ -976,6 +1062,7 @@ These differences are accepted at the cutover. The last two columns give the num
 | `stale` absent from an idle PR that carries `do-not-expire` | `do_not_expire ⇒ not idle` | not seen ⁴ | not seen ⁴ |
 | `duplicate` on a PR where it or the older PR on the same issue carries `stale` | Every open PR counts. `pr-duplicates` treats a PR with `stale` as inactive | not seen | not seen |
 | `duplicate` absent where a person applied it by hand | The reconciler is the only writer of the label on a PR | not seen | not seen |
+| A `PR policy` check run on every open PR, failing where `needs_issue` or `description_empty` holds | The check run is new. No workflow calls `pr-nudge`, so no PR has a check of this kind today. It blocks a merge only once a branch protection requires it | not in the backtest | not in the backtest |
 
 - ¹ 99 of them `unapproved-issue` and 41 `missing-issue`.
 - ² On 26 of them a person changed a label within the last 60 days: a bulk change from `go` to `area/` labels, and single `changelog:` labels. "Time and history" gives the reason that a label change is not activity.
@@ -1002,11 +1089,13 @@ The first defect is the motivating case once more: one actor read what another a
 - **Label ages.** A flag label or a `stale` label that an old action applied has its event in the timeline. The notice periods continue from those events and do not restart. A PR that receives its label from the reconciler's first run gets the full period from that run.
 - **Existing bot comments.** The reconciler recognizes a "policy comment" by one of five texts: its own marker, the linked-issue marker, the duplicate marker, the two visible phrases of the quota comments, and the phrase of the `actions/stale` message. All are comments of `github-actions[bot]`. The newest becomes its one comment and is rewritten in place, which sends no notification, and the others are minimized. An old comment that was created after the PR got the label counts as the notification, so a PR that was already told is not told again. `pr-linked-issue` and `actions/stale` post their comment up to one second before their label, so a comment of a replaced action also counts when it precedes the label by less than a minute. The comment of the reconciler follows its label and gets no such allowance. The linked-issue marker also counts in a comment that a maintainer posted through the local script. The reconciler cannot edit that comment, so it stays as the notice and is left as it is. When the rules derive no comment for a PR, a comment of a replaced action is left as it is too, because nothing says that its text is wrong. The recognition of the old texts is deleted when no open PR carries one.
 - **The `duplicate` ownership marker.** It is ignored. A `duplicate` label on a PR that the rules do not derive is removed, whoever applied it. The shadow report lists these PRs before the cutover.
-- **The first run in write mode.** The shadow report of the day is the list of what that run does. It is read for two things before the cutover: the PRs that the run would close, and the number of comments that it would create. In the backtest the run would close no PR, and it would create 142 comments in jaeger, for the PRs that were never flagged, and 2 in jaeger-ui. GitHub allows 80 content-creating requests per minute and 500 per hour [\[18\]](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api), so `apply()` paces itself, and a run that stops early is continued by the next one, because a half-applied plan is an observed state like any other.
+- **The first run in write mode.** The shadow report of the day is the list of what that run does. It is read for two things before the cutover: the PRs that the run would close, and the number of comments that it would create. In the backtest the run would close no PR, and it would create 142 comments in jaeger, for the PRs that were never flagged, and 2 in jaeger-ui. The run also publishes a check run on the head commit of every open PR, 263 on the day of the backtest. The backtest did not plan those, so the shadow report of the prototype does not list them. GitHub allows 80 content-creating requests per minute and 500 per hour [\[18\]](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api), so `apply()` paces itself, and a run that stops early is continued by the next one, because a half-applied plan is an observed state like any other.
 
 ### Rollback
 
 The cutover is one PR per repository, and reverting it is the rollback: the old workflows return and the reconciler returns to shadow mode. The revert restores the code and not the state. Labels stay as the reconciler left them, and the old actions correct a label only when an event touches the PR. The combined comment stays, and the old actions do not recognize it. A PR that the reconciler closed stays closed. A rollback is therefore a way to stop further changes, and the shadow period is the protection against needing one.
+
+The revert is not enough once a branch protection requires `PR policy`. The reconciler in shadow mode publishes no check run, a new commit then has a required check that stays pending, and no PR can be merged. A rollback in that state first removes the requirement from the branch protection, or it keeps a workflow that publishes the check.
 
 ### What shadow mode cannot show
 
@@ -1023,15 +1112,24 @@ The cutover is one PR per repository, and reverting it is the rollback: the old 
 ## Limitations
 
 - **Events that GitHub does not send stay unsent.** Linking an issue through the sidebar and labelling an issue in another repository still fire nothing. The scheduled run bounds the delay to a day, as #10257 does.
-- **The cutover is one large change per repository.** Every policy changes hands in one PR, and the first run in write mode creates a notifying comment on every PR that was never flagged, 142 in jaeger on the day of the backtest, and closes the PRs whose deadline has passed. The shadow report lists both beforehand. A rollback stops further changes and does not undo these.
+- **The cutover is one large change per repository.** Every policy changes hands in one PR, and the first run in write mode creates a notifying comment on every PR that was never flagged, 142 in jaeger on the day of the backtest, and closes the PRs whose deadline has passed. The shadow report lists both beforehand. The same run publishes a `PR policy` check run on every open PR, and a failing one where `needs_issue` or `description_empty` holds, which no PR has today. A rollback stops further changes and does not undo these.
 - **Nothing has changed GitHub yet.** No write mode exists, and no workflow or action bundle. The cache is the SQLite file of the CLI and not an artifact of a previous run. Whether the token of a workflow may list the collaborators of a repository was not checked.
 - **The backtest covers the rules, and not closing, the event load or the write path.** "What shadow mode cannot show" lists the gaps.
+- **The check run is designed and not built.** It is not in the prototype or in the backtest, and these points about it are open:
+  - Its place in the fixed order of changes is not chosen.
+  - Two open PRs with the same head commit share one check run, and the result that a run publishes last shows on both. The design does not resolve the case.
+  - Two predicates of the checks read outputs of the reconciler as they stand. `ci_failing` reads the status rollup, which includes the check run, and `stale_on_author` reads the `stale` label and `updatedAt`. Both have to change before the check run is published, and how `stale_on_author` changes is not decided: it reads the facts of the reconciler, or it leaves the policy.
+  - The facts of the checks need inputs that the queries of the backtest do not return. The query for them is not designed, its cost for every open PR is not measured, and the freshness key has no signal for a merge conflict that a push to the base branch creates.
+  - "The run model" does not say which event types of `pull_request_target` start a run, or whether a person can start one by hand. Until it does, it is not known how soon the check run follows an edit of the description.
+  - `description_empty` blocks the merge without an override label and without an exemption for an author with write permission. Whether it should block before it has one is not decided.
+  - The body lists the base facts of the checks. Whether it also lists `over_quota`, `is_duplicate` and `quiet_for_60_days`, and whether it lists a base fact whose derived fact is vetoed as information, is not decided.
+- **A required `PR policy` check makes every merge depend on the reconciler.** An absent check run is pending, so an outage of the reconciler or an exhausted API budget blocks every merge in the repository. The check run shows the state at the last run, so it can be wrong for up to a day after a change that sends no event. And a rollback has to remove the requirement from the branch protection first.
 - **A replaced pending run shows as a cancelled check on a PR.** It is the cost of one lock per repository without a dispatch job.
 - **One program is one blast radius.** A wrong rule can mislabel or close PRs under every policy in every repository in one run. The guards are the shadow period, the reported difference, and the rule that incomplete facts end the run. Independent actions fail independently, and this design gives that up.
-- **The whole condition of an output is not written in one place.** It is spread over small rules, and a veto can silence a reason that another policy added. The generated decision table of the output is the place to read it, and a reviewer who skips the diff of that table misses the consequences of a rule.
-- **A decision table roughly doubles with each reason that is added to its output.** The tables of `should_close` and `comment` have 24 and 21 rows today. They also show rows that cannot occur, and they do not show the text of a comment, which comes from the summaries of the observations.
-- **The project owns the evaluator and the startup check.** They are 210 and 223 lines, with 114 lines of shared data types. The code is loops and a graph walk and not an inference engine, and it is still code to maintain.
-- **The startup check proves properties of the rule set, not of the observations or of the world.** "Contradictions are reported at startup" lists what it cannot catch. Its convergence check covers one PR, and the declared `reads` of an observation is enforced only when the observation runs.
+- **All the rules of one output are not written in one place.** They are spread over the policies, and a veto can silence a reason that another policy added. The generated decision table of the output is the place to read them, and a reviewer who skips the diff of that table misses the consequences of a rule.
+- **A decision table roughly doubles with each reason that is added to its output.** The tables of `should_close` and `comment` have 24 and 21 rows in the prototype. They also show rows that cannot occur, and they do not show the text of a comment, which comes from the summaries of the base facts.
+- **The project owns the evaluator and the startup check.** In the prototype they are 210 and 223 lines, with 114 lines of shared data types. The code is loops and a graph walk and not an inference engine, and it is still code to maintain.
+- **The startup check proves properties of the rule set, not of the predicates or of the world.** "Violations are reported at startup" lists what it cannot catch. Its convergence check covers one PR, and the declared `reads` of a predicate is enforced only when the predicate runs.
 - **The observer reads bounded lists.** It reads the first 20 closing references of a PR and the last 100 reviews and commits. A PR beyond those bounds is evaluated on part of its facts.
 - **A push is dated by the committed date of its commit.** GraphQL returns no time of a push, except of a force push. A merge from the base branch arrives as a push, so it is activity for the idle rule and it passes the turn to the maintainers, although it answers nothing that a maintainer asked.
 - **`idle` holds earlier than `stale` does today.** A label change and a comment by a bot are not activity, and `actions/stale` counts both. A PR that only such changes kept fresh gets the `stale` notice at the cutover.
@@ -1039,8 +1137,8 @@ The cutover is one PR per repository, and reverting it is the rollback: the old 
 - **A hand edit of an output does not last.** A maintainer who removes `stale`, `waiting-for-author`, `duplicate` or a flag label from a PR by hand sees it return on the next run, and a `duplicate` applied by hand is removed. For a flag label that is removed and restored, the week restarts. The intent has to be expressed through an input: a comment, a review, or one of the labels that people own.
 - **The notice construct reads the age of the reconciler's own label.** It is the one exception to "no rule reads an output", and it is safe only in the paired form that the design section gives.
 - **Invariants do not describe a sequence of human decisions well.** The issue triage workflow is such a sequence. This RFC does not design it, and it does not say which triage labels the project wants.
-- **The API cost is measured for single runs only.** The figures in "API budget and the cache of observed facts" are from one run with an empty cache and one with a full cache per repository. Shadow mode in Actions measures the cost under the event load.
-- **The cache adds a file that outlives a run.** It is safe only while it holds observed facts and nothing else. A decision that came to depend on it would be a hidden store, which this design excludes.
+- **The API cost is measured for single runs only.** The figures in "API budget and the cache of observed inputs" are from one run with an empty cache and one with a full cache per repository. Shadow mode in Actions measures the cost under the event load.
+- **The cache adds a file that outlives a run.** It is safe only while it holds observed inputs and nothing else. A decision that came to depend on it would be a hidden store, which this design excludes.
 - **The freshness key misses two known changes and can miss others that nobody listed.** The known ones are a label that an issue form applies at creation and the merged count of an author whose PR was opened and merged between two runs. The daily run without the cache bounds such a gap to a day.
 - **Comment wording changes for contributors.** One combined comment replaces up to three.
 - **The external tools, Cedar, CEL and the Datalog libraries were assessed from their documentation and repositories, not by trial.** The claim that Mergify cannot express the two central policies rests on its documented condition attributes.
