@@ -21,28 +21,11 @@ make build
 If the build modifies any committed `*/dist/index.js`, **commit that change in
 the same PR** — the lint-build workflow's drift-check will fail otherwise.
 
-## Repository Structure
+## Architecture
 
-```
-maintainer-tools/
-├── packages/
-│   └── checks/                # shared predicate library, GraphQL layer, SQLite cache
-├── pr-nudge/                  # first GitHub Action; ships action.yml + committed dist/index.js
-│   ├── action.yml
-│   ├── src/
-│   └── dist/                  # ncc-bundled, COMMITTED — see "Action bundles" below
-├── cli/                       # local maintainer CLI: `maintainer-tools triage`
-│   ├── src/
-│   └── config.example.json
-├── docs/rfc/                  # design docs
-└── .github/workflows/         # CI for this repo (not the actions it ships)
-```
-
-Each top-level `<tool>/` is either a published GitHub Action subfolder
-(`pr-nudge/`, with committed `dist/`) or the local CLI (`cli/`, no
-committed build output — users `make install && make build`). New actions
-follow `pr-nudge/`'s pattern: `<tool>/action.yml`, `<tool>/src/`,
-`<tool>/dist/`.
+Read [`ARCHITECTURE.md`](ARCHITECTURE.md) before changing code. It describes
+the shared library, how data flows from GitHub to each consumer, and how an
+action is laid out. Record a layout change there, not in this file.
 
 ## Development Setup
 
@@ -140,26 +123,6 @@ well-named identifiers cover that.
 Renovate (`renovate.json`) opens PRs on Sundays for minor/major upgrades only;
 patch and digest upgrades are disabled to reduce noise. GitHub Actions
 upgrades are grouped. Patch/digest upgrades to workflows are also disabled.
-
-## Key Source Files
-
-| File                                      | Role                                                                                 |
-| ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| `packages/checks/src/types.ts`            | Core `PullRequest` and `CheckResult` types — the shared data contract for all tools. |
-| `packages/checks/src/predicates/index.ts` | Predicate registry and `runAll()` entry point.                                       |
-| `packages/checks/src/graphql.ts`          | All GitHub GraphQL queries (`LIST_QUERY`, `PR_QUERY`, `VIEWER_QUERY`, …).            |
-| `packages/checks/src/cache.ts`            | SQLite-backed PR cache (Node 22.5+ `node:sqlite`).                                   |
-| `cli/src/index.ts`                        | CLI entry point — arg parsing, orchestration, output.                                |
-| `cli/src/config.ts`                       | Config schema (`TriageConfig`), loader, validation, and defaults.                    |
-| `cli/src/buckets.ts`                      | `classify()` — assigns each PR to exactly one of 9 buckets; `computeFlags()`.        |
-| `cli/src/scan.ts`                         | Multi-repo scanner: list → cache-check → fetch loop.                                 |
-| `cli/src/quota.ts`                        | Cross-PR quota enrichment (`enrichQuotaState()`).                                    |
-| `cli/src/render/shared.ts`                | Renderer-agnostic grouping (`groupByRepo`, `buildPriorityGroups`).                   |
-| `cli/src/render/html.ts`                  | Self-contained HTML report generator.                                                |
-| `cli/config.example.json`                 | Generic starter config with placeholder values.                                      |
-| `cli/config.example.jaeger.json`          | Jaeger-org starter config. Field defaults live in `cli/src/config.ts`.               |
-| `pr-nudge/src/index.ts`                   | GitHub Action entry point — fetches one PR and publishes Check Runs.                 |
-| `pr-weekly-digest/src/index.ts`           | Cron action — posts/edits per-PR digest comments.                                    |
 
 ## Pointers
 
