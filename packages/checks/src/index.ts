@@ -8,10 +8,13 @@ export type {
   FileChange,
   IssueMeta,
   IssueRef,
+  OpenPullRequests,
   PullRequest,
   PredicateContext,
 } from './types.js';
 export { hasLogin, sameLogin } from './logins.js';
+export { authorQuotas, quotaCandidates } from './quota.js';
+export type { QuotaCandidate } from './quota.js';
 export {
   classifyPath,
   computeComposition,

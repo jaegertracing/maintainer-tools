@@ -134,7 +134,9 @@ report gives the reasons for hiding, the digest prints its lines, and a
 decision table lists its base facts, in the order of those rules.
 
 - `policy.baseFact(name, predicate, { changedBy })` declares a base fact. The
-  predicate is a pure function of the PR and the injected clock. It returns
+  predicate is a pure function of the PR and the predicate context, which
+  holds the injected clock and, when the consumer gathers them, the open PRs
+  of the run. It returns
   the boolean, or an object with the boolean, the `summary` line that every
   surface prints verbatim, and the `details` paragraph behind the "Details"
   link of a check run (`BaseFactValue`). `changedBy` is the change source of
@@ -415,12 +417,18 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   exceed a quota, the metadata of the issues that the PRs claim to close,
   the viewer, and the time of the run.
 - **Deciding** is `classifySnapshot()`, a function of the snapshot and the
-  config. It computes the quota tiers and the issue collisions, and it
-  classifies every PR.
+  config. It computes the issue collisions, and it classifies every PR. It
+  passes the open PRs of the snapshot and the merged-PR counts to the rules
+  as `openPullRequests` of the predicate context, because the quota of an
+  author is a property of the set and not of one PR.
 
-`quota.ts` and `issues.ts` each have a part in both layers, so each has one
-function for each layer: `fetchMergedCounts()` and `markQuotaExceeded()`,
-`fetchIssueMeta()` and `attachIssueState()`.
+`cli/src/quota.ts` gathers the merged-PR counts with `fetchMergedCounts()`,
+and the `quota_exceeded` check decides the quota from them in
+`packages/checks/src/quota.ts`. A consumer that does not gather the open PRs
+as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
+`openPullRequests`, so for it the quota is decided by the `pr-quota-reached`
+label alone. `cli/src/issues.ts` has a part in both layers, so it has one
+function for each: `fetchIssueMeta()` and `attachIssueState()`.
 
 ### Comparing two versions of the classifier
 

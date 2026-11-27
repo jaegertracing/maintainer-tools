@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import type {
+  GraphqlClient,
+  OpenPullRequests,
+  PullRequest,
+} from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifyContext } from './buckets.js';
 import type { TriageConfig } from './config.js';
-import { fetchMergedCounts, markQuotaExceeded } from './quota.js';
+import { fetchMergedCounts } from './quota.js';
 import { renderHtml } from './render/html.js';
 import { buildTriagePolicy, classifyAll } from './triage-policy.js';
 
@@ -89,12 +93,15 @@ test('triage policy wires every priority source into classification and quota', 
     },
   } as unknown as GraphqlClient;
 
-  const mergedCounts = await fetchMergedCounts(prs, client, policy.priorityAuthors);
-  markQuotaExceeded(prs, mergedCounts, policy.priorityAuthors);
+  const openPullRequests: OpenPullRequests = {
+    pullRequests: prs,
+    mergedCounts: await fetchMergedCounts(prs, client, policy.priorityAuthors),
+    quotaExemptLogins: policy.priorityAuthors,
+  };
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
-    classifyAll(prs, 'maintainer-a', policy, now).map((result) => result.bucket),
+    classifyAll(openPullRequests, 'maintainer-a', policy, now).map((result) => result.bucket),
     [
       'priority-authors',
       'priority-authors',
@@ -350,19 +357,52 @@ test('priority-author quota exemptions are case-insensitive', async () => {
   } as unknown as GraphqlClient;
 
   const exemptLogins = new Set(['Priority-Author']);
-  markQuotaExceeded(prs, await fetchMergedCounts(prs, client, exemptLogins), exemptLogins);
+  const openPullRequests: OpenPullRequests = {
+    pullRequests: prs,
+    mergedCounts: await fetchMergedCounts(prs, client, exemptLogins),
+    quotaExemptLogins: exemptLogins,
+  };
 
   assert.equal(mergedCountCalls, 0);
   assert.deepEqual(
-    prs.map((pr) => classify(pr, context).bucket),
+    prs.map((pr) => classify(pr, { ...context, openPullRequests }).bucket),
     ['priority-authors', 'priority-authors'],
+  );
+});
+
+test('the newer pull request of an author with a quota of one is hidden', () => {
+  const prs = [
+    pullRequest({ number: 2, createdAt: hoursAgo(24) }),
+    pullRequest({ number: 1, createdAt: hoursAgo(48) }),
+  ];
+  const openPullRequests: OpenPullRequests = {
+    pullRequests: prs,
+    mergedCounts: { 'example/repo|contributor': 0 },
+    quotaExemptLogins: new Set(),
+  };
+
+  // classify() receives a copy of each pull request, because a caller can
+  // read a pull request from a source other than `openPullRequests`.
+  assert.deepEqual(
+    prs.map((pr) =>
+      classify(structuredClone(pr), {
+        ...context,
+        openPullRequests,
+      }).facets.hideReasons.includes('hide:quota_exceeded'),
+    ),
+    [true, false],
   );
 });
 
 test('a snapshot without the merged count of a quota candidate is rejected', () => {
   const prs = [pullRequest({ number: 1 }), pullRequest({ number: 2 })];
+  const openPullRequests: OpenPullRequests = {
+    pullRequests: prs,
+    mergedCounts: {},
+    quotaExemptLogins: new Set(),
+  };
   assert.throws(
-    () => markQuotaExceeded(prs, {}, new Set()),
+    () => classify(prs[0]!, { ...context, openPullRequests }),
     /no merged-PR count for @contributor in example\/repo/,
   );
 });

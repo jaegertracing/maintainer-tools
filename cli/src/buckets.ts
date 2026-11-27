@@ -11,6 +11,7 @@ import {
   mergeConflict,
   noLinkedIssue,
   noTestsForCodeChange,
+  type OpenPullRequests,
   resolvedWithoutReply,
   staleOnAuthor,
   supportingFacts,
@@ -113,6 +114,9 @@ export interface ClassifyContext {
   now: Date;
   // See TriageConfig.ignoreReviewRequestedOnYou.
   ignoreReviewRequestedOnYou: boolean;
+  // The pull requests that are classified together with this one. Without
+  // them the quota is decided from its label alone.
+  openPullRequests?: OpenPullRequests;
 }
 
 export interface ClassifiedPR {
@@ -154,7 +158,7 @@ export interface Facets {
 export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
-  const verdict = ruleSet.evaluate(pr, { now: ctx.now });
+  const verdict = ruleSet.evaluate(pr, { now: ctx.now, openPullRequests: ctx.openPullRequests });
   const flags = computeFlags(pr, verdict, ctx);
   const reasons: string[] = [];
 

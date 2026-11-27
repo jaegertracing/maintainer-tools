@@ -55,9 +55,11 @@ export interface Rule {
 
 // A predicate is the function that reads a pull request and returns whether
 // one base fact holds, with an optional summary. Everything else that a
-// policy holds is data. A predicate must be a pure function of the pull request and the injected
-// clock. The startup check evaluates the rules without calling a predicate,
-// and a verdict must be reproducible from the pull request and the clock.
+// policy holds is data. A predicate must be a pure function of the pull
+// request and the predicate context, which holds the clock and, when the
+// consumer gathers them, the open pull requests of the run. The startup
+// check evaluates the rules without calling a predicate, and a verdict must
+// be reproducible from those two arguments.
 export type Predicate = (pr: PullRequest, context: PredicateContext) => BaseFactValue;
 
 // The value of a base fact for one pull request. A predicate returns the
