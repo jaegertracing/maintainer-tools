@@ -11,7 +11,7 @@ Everything in this repo orbits a single shared TypeScript module:
 
 ```
 packages/checks/                  shared predicate library
-├── src/types.ts                  CheckResult + PullRequest shape
+├── src/types.ts                  PullRequest shape and the check IDs
 ├── src/predicates/*.ts           one predicate per check
 ├── src/policy.ts                 every fact and every rule of the checks
 ├── src/rules/*.ts                the rule form: policy, evaluator, startup check
@@ -91,6 +91,9 @@ repeats the definition.
   not its name, so that a misspelled name does not compile.
   `reasons(conclusion)` and `vetoes(conclusion)` return the premise texts of
   the reasons and of the vetoes that held for the conclusion.
+- **Supporting fact** (`supportingFacts()`): a base fact that makes an output
+  hold, directly or through derived facts, by reasons that held.
+  `supportingFacts()` returns the supporting facts that have a summary.
 - **Violation** (`RuleSetViolation`): a defect that makes a rule set
   unusable: a dependency cycle, an output that no person can clear, or a
   rule that never holds. The startup check rejects a rule set that has one
@@ -174,19 +177,30 @@ when a committed file differs, so a change of the rules shows as a diff of
 the tables. `pnpm run decision-tables` in `packages/checks` runs that test in
 the mode that writes the files.
 
-`runAll(pr, ids)` evaluates the rules for one PR and returns one
-`CheckResult` for each check, with the fact of the check, its check run, and
-the outputs that the check is a reason for:
+`ruleSet.evaluate(pr, { now })` evaluates the rules for one PR and returns a
+`Verdict`, which every consumer reads directly:
 
-| Field             | Meaning                                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `triggered`       | The fact of the check holds                                                                                                                        |
-| `summary`         | Short line from the predicate, reused verbatim across surfaces                                                                                     |
-| `details`         | Longer remediation paragraph (Checks panel "Details" link)                                                                                         |
-| `publishesCheck`  | The check has a check run and applies to the PR                                                                                                    |
-| `checkConclusion` | `failure` or `neutral` when the fact of the check holds, `success` if not. Undefined for a check that has no check run or does not apply to the PR |
-| `inDigest`        | The digest holds by a reason that reads the fact, or a fact derived from it                                                                        |
-| `hidesFromTriage` | The same for the Hidden bucket                                                                                                                     |
+| Member                | Meaning                                                                 |
+| --------------------- | ----------------------------------------------------------------------- |
+| `factsThatHold`       | The names of the facts that hold                                        |
+| `outputsThatHold`     | The names of the outputs that hold                                      |
+| `rulesThatHold`       | The rules that hold                                                     |
+| `holds(fact)`         | Whether one fact holds, asked with the fact object                      |
+| `reasons(conclusion)` | The premise texts of the reasons that held for the conclusion           |
+| `vetoes(conclusion)`  | The premise texts of the vetoes that held for the conclusion            |
+| `summary(factName)`   | The `summary` of a base fact whose predicate returned one, or undefined |
+| `details(factName)`   | The same for the `details`                                              |
+
+A consumer passes the fact object to `holds()`
+(`verdict.holds(mergeConflict)`) and prints the summary of the
+fact. Code that handles every check in a loop takes the fact from
+`CHECK_FACTS`, which holds the base fact of each check by check ID. To say why an output holds,
+`supportingFacts(verdict, output)` returns the base facts that
+make the output hold, directly or through a derived fact, and have a
+summary: the triage report names them as the reasons of the Hidden bucket,
+and the digest prints one line for each. `checkRunConclusion(id, verdict)`
+is the conclusion of the check run of a check, or undefined when the check
+has no check run or does not apply to the PR.
 
 Three properties keep the checks trustworthy:
 
@@ -226,9 +240,9 @@ in `CONCLUSION_WHEN_CHECK_HOLDS` in `predicates/index.ts`.
          │ PullRequest
          ▼
 ┌──────────────────┐
-│ runAll(pr, ids)  │   ← packages/checks/src/predicates/index.ts
+│ ruleSet.evaluate │   ← packages/checks/src/policy.ts
 └────────┬─────────┘
-         │ CheckResult[]
+         │ Verdict
          ▼
 ┌──────────────────┐
 │ Consumer-specific│   ← pr-nudge/src/index.ts (Check Runs)
@@ -296,7 +310,7 @@ Each top-level `<tool>/` folder is one GitHub Action:
 ```
 pr-nudge/
 ├── action.yml          declares inputs, the `node20` runtime, and `dist/index.js`
-├── src/index.ts        thin glue: parse inputs, fetch PR, runAll(), emit Check Runs
+├── src/index.ts        thin glue: parse inputs, fetch PR, evaluate the rules, emit Check Runs
 ├── dist/index.js       COMMITTED — @vercel/ncc bundle of src + deps
 └── tsconfig.json
 ```
@@ -314,9 +328,9 @@ An action subfolder is intentionally a _thin_ layer:
 - Resolve the PR reference from the event payload (`pull_request`,
   `issue_comment` on a PR, …).
 - Call `fetchPullRequest` from the shared library.
-- Call `runAll(pr, rules)` from the shared library.
-- For each result, dispatch to the appropriate surface (Check Run, label,
-  comment).
+- Call `ruleSet.evaluate(pr, { now })` from the shared library.
+- Read the facts of the verdict and dispatch to the appropriate surface
+  (Check Run, label, comment).
 
 The bulk of the work — fetching, predicate evaluation, summary text —
 lives in `packages/checks`. The action is just plumbing.
@@ -347,7 +361,7 @@ self-heal on the next trigger; double-fires are idempotent.
 
 Three output surfaces, in decreasing volume:
 
-1. **Checks panel** — primary. Every `publishesCheck: true` result becomes
+1. **Checks panel** — primary. Every requested check that has a check run and applies becomes
    a `checks.create` call on the PR's head SHA. Zero notifications,
    native UI affordance.
 2. **Labels** — state. `waiting-for-author`, `awaiting-maintainer-input`,
@@ -460,9 +474,10 @@ exactly one of nine priority-ordered buckets:
 7. **fyi** — catch-all for open PRs with no stronger signal.
 8. **dependency-bots** — author is `dependabot[bot]` / `renovate[bot]` /
    `renovate-bot[bot]`.
-9. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything a
-   predicate marked `hidesFromTriage`. Rendered as its own collapsed
-   section with a `reason` column, not merely counted.
+9. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything with
+   a base fact that makes the `triage_hidden` output hold and has a summary.
+   Rendered as its own collapsed section with a `reason` column, not merely
+   counted.
 
 Hide rules run before bucket assignment. The lone exception is
 `review-requested-on-you`: an explicit review request overrides hide rules

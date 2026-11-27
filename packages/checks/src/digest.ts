@@ -5,8 +5,10 @@
 import type { CommentClient } from './comments/publisher.js';
 import { publishComment } from './comments/publisher.js';
 import type { GraphqlClient } from './graphql.js';
-import type { CheckResult } from './types.js';
-import { runAll } from './predicates/index.js';
+import { ruleSet } from './policy.js';
+import { supportingFacts } from './rules/evaluate.js';
+import { OutputName } from './rules/model.js';
+import type { PullRequest } from './types.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -44,16 +46,17 @@ export interface DigestLogger {
   warning(msg: string): void;
 }
 
-export function renderDigestBody(
-  author: string | null,
-  triggered: CheckResult[],
-  waitDays: number,
-): string {
+export function digestItems(pr: PullRequest, now: Date): string[] {
+  const verdict = ruleSet.evaluate(pr, { now });
+  return supportingFacts(verdict, OutputName.WeeklyDigest).map((fact) => verdict.summary(fact)!);
+}
+
+export function renderDigestBody(author: string | null, items: string[], waitDays: number): string {
   const tag = author ? `@${author}` : 'there';
-  const items = triggered.map((c) => `- ${c.summary}`).join('\n');
+  const list = items.map((item) => `- ${item}`).join('\n');
   return `Hi ${tag}, this PR has been waiting on you for over ${waitDays} days. Please address:
 
-${items}
+${list}
 
 If you're blocked on a question to maintainers, comment \`/awaiting-input\` and we'll move this out of your queue while we discuss.`;
 }
@@ -93,14 +96,14 @@ export async function runDigest(
     stats.considered++;
     try {
       const pr = await gql.fetchPullRequest(owner, repo, summary.number);
-      const triggered = runAll(pr, undefined, { now }).filter((c) => c.inDigest && c.triggered);
-      if (triggered.length === 0) {
+      const items = digestItems(pr, now);
+      if (items.length === 0) {
         stats.skippedNoChecks++;
         logger.info(`  #${pr.number}: no in-digest checks triggered — skipping`);
         continue;
       }
 
-      const body = renderDigestBody(pr.author?.login ?? null, triggered, waitDays);
+      const body = renderDigestBody(pr.author?.login ?? null, items, waitDays);
       // No `scope`: one digest comment per PR, edited in place. An
       // unchanged set of triggered reasons then hits `publishComment`'s
       // sha-match/skip path, so a genuinely idle PR gets no write — and no
@@ -132,7 +135,7 @@ export async function runDigest(
             author: pr.author?.login ?? null,
             body,
           });
-          logger.info(`  ${prefix}#${pr.number}: POST (${triggered.length} item(s))${minSuffix}`);
+          logger.info(`  ${prefix}#${pr.number}: POST (${items.length} item(s))${minSuffix}`);
           break;
         case 'patch':
           stats.patched++;
@@ -143,7 +146,7 @@ export async function runDigest(
             author: pr.author?.login ?? null,
             body,
           });
-          logger.info(`  ${prefix}#${pr.number}: PATCH (${triggered.length} item(s))`);
+          logger.info(`  ${prefix}#${pr.number}: PATCH (${items.length} item(s))`);
           break;
         case 'skip':
           stats.noop++;

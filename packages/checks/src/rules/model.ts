@@ -1,7 +1,7 @@
 // This file declares the concepts of the rule form and holds no algorithm.
 // "Vocabulary of the rule form" in ARCHITECTURE.md defines each term.
 
-import type { PullRequest, ResolvedPredicateOptions } from '../types.js';
+import type { PullRequest, PredicateContext } from '../types.js';
 
 // An output is a decision that the rules make about a pull request and that
 // one tool acts on. The rules decide, for each pull request, whether each
@@ -58,7 +58,7 @@ export interface Rule {
 // policy holds is data. A predicate must be a pure function of the pull request and the injected
 // clock. The startup check evaluates the rules without calling a predicate,
 // and a verdict must be reproducible from the pull request and the clock.
-export type Predicate = (pr: PullRequest, opts: ResolvedPredicateOptions) => BaseFactValue;
+export type Predicate = (pr: PullRequest, context: PredicateContext) => BaseFactValue;
 
 // The value of a base fact for one pull request. A predicate returns the
 // object form when its base fact has a summary for a consumer to print.

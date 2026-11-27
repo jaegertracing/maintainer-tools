@@ -12,7 +12,11 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-import { computeComposition, type PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import {
+  computeComposition,
+  dcoMissing,
+  type PullRequest,
+} from '@jaegertracing/maintainer-tools-checks';
 
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
@@ -129,7 +133,7 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       createdAt: pr.createdAt.slice(0, 10),
       labels: pr.labels,
       issues: (pr.computed?.issueRefs ?? []).map((r) => issueLabel(r, pr)),
-      dco: c.checks.some((k) => k.id === 'dco_missing' && k.triggered) ? 'missing' : 'ok',
+      dco: c.verdict.holds(dcoMissing) ? 'missing' : 'ok',
       ci: (pr.statusCheckRollup ?? 'none').toLowerCase(),
       mergeable: pr.mergeable.toLowerCase(),
       openThreads: (pr.reviewThreads ?? []).filter((t) => !t.isResolved).length,

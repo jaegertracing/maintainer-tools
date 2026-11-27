@@ -287,7 +287,7 @@ test('dependency bots still hide-check-trigger PRs land in their own bucket, not
 
   assert.ok(
     result.facets.hideReasons.includes('hide:stale_on_author'),
-    'the stale label must actually trip a hidesFromTriage predicate for this to test anything',
+    'the stale label must actually trip a predicate that hides for this to test anything',
   );
   assert.equal(result.bucket, 'dependency-bots');
 });

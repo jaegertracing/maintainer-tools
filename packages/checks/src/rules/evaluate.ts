@@ -2,7 +2,7 @@
 // follows the derived facts that its rules read. It decides every derived
 // fact in one pass over that order, and then it decides every output.
 
-import type { PullRequest, ResolvedPredicateOptions } from '../types.js';
+import type { PullRequest, PredicateContext } from '../types.js';
 import { isSameConclusion, premiseText, ruleText } from './model.js';
 import type {
   BaseFact,
@@ -71,7 +71,7 @@ export interface RuleSet {
   // Evaluates the rules once for each element. A base fact that an element
   // leaves out is false.
   evaluateBaseFacts(hypotheticalPullRequests: readonly BaseFacts[]): Verdict[];
-  evaluate(pr: PullRequest, opts: ResolvedPredicateOptions): Verdict;
+  evaluate(pr: PullRequest, context: PredicateContext): Verdict;
 }
 
 interface Decision {
@@ -185,11 +185,11 @@ export function loadRuleSet(policy: Policy): RuleSet {
       );
     },
 
-    evaluate(pr: PullRequest, opts: ResolvedPredicateOptions): Verdict {
+    evaluate(pr: PullRequest, context: PredicateContext): Verdict {
       const values = new Map<string, boolean>();
       const printedValues = new Map<string, Exclude<BaseFactValue, boolean>>();
       for (const { name, predicate } of baseFacts) {
-        const value = predicate(pr, opts);
+        const value = predicate(pr, context);
         if (typeof value === 'boolean') {
           values.set(name, value);
         } else {
@@ -200,4 +200,22 @@ export function loadRuleSet(policy: Policy): RuleSet {
       return deriveVerdict(values, new Verdict(printedValues));
     },
   };
+}
+
+// Returns the base facts that make `output` hold in a verdict and have a
+// summary. A consumer prints their summaries to say why the output holds.
+export function supportingFacts(verdict: Verdict, output: OutputName): string[] {
+  if (!verdict.outputsThatHold.includes(output)) return [];
+  const facts = new Set<string>();
+  const visitConclusion = (conclusion: Conclusion): void => {
+    for (const rule of verdict.rulesThatHold) {
+      if (rule.isVeto || !isSameConclusion(rule.conclusion, conclusion)) continue;
+      for (const premise of rule.premises) {
+        if (verdict.summary(premise) !== undefined) facts.add(premise);
+        visitConclusion({ kind: 'derived fact', name: premise });
+      }
+    }
+  };
+  visitConclusion({ kind: 'output', name: output });
+  return [...facts];
 }

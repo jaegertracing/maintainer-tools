@@ -267,8 +267,8 @@ will surface upgrade PRs.
    `pull_request_target` / `issue_comment` on a PR).
 2. Fetches the PR via one GraphQL query.
 3. Runs the requested predicates.
-4. Publishes one Check Run on the PR's head SHA per predicate that
-   declares `publishesCheck: true` (currently `dco_missing`,
+4. Publishes one Check Run on the PR's head SHA per requested check that
+   has a check run and applies to the PR (currently `dco_missing`,
    `merge_conflict`, `description_empty`, `no_linked_issue`,
    `no_tests_for_code_change`).
 
@@ -373,7 +373,7 @@ A PR is nudged if **all** of these are true:
 1. It carries the `label` (default `waiting-for-author`).
 2. Its `updatedAt` is at least `wait-days` old. Any maintainer activity
    bumps `updatedAt` and naturally suppresses the nudge for that week.
-3. At least one `inDigest: true` predicate triggers (see catalog).
+3. At least one predicate that the digest lists triggers (see catalog).
 
 If none trigger, the PR is silently skipped — it carries the label but
 nothing needs to be said.

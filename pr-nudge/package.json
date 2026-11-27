@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
+    "test": "tsx --tsconfig ../tsconfig.json --test \"src/**/*.test.ts\"",
     "tsc-lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

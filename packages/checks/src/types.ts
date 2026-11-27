@@ -1,12 +1,10 @@
 // Shared types for the predicate library.
 //
 // Every check is a base fact of a PR, declared in predicates/ with the surfaces
-// (Checks panel, weekly digest, triage report) that it appears on. A
-// CheckResult is the result of the rules for one check: whether its fact
-// holds (`triggered`), and which surfaces it publishes to.
+// (Checks panel, weekly digest, triage report) that it appears on.
 // See the RFC: docs/rfc/0001-maintainer-pr-triage-tooling.md ("Predicate library").
 
-// The checks, in the order in which `runAll()` returns their results.
+// The checks, in the order in which the JSON report lists them.
 export const CHECK_IDS = [
   'dco_missing',
   'ci_failing',
@@ -31,40 +29,12 @@ export function appliesFactName(id: CheckId): string {
 }
 
 // Predicates are pure functions of the PR, so a predicate that compares
-// against the current time takes it from here instead of the wall clock. A
-// caller that passes no clock gets the real one, resolved once in runAll.
-export interface PredicateOptions {
-  now?: Date;
-}
-
-export interface ResolvedPredicateOptions {
+// against the current time takes it from here instead of the wall clock.
+export interface PredicateContext {
   now: Date;
 }
 
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
-
-export interface CheckResult {
-  id: CheckId;
-  // Whether the predicate's condition is currently met for this PR.
-  triggered: boolean;
-  // Short human-readable text. Reused verbatim in the Checks panel and the
-  // weekly digest so there is no parallel phrasing to maintain.
-  summary: string;
-  // Optional longer remediation paragraph rendered behind the Checks panel
-  // "Details" link.
-  details?: string;
-  // Surface declarations — derived from the evaluated rules by `runAll()`,
-  // read by each consumer.
-  publishesCheck: boolean;
-  checkConclusion?: CheckConclusion;
-  inDigest: boolean;
-  hidesFromTriage: boolean;
-  // Set for a triggered `ci_failing`: whether the only failing checks are
-  // label-gate checks (e.g. "check-label"), which is the fact
-  // `label_only_failure`. Such PRs are not hidden from triage — a
-  // maintainer needs to apply the label — but are shown in a dedicated group.
-  labelOnlyFailure?: boolean;
-}
 
 // GitHub's PR-author association enum.
 export type AuthorAssociation =

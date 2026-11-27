@@ -3,7 +3,14 @@
 // `maintainer-tools triage --pr <spec> --explain` — answers "why is this PR
 // sitting where it is?" without needing to open the HTML report and guess.
 
-import type { CheckResult } from '@jaegertracing/maintainer-tools-checks';
+import {
+  CHECK_FACTS,
+  CHECK_IDS,
+  supportingFacts,
+  OutputName,
+  type Verdict,
+} from '@jaegertracing/maintainer-tools-checks';
+
 import { BUCKET_DESCRIPTIONS, BUCKET_LABELS, type ClassifiedPR } from '../buckets.js';
 import { copilotTooltip } from '../copilot.js';
 import { ageInDays } from './shared.js';
@@ -27,15 +34,16 @@ export function renderExplain(c: ClassifiedPR, now: Date): string {
     lines.push('  (none recorded)');
   } else {
     for (const reason of c.reasons) {
-      lines.push(`  - ${describeReason(reason, c.checks)}`);
+      lines.push(`  - ${describeReason(reason, c.verdict)}`);
     }
   }
   lines.push('');
   lines.push('Predicate checks:');
-  for (const check of c.checks) {
-    const mark = check.triggered ? 'x' : ' ';
-    const hide = check.hidesFromTriage && check.triggered ? ' hides' : '';
-    lines.push(`  [${mark}] ${check.id.padEnd(28)}${hide.padEnd(6)} ${check.summary}`);
+  const factsSupportingHidden = supportingFacts(c.verdict, OutputName.TriageHidden);
+  for (const id of CHECK_IDS) {
+    const mark = c.verdict.holds(CHECK_FACTS[id]) ? 'x' : ' ';
+    const hide = factsSupportingHidden.includes(id) ? ' hides' : '';
+    lines.push(`  [${mark}] ${id.padEnd(28)}${hide.padEnd(6)} ${c.verdict.summary(id)!}`);
   }
   lines.push('');
   lines.push(`Row flags: ${c.flags.length > 0 ? c.flags.join(', ') : '(none)'}`);
@@ -59,9 +67,8 @@ export function renderExplain(c: ClassifiedPR, now: Date): string {
 // Hidden-bucket reasons are `hide:<predicate_id>`; resolve them to the
 // predicate's own summary so the explanation matches the Checks table
 // below instead of just repeating the bare id.
-function describeReason(reason: string, checks: CheckResult[]): string {
+function describeReason(reason: string, verdict: Verdict): string {
   if (!reason.startsWith('hide:')) return reason;
   const id = reason.slice(5);
-  const check = checks.find((c) => c.id === id);
-  return check ? `${id} — ${check.summary}` : reason;
+  return `${id} — ${verdict.summary(id)!}`;
 }

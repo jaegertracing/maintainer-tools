@@ -8,10 +8,10 @@ const DEFAULT_STALE_DAYS = 30;
 
 export function staleOnAuthorPredicate(
   pr: PullRequest,
-  opts: { staleDays?: number; now: Date },
+  context: { staleDays?: number; now: Date },
 ): BaseFactValue {
-  const staleDays = opts.staleDays ?? DEFAULT_STALE_DAYS;
-  const now = opts.now;
+  const staleDays = context.staleDays ?? DEFAULT_STALE_DAYS;
+  const now = context.now;
   const updated = new Date(pr.updatedAt);
   const ageDays = (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24);
 
