@@ -554,7 +554,7 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   'DCO-MISSING': 'One or more non-merge commits are missing a `Signed-off-by` trailer.',
   'CI-FAILING': 'CI status rollup is failing on checks beyond just a label gate.',
   'DESCRIPTION-EMPTY': 'PR description is empty or contains only unfilled template stubs.',
-  'QUOTA-EXCEEDED':
+  'OVER-QUOTA':
     'Author has reached the new-contributor open-PR quota; this PR is on hold until an older one closes.',
   'ISSUE-COLLISION':
     'Another open PR claims to close the same issue. The count includes this PR, so `2` means one other PR is duplicating the work.',

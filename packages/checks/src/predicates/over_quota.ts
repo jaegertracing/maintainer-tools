@@ -11,7 +11,7 @@ import type { PredicateContext, PullRequest } from '../types.js';
 //     only.
 const QUOTA_LABEL = 'pr-quota-reached';
 
-export function quotaExceededPredicate(
+export function overQuotaPredicate(
   pr: PullRequest,
   { openPullRequests }: PredicateContext,
 ): BaseFactValue {

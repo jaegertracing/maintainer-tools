@@ -10,7 +10,7 @@ export const CHECK_IDS = [
   'ci_failing',
   'merge_conflict',
   'stale_on_author',
-  'quota_exceeded',
+  'over_quota',
   'description_empty',
   'no_linked_issue',
   'no_tests_for_code_change',

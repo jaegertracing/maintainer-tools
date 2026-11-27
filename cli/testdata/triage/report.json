@@ -41,7 +41,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -149,7 +149,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -259,7 +259,7 @@
             },
             {
               "hidesFromTriage": true,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR on hold — author has reached the new-contributor open-PR quota (computed)",
@@ -316,7 +316,7 @@
             "dependencyBot": false,
             "firstTimer": false,
             "hideReasons": [
-              "hide:quota_exceeded"
+              "hide:over_quota"
             ],
             "maintainerEngaged": false,
             "priorityAuthor": false,
@@ -330,7 +330,7 @@
           ],
           "number": 3,
           "reasons": [
-            "hide:quota_exceeded"
+            "hide:over_quota"
           ]
         },
         {
@@ -374,7 +374,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -488,7 +488,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -608,7 +608,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -719,7 +719,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -827,7 +827,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -936,7 +936,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -1041,7 +1041,7 @@
             },
             {
               "hidesFromTriage": true,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR on hold — author has reached the new-contributor open-PR quota (label)",
@@ -1099,7 +1099,7 @@
             "firstTimer": false,
             "hideReasons": [
               "hide:stale_on_author",
-              "hide:quota_exceeded",
+              "hide:over_quota",
               "waiting-for-author"
             ],
             "maintainerEngaged": false,
@@ -1115,7 +1115,7 @@
           "number": 10,
           "reasons": [
             "hide:stale_on_author",
-            "hide:quota_exceeded"
+            "hide:over_quota"
           ]
         },
         {
@@ -1157,7 +1157,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -1269,7 +1269,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -1382,7 +1382,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -1496,7 +1496,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",
@@ -1612,7 +1612,7 @@
             },
             {
               "hidesFromTriage": false,
-              "id": "quota_exceeded",
+              "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
               "summary": "PR not quota-blocked",

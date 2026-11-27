@@ -23,7 +23,7 @@ import {
   noLinkedIssuePredicate,
 } from './predicates/no_linked_issue.js';
 import { noTestsForCodeChangePredicate } from './predicates/no_tests_for_code_change.js';
-import { quotaExceededPredicate } from './predicates/quota_exceeded.js';
+import { overQuotaPredicate } from './predicates/over_quota.js';
 import { resolvedWithoutReplyPredicate } from './predicates/resolved_without_reply.js';
 import { staleOnAuthorPredicate } from './predicates/stale_on_author.js';
 import { unresolvedFromReviewerPredicate } from './predicates/unresolved_from_reviewer.js';
@@ -47,7 +47,7 @@ export const mergeConflict = policy.baseFact('merge_conflict', mergeConflictPred
 export const staleOnAuthor = policy.baseFact('stale_on_author', staleOnAuthorPredicate, {
   changedBy: 'author',
 });
-const quotaExceeded = policy.baseFact('quota_exceeded', quotaExceededPredicate, {
+const overQuota = policy.baseFact('over_quota', overQuotaPredicate, {
   changedBy: 'author',
 });
 const descriptionEmpty = policy.baseFact('description_empty', descriptionEmptyPredicate, {
@@ -117,7 +117,7 @@ policy.triageHidden
   // maintainer can do nothing until the author rebases.
   .when(mergeConflict)
   .when(staleOnAuthor)
-  .when(quotaExceeded)
+  .when(overQuota)
   .when(descriptionEmpty)
   // The PR is not reviewable until the author links a qualifying issue.
   .when(noLinkedIssue, missingIssueLabel)

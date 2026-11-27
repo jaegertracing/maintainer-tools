@@ -113,13 +113,13 @@ Each check is a pure function `(pr: PullRequest) => CheckResult`. A `CheckResult
 - `inDigest` — appear in the weekly digest comment for `waiting-for-author > 7d` PRs.
 - `hidesFromTriage` — drop the PR from the maintainer's triage report.
 
-The `summary` string is reused verbatim across the Checks panel and the digest so there's no parallel phrasing to maintain. Comments are *not* a per-check surface: the only bot comments are the weekly digest, slash-command acknowledgments, and `quota_exceeded`'s one-shot explanation.
+The `summary` string is reused verbatim across the Checks panel and the digest so there's no parallel phrasing to maintain. Comments are *not* a per-check surface: the only bot comments are the weekly digest, slash-command acknowledgments, and `over_quota`'s one-shot explanation.
 
 ### State-based, not event-reactive
 
 The existing `waiting-for-author.js` reacts to "what just happened" — it fires on `synchronize` or `issue_comment: created` and decides based on the event. This is fragile: out-of-order events, maintainer drive-by comments, and author replies that don't resolve outstanding issues all confuse it.
 
-The proposed `waitingForAuthor` predicate is **a pure function of current PR state**, recomputed on every relevant event. It is the OR of every "author must act first" predicate (`dco_missing`, `ci_failing`, `merge_conflict`, `quota_exceeded`, `description_empty`, "last review requesting changes from a maintainer"). The only side effect is applying or removing the `waiting-for-author` label, fully determined by the predicate result. Idempotent, self-healing on missed events, and the `details.reasons` field lets the triage report and label tooltip explain *why* — `waiting-for-author (ci_failing, dco_missing)` — instead of being a black box.
+The proposed `waitingForAuthor` predicate is **a pure function of current PR state**, recomputed on every relevant event. It is the OR of every "author must act first" predicate (`dco_missing`, `ci_failing`, `merge_conflict`, `over_quota`, `description_empty`, "last review requesting changes from a maintainer"). The only side effect is applying or removing the `waiting-for-author` label, fully determined by the predicate result. Idempotent, self-healing on missed events, and the `details.reasons` field lets the triage report and label tooltip explain *why* — `waiting-for-author (ci_failing, dco_missing)` — instead of being a black box.
 
 ### Author-question handling
 
@@ -139,7 +139,7 @@ Three surfaces, in decreasing volume:
 
 - **GitHub Checks panel** (primary). Every mechanical predicate publishes here, side-by-side with CI. The "Details" link expands into a short remediation paragraph. Zero notifications, native UI affordance, no documentation hunt.
 - **Labels** (state). `waiting-for-author`, `awaiting-maintainer-input`, `quota-exceeded`, `stale` (read from `actions/stale`). Searchable, filterable, consumed by triage tools.
-- **Comments** (rare). Weekly digest, slash-command acks, `quota_exceeded`'s one-shot. Every bot comment ends with an HTML-comment footer `<!-- maintainer-tools: kind=… sha=… -->`; the consumer fetches existing bot comments and edits-in-place rather than reposting (the only correct way to be idempotent against GitHub's append-only comment model).
+- **Comments** (rare). Weekly digest, slash-command acks, `over_quota`'s one-shot. Every bot comment ends with an HTML-comment footer `<!-- maintainer-tools: kind=… sha=… -->`; the consumer fetches existing bot comments and edits-in-place rather than reposting (the only correct way to be idempotent against GitHub's append-only comment model).
 
 ### Data and auth
 
@@ -167,7 +167,7 @@ Each predicate declares which surface(s) it publishes to (Check = GitHub Checks 
 | `stale_on_you` | You're a requested reviewer, last activity > N days ago, was from author | — | — | — | no (own bucket) |
 | `bot_authored` | Author is a bot account not recognized as a dependency bot | — | — | — | yes |
 | `waiting_for_author` *(migrated)* | OR of "author must act" predicates; suppressed by `awaiting-maintainer-input` label or the unanswered-author-comment heuristic | — | — | manages `waiting-for-author` | yes (unless suppressed) |
-| `quota_exceeded` *(migrated)* | PR carries `quota-exceeded` label or author has > M open PRs in repo | — | — | manages `quota-exceeded`. Posts a one-shot comment when the cap is first hit. | yes |
+| `over_quota` *(migrated)* | PR carries `quota-exceeded` label or author has > M open PRs in repo | — | — | manages `quota-exceeded`. Posts a one-shot comment when the cap is first hit. | yes |
 
 The two migrated checks default to the same contributor-facing behavior as their current JS implementations to avoid regressions during cutover. `stale_on_author` is triage-only — `actions/stale` continues to own the nudge half.
 
