@@ -74,7 +74,9 @@
           "repo": "repo",
           "number": 100,
           "state": "OPEN",
-          "labels": ["help wanted", "allow-multiple-prs"]
+          "labels": ["help wanted", "allow-multiple-prs"],
+          "title": "Exporter retries without a budget",
+          "author": "maintainer-b"
         }
       ],
       "reviewThreads": []
@@ -127,9 +129,19 @@
           "repo": "repo",
           "number": 100,
           "state": "OPEN",
-          "labels": ["help wanted", "allow-multiple-prs"]
+          "labels": ["help wanted", "allow-multiple-prs"],
+          "title": "Exporter retries without a budget",
+          "author": "maintainer-b"
         },
-        { "owner": "other", "repo": "repo", "number": 7, "state": "OPEN", "labels": [] }
+        {
+          "owner": "other",
+          "repo": "repo",
+          "number": 7,
+          "state": "OPEN",
+          "labels": [],
+          "title": "Share the retry settings",
+          "author": "maintainer-a"
+        }
       ],
       "reviewThreads": []
     },
@@ -176,7 +188,9 @@
           "repo": "repo",
           "number": 101,
           "state": "CLOSED",
-          "labels": ["help wanted"]
+          "labels": ["help wanted"],
+          "title": "Typo in the exporter log line",
+          "author": "newcomer"
         }
       ],
       "reviewThreads": []
@@ -350,7 +364,9 @@
           "repo": "repo",
           "number": 105,
           "state": "OPEN",
-          "labels": ["help wanted"]
+          "labels": ["help wanted"],
+          "title": "Queue does not report its size",
+          "author": "maintainer-b"
         }
       ],
       "reviewThreads": []
@@ -404,7 +420,15 @@
       "comments": [],
       "body": "The writer sent one request for each span. This change sends them in batches.\n\nFixes #104",
       "linkedIssues": [
-        { "owner": "example", "repo": "repo", "number": 104, "state": "OPEN", "labels": ["bug"] }
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 104,
+          "state": "OPEN",
+          "labels": ["bug"],
+          "title": "Sampler drops the first span",
+          "author": "maintainer-a"
+        }
       ],
       "reviewThreads": []
     },
@@ -446,7 +470,15 @@
       "comments": [],
       "body": "The README did not list the settings of the sampler. This change adds a table of them.",
       "linkedIssues": [
-        { "owner": "example", "repo": "repo", "number": 104, "state": "OPEN", "labels": ["bug"] }
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 104,
+          "state": "OPEN",
+          "labels": ["bug"],
+          "title": "Sampler drops the first span",
+          "author": "maintainer-a"
+        }
       ],
       "reviewThreads": []
     },
@@ -538,7 +570,12 @@
       ],
       "reviewRequests": [],
       "reviews": [],
-      "comments": [{ "author": "maintainer-b", "createdAt": "2026-04-25T12:00:00Z" }],
+      "comments": [
+        {
+          "author": "maintainer-b",
+          "createdAt": "2026-04-25T12:00:00Z"
+        }
+      ],
       "body": "The query service read the service names on every request. This change caches them.",
       "linkedIssues": [],
       "reviewThreads": []
@@ -817,43 +854,5 @@
   ],
   "mergedCounts": {
     "example/repo|newcomer": 0
-  },
-  "issues": {
-    "example/repo#100": {
-      "author": "maintainer-b",
-      "state": "OPEN",
-      "title": "Exporter retries without a budget",
-      "isPullRequest": false
-    },
-    "other/repo#7": {
-      "author": "maintainer-a",
-      "state": "OPEN",
-      "title": "Share the retry settings",
-      "isPullRequest": false
-    },
-    "example/repo#101": {
-      "author": "newcomer",
-      "state": "CLOSED",
-      "title": "Typo in the exporter log line",
-      "isPullRequest": false
-    },
-    "example/repo#103": {
-      "author": "erin",
-      "state": "MERGED",
-      "title": "Add the queue size setting",
-      "isPullRequest": true
-    },
-    "example/repo#104": {
-      "author": "maintainer-a",
-      "state": "OPEN",
-      "title": "Sampler drops the first span",
-      "isPullRequest": false
-    },
-    "example/repo#105": {
-      "author": "maintainer-b",
-      "state": "OPEN",
-      "title": "Queue does not report its size",
-      "isPullRequest": false
-    }
   }
 }

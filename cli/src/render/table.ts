@@ -132,7 +132,7 @@ export function buildTableRows(classified: ClassifiedPR[], opts: TableOptions): 
       updatedAt: pr.updatedAt.slice(0, 10),
       createdAt: pr.createdAt.slice(0, 10),
       labels: pr.labels,
-      issues: (pr.computed?.issueRefs ?? []).map((r) => issueLabel(r, pr)),
+      issues: (pr.linkedIssues ?? []).map((issue) => issueLabel(issue, pr)),
       dco: c.verdict.holds(dcoMissing) ? 'missing' : 'ok',
       ci: (pr.statusCheckRollup ?? 'none').toLowerCase(),
       mergeable: pr.mergeable.toLowerCase(),
@@ -328,7 +328,7 @@ const TABLE_SCRIPT = `
     updatedAt: 'Date of the last update.',
     createdAt: 'Date the PR was opened.',
     labels: 'GitHub labels on the PR.',
-    issues: 'Issues the PR description claims to close.',
+    issues: 'Issues that GitHub closes when the PR is merged.',
   };
 
   const text = (title, field, extra) => Object.assign({ title, field, headerFilter: 'input' }, extra);

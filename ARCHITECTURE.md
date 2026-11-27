@@ -418,17 +418,20 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
 - **Gathering** is the only layer that talks to GitHub, uses the SQLite
   cache or reads the clock. `gatherSnapshot()` returns a `TriageSnapshot`:
   the open PRs as fetched, the merged-PR counts of the authors that can
-  exceed a quota, the metadata of the issues that the PRs claim to close,
-  the permission of each collaborator, the viewer, and the time of the run.
+  exceed a quota, the permission of each collaborator, the viewer, and the
+  time of the run.
   A PR carries the issues that GitHub closes when it is merged, as
-  `linkedIssues`, the text of each comment that
+  `linkedIssues`, each with its state, labels, title and author. A PR also
+  carries the text of each comment that
   `packages/checks/src/policy-comments.ts` recognizes as a policy comment,
   and the GitHub account of the author of each commit.
   The lifecycle policies of RFC 0003 read the linked issues and the
   collaborators, and the turn policy leaves a policy comment out of the
-  activity on a PR.
+  activity on a PR. The issue column and the `ISSUE-COLLISION`,
+  `SELF-FILED` and `ISSUE-CLOSED` flags of the triage report read the
+  linked issues too.
 - **Deciding** is `classifySnapshot()`, a function of the snapshot and the
-  config. It computes the issue collisions, and it classifies every PR. It
+  config. It classifies every PR. It
   passes the open PRs of the snapshot and the merged-PR counts to the rules
   as `openPullRequests` of the predicate context, because the quota of an
   author and the duplicates of an issue are properties of the set and not of
@@ -441,8 +444,6 @@ as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
 `openPullRequests`, so for it `over_quota`, `is_duplicate` and `authors_turn` never hold. The `over_quota` check does not
 read the `pr-quota-reached` label, because the label is the output of a
 separate evaluation of the quota policy by the pr-quota-manager workflow.
-`cli/src/issues.ts` has a part in both layers, so it has one
-function for each: `fetchIssueMeta()` and `attachIssueState()`.
 
 ### Comparing two versions of the classifier
 

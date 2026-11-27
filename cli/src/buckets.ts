@@ -14,6 +14,7 @@ import {
   mergeConflict,
   needsIssue,
   noTestsForCodeChange,
+  pullRequestsOfSameIssue,
   type OpenPullRequests,
   resolvedWithoutReply,
   staleOnAuthor,
@@ -113,6 +114,10 @@ export interface ClassifiedPR {
   // Inline row flags derived from PR state, not from a single predicate.
   flags: RowFlag[];
   facets: Facets;
+  // The other open PRs that share an issue with this one under the
+  // duplicates policy, ordered by number. The report lists them beside the
+  // issues of the PR.
+  pullRequestsOfSameIssue: Array<{ number: number; url: string }>;
   // Latest GitHub Copilot review verdict, parsed once here for every renderer.
   copilot: CopilotReview | null;
 }
@@ -142,7 +147,10 @@ export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const verdict = ruleSet.evaluate(pr, { now: ctx.now, openPullRequests: ctx.openPullRequests });
-  const flags = computeFlags(pr, verdict, ctx);
+  const sharingIssue = pullRequestsOfSameIssue(pr, ctx.openPullRequests?.pullRequests ?? [])
+    .map(({ number, url }) => ({ number, url }))
+    .sort((left, right) => left.number - right.number);
+  const flags = computeFlags(pr, verdict, ctx, sharingIssue.length);
   const reasons: string[] = [];
 
   // --- Hide rules first. The `triage_hidden` output of the rules wins
@@ -193,6 +201,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     verdict,
     flags,
     facets,
+    pullRequestsOfSameIssue: sharingIssue,
     copilot,
   });
 
@@ -401,9 +410,14 @@ function anyFileMatches(files: string[], patterns: string[]): boolean {
   return files.some((f) => patterns.some((p) => matchesGlob(f, p)));
 }
 
-function computeFlags(pr: PullRequest, verdict: Verdict, ctx: ClassifyContext): RowFlag[] {
+function computeFlags(
+  pr: PullRequest,
+  verdict: Verdict,
+  ctx: ClassifyContext,
+  otherPullRequestsOfSameIssue: number,
+): RowFlag[] {
   const flags: RowFlag[] = [];
-  flags.push(...issueFlags(pr, ctx));
+  flags.push(...issueFlags(pr, ctx, otherPullRequestsOfSameIssue));
   if (pr.isDraft) flags.push('DRAFT');
   if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT-AUTHORED');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
@@ -429,40 +443,34 @@ function computeFlags(pr: PullRequest, verdict: Verdict, ctx: ClassifyContext): 
   return flags;
 }
 
-// Flags derived from the referenced-issue enrichment (cli/src/issues.ts).
-// Absent enrichment yields no flags rather than misleading ones.
-function issueFlags(pr: PullRequest, ctx: ClassifyContext): RowFlag[] {
-  const refs = pr.computed?.issueRefs;
-  if (!refs || refs.length === 0) return [];
+// Flags about the issues that GitHub closes when the PR is merged.
+function issueFlags(
+  pr: PullRequest,
+  ctx: ClassifyContext,
+  otherPullRequestsOfSameIssue: number,
+): RowFlag[] {
+  const issues = pr.linkedIssues ?? [];
   const flags: RowFlag[] = [];
-  const meta = pr.computed?.issueMeta ?? {};
   const author = pr.author?.login;
 
-  const colliding = pr.computed?.collidingPrs ?? [];
-  if (colliding.length > 0) flags.push(`ISSUE-COLLISION: ${colliding.length + 1}`);
+  if (otherPullRequestsOfSameIssue > 0) {
+    flags.push(`ISSUE-COLLISION: ${otherPullRequestsOfSameIssue + 1}`);
+  }
 
   // Self-filed only counts for outside contributors. A priority author filing
   // an issue and then fixing it is ordinary planned work, so flagging it would
   // fire on the expected PRs and mean nothing.
-  if (author && !isPriorityAuthor(ctx, author)) {
-    for (const ref of refs) {
-      const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];
-      if (m && !m.isPullRequest && m.author === author) {
-        flags.push('SELF-FILED');
-        break;
-      }
-    }
+  if (
+    author &&
+    !isPriorityAuthor(ctx, author) &&
+    issues.some((issue) => issue.author != null && sameLogin(issue.author, author))
+  ) {
+    flags.push('SELF-FILED');
   }
 
   // An open PR against an already-closed issue is either superseded by
   // whoever closed it or stale enough that the problem went away.
-  for (const ref of refs) {
-    const m = meta[`${ref.owner}/${ref.repo}#${ref.number}`];
-    if (m && m.state !== 'OPEN') {
-      flags.push('ISSUE-CLOSED');
-      break;
-    }
-  }
+  if (issues.some((issue) => issue.state !== 'OPEN')) flags.push('ISSUE-CLOSED');
   return flags;
 }
 

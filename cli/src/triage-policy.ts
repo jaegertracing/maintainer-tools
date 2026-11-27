@@ -2,7 +2,6 @@ import type { OpenPullRequests } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifiedPR } from './buckets.js';
 import type { TriageConfig } from './config.js';
-import { attachIssueState } from './issues.js';
 import { logAuthorQuotas } from './quota.js';
 import type { TriageSnapshot } from './snapshot.js';
 
@@ -33,7 +32,6 @@ export function classifySnapshot(snapshot: TriageSnapshot, policy: TriagePolicy)
     collaborators: snapshot.collaborators,
   };
   logAuthorQuotas(openPullRequests);
-  if (snapshot.issues) attachIssueState(snapshot.pullRequests, snapshot.issues);
   return classifyAll(openPullRequests, snapshot.viewer, policy, new Date(snapshot.now));
 }
 

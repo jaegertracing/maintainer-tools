@@ -1,9 +1,5 @@
-// Parsing the issues a PR claims to close.
-//
-// One pattern serves two consumers: `no_linked_issue` asks whether any
-// reference exists, and the triage CLI needs the actual numbers so it can
-// group PRs that claim the same issue. Keeping both on this module is what
-// stops the "does it have one" and "which one is it" answers from drifting.
+// Whether the description of a PR claims to close an issue, which the
+// `no_linked_issue` check asks.
 //
 // Only GitHub's closing keywords count. A bare `#N` mention is not a claim to
 // fix anything, and measuring the Jaeger queue bears that out: of 59 distinct
@@ -26,7 +22,7 @@ const KEYWORDS = 'fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved'
 const REF_RE = new RegExp(
   String.raw`\b(?:${KEYWORDS})\b[:\s]+(?:(?<slugOwner>[\w.-]+)\/(?<slugRepo>[\w.-]+))?#(?<num>\d+)` +
     String.raw`|\b(?:${KEYWORDS})\b[:\s]+https?:\/\/github\.com\/(?<urlOwner>[\w.-]+)\/(?<urlRepo>[\w.-]+)\/issues\/(?<urlNum>\d+)`,
-  'gi',
+  'i',
 );
 
 // Jaeger's PR template ships the line `<!-- Example: Resolves #123 -->`, and
@@ -54,50 +50,11 @@ function stripComments(body: string): string {
 }
 
 export function hasIssueRef(body: string): boolean {
-  // Fresh lastIndex per call: REF_RE is global and shared.
-  REF_RE.lastIndex = 0;
   return REF_RE.test(stripComments(body));
-}
-
-// Extract every claimed issue, de-duplicated. Bare `#N` resolves against the
-// referring PR's own repo.
-export function extractIssueRefs(
-  body: string,
-  defaultOwner: string,
-  defaultRepo: string,
-): IssueRef[] {
-  const out: IssueRef[] = [];
-  const seen = new Set<string>();
-  REF_RE.lastIndex = 0;
-  for (const m of stripComments(body).matchAll(REF_RE)) {
-    const g = m.groups;
-    if (!g) continue;
-    const numRaw = g.num ?? g.urlNum;
-    if (!numRaw) continue;
-    const ref: IssueRef = {
-      owner: g.slugOwner ?? g.urlOwner ?? defaultOwner,
-      repo: g.slugRepo ?? g.urlRepo ?? defaultRepo,
-      number: Number(numRaw),
-    };
-    const key = refKey(ref);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(ref);
-  }
-  return out;
 }
 
 export function refKey(ref: IssueRef): string {
   return `${ref.owner}/${ref.repo}#${ref.number}`;
-}
-
-// Inverse of `refKey`. Used to turn the stored `owner/repo#number` strings
-// back into links; the format is one we produce ourselves, so a parse failure
-// means a bug rather than bad input.
-export function parseRefKey(key: string): IssueRef | null {
-  const m = /^([\w.-]+)\/([\w.-]+)#(\d+)$/.exec(key);
-  if (!m) return null;
-  return { owner: m[1]!, repo: m[2]!, number: Number(m[3]) };
 }
 
 export function issueUrl(ref: IssueRef): string {

@@ -16,8 +16,6 @@ import { isPolicyComment } from './policy-comments.js';
 import type {
   AuthorAssociation,
   AuthorTypename,
-  IssueMeta,
-  IssueRef,
   LinkedIssue,
   RepositoryPermission,
   PullRequest,
@@ -50,12 +48,6 @@ export interface GraphqlClient {
   // an exact `issueCount` without paginating — far cheaper than walking
   // closed PRs page-by-page.
   countMergedPRs(owner: string, repo: string, author: string): Promise<number>;
-  // Look up author/state/title for a batch of referenced issues in one
-  // request. Returns a map keyed by `refKey()`; a reference that doesn't
-  // resolve (deleted, wrong repo, or a number that was never valid) is
-  // simply absent from the map rather than throwing, because contributors
-  // do write `Fixes #<nonexistent>`.
-  fetchIssues(refs: IssueRef[]): Promise<Map<string, IssueMeta>>;
   // The permission of every collaborator of `owner/repo`, by login.
   fetchCollaborators(owner: string, repo: string): Promise<Record<string, RepositoryPermission>>;
 }
@@ -426,38 +418,6 @@ async function paginateListQuery(
   return out;
 }
 
-// How many issue lookups to put in one aliased query. GitHub's GraphQL node
-// limit is generous for this shape (each alias fetches one node with three
-// scalar fields), and 50 keeps the query text well short of any practical
-// request-size limit.
-const ISSUE_BATCH_SIZE = 50;
-
-// `issueOrPullRequest` rather than `issue`: closing keywords accept any
-// number, and contributors do point them at pull requests. Resolving both
-// lets the caller report that rather than showing a blank.
-function buildIssueQuery(refs: IssueRef[]): string {
-  const parts = refs.map(
-    (ref, i) => `    a${i}: repository(owner: ${JSON.stringify(ref.owner)}, name: ${JSON.stringify(
-      ref.repo,
-    )}) {
-      issueOrPullRequest(number: ${ref.number}) {
-        __typename
-        ... on Issue { title state author { login } }
-        ... on PullRequest { title prState: state author { login } }
-      }
-    }`,
-  );
-  return `query IssueBatch {\n${parts.join('\n')}\n}`;
-}
-
-type IssueOrPrNode = {
-  __typename: string;
-  title: string;
-  state?: string;
-  prState?: string;
-  author: { login: string } | null;
-} | null;
-
 type RawReviewThread = {
   isResolved: boolean;
   resolvedBy: { login: string } | null;
@@ -521,41 +481,6 @@ export function createGraphqlClient(token: string): GraphqlClient {
     async fetchViewerLogin() {
       const data = await gql<{ viewer: { login: string } }>(VIEWER_QUERY);
       return data.viewer.login;
-    },
-
-    async fetchIssues(refs) {
-      const out = new Map<string, IssueMeta>();
-      for (let i = 0; i < refs.length; i += ISSUE_BATCH_SIZE) {
-        const batch = refs.slice(i, i + ISSUE_BATCH_SIZE);
-        let data: Record<string, { issueOrPullRequest: IssueOrPrNode } | null>;
-        try {
-          data = await gql<Record<string, { issueOrPullRequest: IssueOrPrNode } | null>>(
-            buildIssueQuery(batch),
-          );
-        } catch (err: unknown) {
-          // A batch can carry NOT_FOUND errors for individual aliases while
-          // still returning usable `data` for the rest. Octokit throws on any
-          // `errors` entry, so recover the partial payload instead of losing
-          // the whole batch to one bad reference.
-          const partial = (err as { data?: Record<string, { issueOrPullRequest: IssueOrPrNode }> })
-            .data;
-          if (!partial) continue;
-          data = partial;
-        }
-        batch.forEach((ref, j) => {
-          const node = data[`a${j}`]?.issueOrPullRequest;
-          if (!node) return;
-          const isPr = node.__typename === 'PullRequest';
-          const state = (isPr ? node.prState : node.state) ?? 'OPEN';
-          out.set(refKey(ref), {
-            author: node.author?.login ?? null,
-            state: state as IssueMeta['state'],
-            title: node.title,
-            isPullRequest: isPr,
-          });
-        });
-      }
-      return out;
     },
 
     async countMergedPRs(owner, repo, author) {

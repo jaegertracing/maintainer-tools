@@ -319,3 +319,46 @@ test('summary totals select matching buckets across repositories in Table view',
   assert.deepEqual(selections[3], { buckets: ['Blocked on author'], count: 1 });
   assert.deepEqual(selections[4], { buckets: [], count: 4 });
 });
+
+test('the issue cell links each linked issue and names the other PRs of the same issue', () => {
+  const sharedIssue = {
+    owner: 'acme',
+    repo: 'widgets',
+    number: 5,
+    state: 'CLOSED' as const,
+    labels: [],
+    title: 'A <bug>',
+    author: 'reporter',
+  };
+  // An issue of a snapshot file from before the title and the author existed.
+  const issueOfOtherRepo = {
+    owner: 'acme',
+    repo: 'gadgets',
+    number: 9,
+    state: 'OPEN' as const,
+    labels: [],
+  };
+  const pullRequests = [
+    pullRequest({ number: 1, linkedIssues: [sharedIssue, issueOfOtherRepo] }),
+    pullRequest({
+      number: 2,
+      url: 'https://github.com/acme/widgets/pull/2',
+      linkedIssues: [sharedIssue],
+    }),
+  ];
+  const openPullRequests = { pullRequests, quotaExemptLogins: new Set<string>() };
+  const html = renderHtml(
+    pullRequests.map((pr) => classify(pr, { ...context, openPullRequests })),
+    { viewer: 'maintainer-a', now, authorOpenCounts: new Map() },
+  );
+
+  for (const expected of [
+    '<a class="issue-link closed" href="https://github.com/acme/widgets/issues/5"',
+    'data-tip="Issue acme/widgets#5 (closed), opened by @reporter: A &lt;bug&gt;">#5</a>',
+    'data-tip="Issue acme/gadgets#9 (open)">acme/gadgets#9</a>',
+    '<span class="issue-others">other PRs: <a href="https://github.com/acme/widgets/pull/2"',
+    '<span class="issue-others">other PRs: <a href="https://github.com/acme/widgets/pull/1"',
+  ]) {
+    assert.ok(html.includes(expected), expected);
+  }
+});

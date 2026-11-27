@@ -9,9 +9,12 @@
 // requirement is bumped to >= 22.5.0 in package.json.
 
 import { DatabaseSync } from 'node:sqlite';
-import type { IssueMeta, PullRequest } from './types.js';
+import type { PullRequest } from './types.js';
 
+// A cache file from before the report read the linked issues holds the
+// table `issue_cache`, which nothing reads.
 const SCHEMA = `
+  DROP TABLE IF EXISTS issue_cache;
   CREATE TABLE IF NOT EXISTS pr_cache (
     owner       TEXT NOT NULL,
     repo        TEXT NOT NULL,
@@ -29,17 +32,6 @@ const SCHEMA = `
     fetched_at  TEXT NOT NULL,
     PRIMARY KEY (owner, repo, author)
   );
-  CREATE TABLE IF NOT EXISTS issue_cache (
-    owner       TEXT NOT NULL,
-    repo        TEXT NOT NULL,
-    number      INTEGER NOT NULL,
-    author      TEXT,
-    state       TEXT NOT NULL,
-    title       TEXT NOT NULL,
-    is_pr       INTEGER NOT NULL,
-    fetched_at  TEXT NOT NULL,
-    PRIMARY KEY (owner, repo, number)
-  );
 `;
 
 export interface PrCache {
@@ -52,12 +44,6 @@ export interface PrCache {
   // older than that.
   getMergedCount(owner: string, repo: string, author: string, maxAgeMs: number): number | null;
   putMergedCount(owner: string, repo: string, author: string, count: number): void;
-  // Referenced-issue metadata for the triage report's issue columns. Like
-  // merged counts, an issue has no cheap "has this changed" signal, so
-  // freshness is TTL-based. An issue's author never changes; `state` does,
-  // which is what the TTL is really for.
-  getIssue(owner: string, repo: string, number: number, maxAgeMs: number): IssueMeta | null;
-  putIssue(owner: string, repo: string, number: number, meta: IssueMeta): void;
   close(): void;
 }
 
@@ -119,19 +105,6 @@ export function openCache(path: string): PrCache {
        count      = excluded.count,
        fetched_at = excluded.fetched_at`,
   );
-  const getIssueStmt = db.prepare(
-    'SELECT author, state, title, is_pr, fetched_at FROM issue_cache WHERE owner = ? AND repo = ? AND number = ?',
-  );
-  const putIssueStmt = db.prepare(
-    `INSERT INTO issue_cache (owner, repo, number, author, state, title, is_pr, fetched_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(owner, repo, number) DO UPDATE SET
-       author     = excluded.author,
-       state      = excluded.state,
-       title      = excluded.title,
-       is_pr      = excluded.is_pr,
-       fetched_at = excluded.fetched_at`,
-  );
 
   return {
     get(owner, repo, number) {
@@ -175,38 +148,6 @@ export function openCache(path: string): PrCache {
     },
     putMergedCount(owner, repo, author, count) {
       putMergedStmt.run(owner, repo, author, count, new Date().toISOString());
-    },
-    getIssue(owner, repo, number, maxAgeMs) {
-      const row = getIssueStmt.get(owner, repo, number) as
-        | {
-            author: string | null;
-            state: string;
-            title: string;
-            is_pr: number | bigint;
-            fetched_at: string;
-          }
-        | undefined;
-      if (!row) return null;
-      const age = Date.now() - Date.parse(row.fetched_at);
-      if (!Number.isFinite(age) || age > maxAgeMs) return null;
-      return {
-        author: row.author,
-        state: row.state as IssueMeta['state'],
-        title: row.title,
-        isPullRequest: Number(row.is_pr) === 1,
-      };
-    },
-    putIssue(owner, repo, number, meta) {
-      putIssueStmt.run(
-        owner,
-        repo,
-        number,
-        meta.author,
-        meta.state,
-        meta.title,
-        meta.isPullRequest ? 1 : 0,
-        new Date().toISOString(),
-      );
     },
     close() {
       db.close();

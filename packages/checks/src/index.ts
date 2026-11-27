@@ -6,7 +6,6 @@ export type {
   CheckId,
   CheckConclusion,
   FileChange,
-  IssueMeta,
   IssueRef,
   LinkedIssue,
   OpenPullRequests,
@@ -25,9 +24,10 @@ export {
   type Composition,
   type FileClass,
 } from './composition.js';
-export { extractIssueRefs, hasIssueRef, issueUrl, parseRefKey, refKey } from './issue-refs.js';
+export { hasIssueRef, issueUrl, refKey } from './issue-refs.js';
 export { checkRunConclusion } from './predicates/index.js';
 export { commitsOfAuthor } from './predicates/authors_turn.js';
+export { pullRequestsOfSameIssue } from './predicates/is_duplicate.js';
 export {
   authorsTurn,
   CHECK_FACTS,

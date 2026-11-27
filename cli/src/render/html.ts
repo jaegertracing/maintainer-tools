@@ -7,7 +7,6 @@
 
 import {
   issueUrl,
-  parseRefKey,
   refKey,
   sameLogin,
   type PullRequest,
@@ -464,7 +463,7 @@ function renderRow(
   const age = formatAge(pr, now);
   return `<tr>
         <td><a href="${escape(pr.url)}" ${NEW_TAB}>#${pr.number}</a></td>
-        <td>${renderIssueCell(pr)}</td>
+        <td>${renderIssueCell(c)}</td>
         <td>${diff}</td>
         <td>${escape(pr.title)}</td>
         <td><a href="https://github.com/${escape(author)}" ${NEW_TAB}>@${escape(author)}</a>${authorTag} <span class="open-count">[${openCount} open]</span></td>
@@ -473,39 +472,32 @@ function renderRow(
       </tr>`;
 }
 
-// The issues this PR claims to close, plus the other open PRs claiming the
-// same ones. Naming those PRs rather than only counting them is what makes the
-// row actionable: three separate contributors each fixed jaeger#8780, and
-// deciding which to keep means opening the other two.
-function renderIssueCell(pr: PullRequest): string {
-  const refs = pr.computed?.issueRefs ?? [];
-  if (refs.length === 0) return '<span class="dim">—</span>';
-  const meta = pr.computed?.issueMeta ?? {};
-  const links = refs
-    .map((ref) => {
-      const key = refKey(ref);
-      const m = meta[key];
-      const label = sameRepoLabel(ref, pr) ?? key;
-      const cls = m?.state && m.state !== 'OPEN' ? 'issue-link closed' : 'issue-link';
-      const tip = m
-        ? `${m.isPullRequest ? 'PR' : 'Issue'} ${key} (${m.state.toLowerCase()})${m.author ? `, opened by @${m.author}` : ''}: ${m.title}`
-        : `${key} — could not be resolved`;
-      return `<a class="${cls}" href="${escape(issueUrl(ref))}" ${NEW_TAB} data-tip="${escape(tip)}">${escape(label)}</a>`;
+// The issues that GitHub closes when this PR is merged, plus the other open
+// PRs that share an issue with it under the duplicates policy. Naming those PRs rather
+// than only counting them is what makes the row actionable: three separate
+// contributors each fixed jaeger#8780, and deciding which to keep means
+// opening the other two.
+function renderIssueCell(classified: ClassifiedPR): string {
+  const pr = classified.pr;
+  const issues = pr.linkedIssues ?? [];
+  if (issues.length === 0) return '<span class="dim">—</span>';
+  const links = issues
+    .map((issue) => {
+      const key = refKey(issue);
+      const label = sameRepoLabel(issue, pr) ?? key;
+      const cls = issue.state !== 'OPEN' ? 'issue-link closed' : 'issue-link';
+      const openedBy = issue.author ? `, opened by @${issue.author}` : '';
+      const title = issue.title === undefined ? '' : `: ${issue.title}`;
+      const tip = `Issue ${key} (${issue.state.toLowerCase()})${openedBy}${title}`;
+      return `<a class="${cls}" href="${escape(issueUrl(issue))}" ${NEW_TAB} data-tip="${escape(tip)}">${escape(label)}</a>`;
     })
     .join(' ');
 
-  const others = (pr.computed?.collidingPrs ?? [])
-    .map(parseRefKey)
-    .filter((r): r is NonNullable<typeof r> => r !== null)
-    .sort((a, b) => a.number - b.number);
+  const others = classified.pullRequestsOfSameIssue;
   if (others.length === 0) return links;
 
   const otherLinks = others
-    .map((r) => {
-      const label = sameRepoLabel(r, pr) ?? refKey(r);
-      const url = `https://github.com/${r.owner}/${r.repo}/pull/${r.number}`;
-      return `<a href="${escape(url)}" ${NEW_TAB}>${escape(label)}</a>`;
-    })
+    .map((other) => `<a href="${escape(other.url)}" ${NEW_TAB}>#${other.number}</a>`)
     .join(', ');
   return `${links}<span class="issue-others">other PRs: ${otherLinks}</span>`;
 }
@@ -553,14 +545,14 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   'DESCRIPTION-EMPTY': 'PR description is empty or contains only unfilled template stubs.',
   'OVER-QUOTA':
     'Author has reached the new-contributor open-PR quota; this PR is on hold until an older one closes.',
-  'ISSUE-COLLISION':
-    'Another open PR claims to close the same issue. The count includes this PR, so `2` means one other PR is duplicating the work.',
   'IS-DUPLICATE':
     'An older open PR closes an issue that this PR closes, and the issue does not carry the `allow-multiple-prs` label.',
+  'ISSUE-COLLISION':
+    'Another open PR of this repository closes an issue of this repository that this PR closes, and the issue does not carry the `allow-multiple-prs` label. The count includes this PR, so `2` means one other PR is duplicating the work.',
   'SELF-FILED':
     'The author of this PR also opened the issue it closes — often a manufactured task rather than a problem the project had already identified. Not applied to maintainers, interns, or priority authors.',
   'ISSUE-CLOSED':
-    'The issue this PR claims to close is already closed, so the PR is likely superseded or stale.',
+    'An issue that this PR closes is already closed, so the PR is likely superseded or stale.',
 };
 
 function tipAttr(head: string): string {
