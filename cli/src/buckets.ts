@@ -7,6 +7,7 @@
 //
 import {
   hasLogin,
+  isDependencyBotLogin,
   labelOnlyFailure,
   mergeConflict,
   noLinkedIssue,
@@ -76,26 +77,6 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
   'dependency-bots': 'Opened by a recognized dependency-update bot (Dependabot, Renovate).',
   hidden: 'Not actionable right now — draft, blocked, or flagged as waiting on the author.',
 };
-
-// Logins treated as "dependency bots" — PRs they open are reviewable
-// merges, just authored by a service account. They always land in their
-// own bucket, regardless of draft state, CI status, or merge conflicts, so
-// they never drown out human-authored PRs in CODEOWNERS hits / FYI and
-// never inflate Blocked-on-author with noise nobody needs to triage.
-// GraphQL's `login` field omits the `[bot]` suffix even for an installed
-// GitHub App — Renovate's own App reports as plain `renovate` — so the
-// unbracketed forms are what this GraphQL-only CLI actually sees.
-// `renovate-bot` is this org's self-hosted Renovate runner. The bracketed
-// forms are kept too, as defense against any non-GraphQL-sourced PR data
-// (fixtures, hand-written cache rows).
-const DEPENDENCY_BOT_LOGINS = new Set<string>([
-  'dependabot',
-  'dependabot[bot]',
-  'renovate',
-  'renovate[bot]',
-  'renovate-bot',
-  'renovate-bot[bot]',
-]);
 
 // High-priority buckets render expanded by default; low-priority collapsed.
 export const BUCKETS_EXPANDED_BY_DEFAULT = new Set<Bucket>([
@@ -308,9 +289,13 @@ function isBotAuthor(pr: PullRequest): boolean {
   return pr.author.login.endsWith('[bot]');
 }
 
+// The PRs of a dependency bot always land in their own bucket, regardless
+// of draft state, CI status, or merge conflicts, so they never drown out
+// human-authored PRs in CODEOWNERS hits / FYI and never inflate
+// Blocked-on-author with noise nobody needs to triage.
 function isDependencyBot(pr: PullRequest): boolean {
   if (!pr.author) return false;
-  return DEPENDENCY_BOT_LOGINS.has(pr.author.login.toLowerCase());
+  return isDependencyBotLogin(pr.author.login);
 }
 
 function isFirstTimeContributor(pr: PullRequest): boolean {
