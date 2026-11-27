@@ -43,6 +43,7 @@ const github: GraphqlClient = {
     structuredClone(pullRequests.find((pr) => pr.number === number)!),
   countMergedPRs: async (_owner, _repo, author) => (author === 'alice' ? 2 : 99),
   fetchIssues: async () => new Map([['example/repo#10', issue10]]),
+  fetchCollaborators: async () => ({ 'maintainer-b': 'WRITE' }),
 };
 
 const options: GatherOptions = {
@@ -62,7 +63,32 @@ test('the snapshot holds everything that the run takes from GitHub', async () =>
   // maintainer-b is exempt.
   assert.deepEqual(snapshot.mergedCounts, { 'example/repo|alice': 2 });
   assert.deepEqual(snapshot.issues, { 'example/repo#10': issue10 });
+  assert.deepEqual(snapshot.collaborators, { 'example/repo': { 'maintainer-b': 'WRITE' } });
   assert.ok(Date.parse(snapshot.now) >= startMs && Date.parse(snapshot.now) <= Date.now());
+});
+
+test('the snapshot has no collaborators of a repository when GitHub refuses the list', async () => {
+  const snapshot = await gatherSnapshot(
+    {
+      ...github,
+      fetchPullRequest: async (owner, repo, number) => ({
+        ...pullRequests.find((pr) => pr.number === number)!,
+        repo: { owner, name: repo },
+      }),
+      fetchCollaborators: async (_owner, repo) => {
+        if (repo === 'refused') throw new Error('the token needs push access');
+        return { [`maintainer-of-${repo}`]: 'WRITE' };
+      },
+    },
+    null,
+    { ...options, repos: ['example/first', 'example/refused', 'example/last'] },
+  );
+
+  assert.deepEqual(snapshot.collaborators, {
+    'example/first': { 'maintainer-of-first': 'WRITE' },
+    'example/last': { 'maintainer-of-last': 'WRITE' },
+  });
+  assert.equal(snapshot.pullRequests.length, 3 * pullRequests.length);
 });
 
 test('the snapshot has no merged counts when the run skips the quota', async () => {

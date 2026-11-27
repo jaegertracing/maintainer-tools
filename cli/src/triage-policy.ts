@@ -30,6 +30,7 @@ export function classifySnapshot(snapshot: TriageSnapshot, policy: TriagePolicy)
     mergedCounts: snapshot.mergedCounts,
     // The priority authors are exempt from the quota.
     quotaExemptLogins: policy.priorityAuthors,
+    collaborators: snapshot.collaborators,
   };
   logAuthorQuotas(openPullRequests);
   if (snapshot.issues) attachIssueState(snapshot.pullRequests, snapshot.issues);

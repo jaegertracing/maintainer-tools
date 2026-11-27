@@ -18,6 +18,7 @@ import type {
   IssueMeta,
   IssueRef,
   LinkedIssue,
+  RepositoryPermission,
   PullRequest,
   ReviewState,
 } from './types.js';
@@ -54,6 +55,8 @@ export interface GraphqlClient {
   // simply absent from the map rather than throwing, because contributors
   // do write `Fixes #<nonexistent>`.
   fetchIssues(refs: IssueRef[]): Promise<Map<string, IssueMeta>>;
+  // The permission of every collaborator of `owner/repo`, by login.
+  fetchCollaborators(owner: string, repo: string): Promise<Record<string, RepositoryPermission>>;
 }
 
 interface PullRequestNode {
@@ -341,6 +344,17 @@ const LIST_BY_LABEL_QUERY = `
 
 const VIEWER_QUERY = `query Viewer { viewer { login } }`;
 
+const COLLABORATORS_QUERY = `
+  query Collaborators($owner: String!, $repo: String!, $cursor: String) {
+    repository(owner: $owner, name: $repo) {
+      collaborators(first: 100, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        edges { permission node { login } }
+      }
+    }
+  }
+`;
+
 // `first: 1` (not 0 — GraphQL search rejects 0) and we read only issueCount;
 // the actual node is discarded. issueCount is the authoritative total.
 const MERGED_COUNT_QUERY = `
@@ -540,6 +554,32 @@ export function createGraphqlClient(token: string): GraphqlClient {
         q: `repo:${owner}/${repo} author:${author} is:pr is:merged`,
       });
       return data.search.issueCount;
+    },
+
+    async fetchCollaborators(owner, repo) {
+      const permissions: Record<string, RepositoryPermission> = {};
+      let cursor: string | null = null;
+      do {
+        const data: {
+          repository: {
+            collaborators: {
+              pageInfo: { hasNextPage: boolean; endCursor: string | null };
+              edges: Array<{ permission: RepositoryPermission; node: { login: string } }>;
+            } | null;
+          };
+        } = await gql(COLLABORATORS_QUERY, { owner, repo, cursor });
+        const { collaborators } = data.repository;
+        // An absent list must not be read as an empty one: a maintainer
+        // would then be treated as an outside contributor.
+        if (!collaborators) {
+          throw new Error(`GitHub returned no list of collaborators for ${owner}/${repo}`);
+        }
+        for (const { permission, node } of collaborators.edges) {
+          permissions[node.login] = permission;
+        }
+        cursor = collaborators.pageInfo.hasNextPage ? collaborators.pageInfo.endCursor : null;
+      } while (cursor);
+      return permissions;
     },
 
     async listOpenPRs(owner, repo) {

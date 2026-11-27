@@ -10,6 +10,7 @@ export type {
   IssueRef,
   LinkedIssue,
   OpenPullRequests,
+  RepositoryPermission,
   PullRequest,
   PredicateContext,
 } from './types.js';
