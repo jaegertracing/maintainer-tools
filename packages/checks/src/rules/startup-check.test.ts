@@ -25,7 +25,24 @@ function validPolicy() {
   const blocked = policy.derivedFact('blocked').when(dcoMissing).when(ciFailingNotLabelOnly);
   policy.triageHidden.when(blocked).when(quiet, monthOld);
   policy.weeklyDigest.when(blocked);
-  return { policy, labelOnlyFailure, monthOld, ciFailingNotLabelOnly, blocked };
+  const staleLabel = policy.label('stale').when(quiet);
+  const staleLabelOld = policy.labelAge('stale_label_old', { of: [staleLabel], days: () => 14 });
+  const quietExpired = policy.derivedFact('quiet_expired').when(quiet, staleLabelOld);
+  policy.close.when(quietExpired);
+  const missingIssueLabel = policy.label('missing-issue').when(dcoMissing).unless(ciFailing);
+  const unapprovedIssueLabel = policy.label('unapproved-issue').when(dcoMissing, ciFailing);
+  policy.exclusive(missingIssueLabel, unapprovedIssueLabel);
+  return {
+    policy,
+    dcoMissing,
+    labelOnlyFailure,
+    monthOld,
+    quiet,
+    ciFailingNotLabelOnly,
+    blocked,
+    staleLabelOld,
+    quietExpired,
+  };
 }
 
 interface SeededViolation {
@@ -63,6 +80,30 @@ const SEEDED_VIOLATIONS: readonly SeededViolation[] = [
         new Policy().baseFact('needs_issue', () => true, { changedBy: 'author' }),
       ),
     ruleInError: 'needs_issue ⇒ triage_hidden',
+  },
+  {
+    name: 'a reason that reads a label age alone',
+    kind: 'rule that reads an output',
+    addBadRule: ({ policy, staleLabelOld }) => policy.close.when(staleLabelOld),
+    ruleInError: 'stale_label_old ⇒ close',
+  },
+  {
+    name: 'a veto that reads a label age',
+    kind: 'rule that reads an output',
+    addBadRule: ({ blocked, staleLabelOld, quiet }) => blocked.unless(quiet, staleLabelOld),
+    ruleInError: 'quiet ∧ stale_label_old ⇒ not blocked',
+  },
+  {
+    name: 'two exclusive outputs that hold together',
+    kind: 'exclusive outputs that both hold',
+    addBadRule: ({ policy, quiet }) => policy.label('unapproved-issue').when(quiet),
+    ruleInError: 'quiet ⇒ label:unapproved-issue',
+  },
+  {
+    name: 'a deadline that removes the label whose age it reads',
+    kind: 'plan that does not converge',
+    addBadRule: ({ policy, quietExpired }) => policy.label('stale').unless(quietExpired),
+    ruleInError: 'quiet ∧ stale_label_old ⇒ quiet_expired',
   },
   {
     name: 'a rule that holds for no values of the base facts',

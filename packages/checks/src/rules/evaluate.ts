@@ -68,6 +68,7 @@ export class Verdict {
 export interface RuleSet {
   readonly rules: readonly Rule[];
   readonly baseFacts: readonly BaseFact[];
+  readonly exclusions: readonly (readonly [OutputName, OutputName])[];
   // Evaluates the rules once for each element. A base fact that an element
   // leaves out is false.
   evaluateBaseFacts(hypotheticalPullRequests: readonly BaseFacts[]): Verdict[];
@@ -150,7 +151,7 @@ export function derivedFactOrder(rules: readonly Rule[]): string[] {
 }
 
 export function loadRuleSet(policy: Policy): RuleSet {
-  const { rules, baseFacts } = policy;
+  const { rules, baseFacts, exclusions } = policy;
   const derivedFactNames = derivedFactOrder(rules);
   const outputs = new Set(
     rules.flatMap(({ conclusion }) => (conclusion.kind === 'output' ? [conclusion.name] : [])),
@@ -178,6 +179,7 @@ export function loadRuleSet(policy: Policy): RuleSet {
   return {
     rules,
     baseFacts,
+    exclusions,
 
     evaluateBaseFacts(hypotheticalPullRequests: readonly BaseFacts[]): Verdict[] {
       return hypotheticalPullRequests.map((values) =>

@@ -59,7 +59,19 @@ repeats the definition.
   `weekly_digest` holds, the `pr-weekly-digest` action has something to list
   in the comment that reminds the author of a quiet pull request. Rules
   decide an output, and no rule reads one. An output is not a fact, so a fact
-  and an output may have the same name.
+  and an output may have the same name. The reconciler of RFC 0003 acts on
+  the other outputs: `label:<name>` for each label that it owns, `comment`
+  and `close`.
+- **Label age**: a base fact that holds when a pull request has carried one
+  of the labels of the reconciler, without a break, for a number of days.
+  It is how a rule reads the age of a label that the reconciler applied.
+- **Notice form**: the only form of rule that may read a label age: a
+  reason that has another fact beside the age. `flag_expired` holds when
+  `needs_issue` holds and the flag label is old enough, so the deadline
+  ends when the fact that put the label there stops holding.
+- **Exclusive outputs**: two outputs that the policy declares never to hold
+  for one pull request, such as `label:missing-issue` and
+  `label:unapproved-issue`.
 - **Rule** (`Rule`): one `.when()` or `.unless()` call, recorded as data. It
   names a list of facts, which are its **premises**, and one derived fact or
   output, which is its **conclusion** (`Conclusion`). `hidden.when(draft)`
@@ -94,10 +106,18 @@ repeats the definition.
   hold, directly or through derived facts, by reasons that held.
   `supportingFacts()` returns the supporting facts that have a summary.
 - **Violation** (`RuleSetViolation`): a defect that makes a rule set
-  unusable: a dependency cycle, an output that no person can clear, or a
-  rule that never holds. The startup check rejects a rule set that has one
-  by throwing an
-  `InvalidRuleSetError`, which lists the violations.
+  unusable. The kinds are a dependency cycle, a rule that reads an output,
+  which is a label age outside the notice form, two exclusive outputs that
+  both hold, an output that no person can clear, a plan that does not
+  converge, and a rule that never holds. The startup check rejects a rule
+  set that has one by throwing an `InvalidRuleSetError`, which lists the
+  violations.
+- **Plan that does not converge**: the outputs of the reconciler change
+  when their own labels are applied. A run can stop after it changed the
+  labels and before it closed the pull request, and the next run must
+  derive the same plan. For every combination of base facts the startup
+  check derives the plan, sets to false every label age none of whose
+  labels the plan keeps, derives the plan again, and rejects a difference.
 - **Output that no person can clear**: an output that a person cannot stop
   from holding. The output holds for some values of the base facts that time
   changes, and with those values it holds whatever values the other base
@@ -165,12 +185,17 @@ decision table lists its base facts, in the order of those rules.
     .unless(linkedIssueExempt);
   ```
 
+- `policy.label(name)`, `policy.comment` and `policy.close` are the outputs
+  of the reconciler. `policy.labelAge(name, { of, days })` declares a label
+  age of the label outputs in `of`, where `days` reads the number of days
+  from the context of the run, and `policy.exclusive(left, right)`
+  declares two outputs exclusive.
+
 Every statement records data and evaluates nothing. `policy.ts` loads the
 policy as a rule set and exports the rule set and not the policy, so no other
 module can add a fact or a rule. It checks the rule set
-once when the package loads (`src/rules/startup-check.ts`): a dependency cycle, an
-output that no person can clear, or a rule that never holds stops every
-consumer before it queries GitHub. `policy.ts` also stops every consumer when
+once when the package loads (`src/rules/startup-check.ts`): a violation
+stops every consumer before it queries GitHub. `policy.ts` also stops every consumer when
 a check ID in `CHECK_IDS` is not the name of a base fact. The decision tables in
 [`docs/decision-tables/`](docs/decision-tables/README.md) are for a person, and no tool reads them. The test
 `src/decision-tables.test.ts` generates them from the same rule set and fails

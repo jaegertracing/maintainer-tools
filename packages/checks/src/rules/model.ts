@@ -1,7 +1,9 @@
-// This file declares the concepts of the rule form and holds no algorithm.
-// "Vocabulary of the rule form" in ARCHITECTURE.md defines each term.
+// This file declares the concepts of the rule form. "Vocabulary of the rule
+// form" in ARCHITECTURE.md defines each term.
 
 import type { PullRequest, PredicateContext } from '../types.js';
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // An output is a decision that the rules make about a pull request and that
 // one tool acts on. The rules decide, for each pull request, whether each
@@ -14,7 +16,53 @@ export enum OutputName {
   // The `pr-weekly-digest` action, which reminds the author of a quiet pull
   // request with a comment, has something to list in that comment.
   WeeklyDigest = 'weekly_digest',
+  // The reconciler keeps the label on the pull request while the output
+  // holds, and removes it otherwise.
+  LabelMissingIssue = 'label:missing-issue',
+  LabelUnapprovedIssue = 'label:unapproved-issue',
+  LabelStale = 'label:stale',
+  LabelDuplicate = 'label:duplicate',
+  LabelPrQuotaReached = 'label:pr-quota-reached',
+  LabelWaitingForAuthor = 'label:waiting-for-author',
+  // The reconciler keeps one comment on the pull request that tells the
+  // author why the pull request needs attention.
+  Comment = 'comment',
+  // The reconciler closes the pull request.
+  Close = 'close',
 }
+
+// The labels that the reconciler owns: it adds and removes them, and no
+// person and no other tool does.
+export const OWNED_LABELS = [
+  'missing-issue',
+  'unapproved-issue',
+  'stale',
+  'duplicate',
+  'pr-quota-reached',
+  'waiting-for-author',
+] as const;
+export type OwnedLabel = (typeof OWNED_LABELS)[number];
+
+const LABEL_OUTPUT_NAMES: Record<OwnedLabel, OutputName> = {
+  'missing-issue': OutputName.LabelMissingIssue,
+  'unapproved-issue': OutputName.LabelUnapprovedIssue,
+  stale: OutputName.LabelStale,
+  duplicate: OutputName.LabelDuplicate,
+  'pr-quota-reached': OutputName.LabelPrQuotaReached,
+  'waiting-for-author': OutputName.LabelWaitingForAuthor,
+};
+
+export function labelOutputName(label: OwnedLabel): OutputName {
+  return LABEL_OUTPUT_NAMES[label];
+}
+
+// The outputs that the reconciler applies to a pull request, which together
+// are the plan of the pull request.
+export const RECONCILER_OUTPUT_NAMES: readonly OutputName[] = [
+  ...OWNED_LABELS.map(labelOutputName),
+  OutputName.Comment,
+  OutputName.Close,
+];
 
 // A conclusion is the derived fact or the output that a rule decides. It
 // carries its kind because a fact and an output may have the same name.
@@ -93,7 +141,35 @@ export class BaseFact {
     readonly name: string,
     readonly predicate: Predicate,
     readonly changedBy: ChangeSource,
+    // The label outputs whose age the fact measures. A fact with such
+    // outputs is a "label age": it can hold only while the pull request
+    // carries one of the labels. Every other base fact has none.
+    readonly ageOf: readonly OutputName[] = [],
   ) {}
+}
+
+// The start of the current unbroken period in which a pull request carries
+// one of `labels`, or undefined when it carries none or when no event dates
+// the period. A swap from one label to another adds before it removes, so
+// the period stays unbroken while one of the labels is present. The events
+// are undone from the newest one, because only the newest events are
+// gathered and the labels before the oldest of them are unknown.
+export function labelPeriodStart(pr: PullRequest, labels: readonly string[]): string | undefined {
+  const presentLabels = new Set(pr.labels.filter((label) => labels.includes(label)));
+  if (presentLabels.size === 0) return undefined;
+  const eventsNewestFirst = (pr.labelEvents ?? [])
+    .filter((event) => labels.includes(event.label))
+    .sort((left, right) => Date.parse(left.at) - Date.parse(right.at))
+    .reverse();
+  for (const event of eventsNewestFirst) {
+    if (event.event === 'unlabeled') {
+      presentLabels.add(event.label);
+    } else {
+      presentLabels.delete(event.label);
+      if (presentLabels.size === 0) return event.at;
+    }
+  }
+  return undefined;
 }
 
 // A derived fact is a named boolean of one pull request that rules decide
@@ -187,9 +263,63 @@ export class Policy {
 
   readonly triageHidden = new Output(OutputName.TriageHidden, this.#recordRule);
   readonly weeklyDigest = new Output(OutputName.WeeklyDigest, this.#recordRule);
+  readonly comment = new Output(OutputName.Comment, this.#recordRule);
+  readonly close = new Output(OutputName.Close, this.#recordRule);
+  readonly #labels = new Map<OwnedLabel, Output>();
+  readonly #declaredExclusions: (readonly [OutputName, OutputName])[] = [];
 
   get rules(): readonly Rule[] {
     return this.#declaredRules;
+  }
+
+  get exclusions(): readonly (readonly [OutputName, OutputName])[] {
+    return this.#declaredExclusions;
+  }
+
+  // The output that holds while the pull request should carry `label`.
+  label(label: OwnedLabel): Output {
+    const declared = this.#labels.get(label);
+    if (declared) return declared;
+    const output = new Output(labelOutputName(label), this.#recordRule);
+    this.#labels.set(label, output);
+    return output;
+  }
+
+  // A label age: a base fact that holds when the pull request has carried
+  // one of the labels of `of`, without a break, for at least `days`. The
+  // number of days is a setting of the run, so `days` reads it from the
+  // context. It is how a rule reads the age of a label that the reconciler
+  // applied, and the startup check limits it to the notice form.
+  labelAge(
+    name: string,
+    { of, days }: { of: readonly Output[]; days: (context: PredicateContext) => number },
+  ): BaseFact {
+    const outputNames = of.map((output) => output.name);
+    const labels = OWNED_LABELS.filter((label) => outputNames.includes(labelOutputName(label)));
+    if (labels.length === 0 || labels.length !== of.length) {
+      throw new Error(`the label age ${name} measures an output that is not a label`);
+    }
+    this.addFactName(name);
+    const labelAge = new BaseFact(
+      name,
+      (pr, context) => {
+        const periodStart = labelPeriodStart(pr, labels);
+        return (
+          periodStart !== undefined &&
+          context.now.getTime() - Date.parse(periodStart) >= days(context) * MILLISECONDS_PER_DAY
+        );
+      },
+      'time',
+      outputNames,
+    );
+    this.#declaredBaseFacts.push(labelAge);
+    return labelAge;
+  }
+
+  // Declares that the two outputs never hold for one pull request. The
+  // startup check rejects a rule set in which they can.
+  exclusive(left: Output, right: Output): void {
+    this.#declaredExclusions.push([left.name, right.name]);
   }
 
   get baseFacts(): readonly BaseFact[] {
