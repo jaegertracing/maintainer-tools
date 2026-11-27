@@ -1,4 +1,4 @@
-.PHONY: install build fmt lint tsc-lint test triage
+.PHONY: install build fmt lint tsc-lint test triage reconcile
 
 build:
 	pnpm run build
@@ -20,3 +20,6 @@ test:
 
 triage:
 	pnpm run triage $(ARGS)
+
+reconcile:
+	pnpm run reconcile $(ARGS)

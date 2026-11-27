@@ -18,6 +18,7 @@
     "prettier-check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\" --log-level warn",
     "tsc-lint": "tsc -p tsconfig.json --noEmit",
     "triage": "tsx cli/src/index.ts triage",
+    "reconcile": "tsx cli/src/index.ts reconcile",
     "test": "pnpm -r --if-present run test"
   },
   "devDependencies": {

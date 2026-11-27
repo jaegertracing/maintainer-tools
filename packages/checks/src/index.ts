@@ -44,6 +44,13 @@ export {
 } from './policy.js';
 export { supportingFacts } from './rules/evaluate.js';
 export type { Verdict } from './rules/evaluate.js';
-export { OutputName } from './rules/model.js';
+export { OutputName, OWNED_LABELS } from './rules/model.js';
+export type { OwnedLabel } from './rules/model.js';
+export { policyCommentsOf } from './policy-comments.js';
+export { lastActivityByPersonAt } from './predicates/idle.js';
+export { reconcile } from './reconciler/reconcile.js';
+export type { Reconciliation } from './reconciler/reconcile.js';
+export type { Change } from './reconciler/difference.js';
+export type { Plan } from './reconciler/plan.js';
 export { createGraphqlClient } from './graphql.js';
 export type { GraphqlClient, PrSummary } from './graphql.js';
