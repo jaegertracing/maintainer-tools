@@ -14,7 +14,7 @@ export type {
   PullRequest,
   PredicateContext,
 } from './types.js';
-export { hasLogin, sameLogin } from './logins.js';
+export { hasLogin, isDependencyBotLogin, sameLogin } from './logins.js';
 export { authorQuotas, quotaCandidates } from './quota.js';
 export type { QuotaCandidate } from './quota.js';
 export {
