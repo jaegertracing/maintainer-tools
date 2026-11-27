@@ -13,6 +13,7 @@ import type { BaseFact } from './rules/model.js';
 import { assertRuleSetIsValid } from './rules/startup-check.js';
 import { appliesFactName, CHECK_IDS } from './types.js';
 import type { CheckId } from './types.js';
+import { authorsTurnPredicate } from './predicates/authors_turn.js';
 import { ciFailingPredicate, labelOnlyFailurePredicate } from './predicates/ci_failing.js';
 import { dcoMissingPredicate } from './predicates/dco_missing.js';
 import { descriptionEmptyPredicate } from './predicates/description_empty.js';
@@ -59,6 +60,11 @@ const overQuota = policy.baseFact('over_quota', overQuotaPredicate, {
   changedBy: 'author',
 });
 const isDuplicate = policy.baseFact('is_duplicate', isDuplicatePredicate, {
+  changedBy: 'author',
+});
+// The triage report flags a PR for which `authors_turn` holds as
+// AUTHORS-TURN.
+export const authorsTurn = policy.baseFact('authors_turn', authorsTurnPredicate, {
   changedBy: 'author',
 });
 const descriptionEmpty = policy.baseFact('description_empty', descriptionEmptyPredicate, {
@@ -166,6 +172,7 @@ policy.triageHidden
   .when(needsIssue)
   // Only the primary pull request of an issue is reviewed.
   .when(isDuplicate)
+  .when(authorsTurn)
   .when(unresolvedFromReviewer);
 
 // The weekly digest lists what the author has to fix. `actions/stale` owns

@@ -327,7 +327,7 @@
           "flags": [
             "SELF-FILED",
             "ISSUE-CLOSED",
-            "NO-ISSUE",
+            "NO-APPROVED-ISSUE",
             "NO-TESTS"
           ],
           "number": 3,
@@ -562,7 +562,7 @@
           },
           "flags": [
             "MERGE-CONFLICT",
-            "NO-ISSUE",
+            "NO-APPROVED-ISSUE",
             "NO-TESTS"
           ],
           "number": 5,
@@ -789,7 +789,7 @@
             "viewerReviewed": false
           },
           "flags": [
-            "NO-ISSUE"
+            "NO-APPROVED-ISSUE"
           ],
           "number": 7,
           "reasons": [
@@ -900,7 +900,7 @@
             "viewerReviewed": false
           },
           "flags": [
-            "NO-ISSUE"
+            "NO-APPROVED-ISSUE"
           ],
           "number": 8,
           "reasons": [
@@ -1111,22 +1111,23 @@
             "hideReasons": [
               "hide:stale_on_author",
               "hide:no_approved_issue",
-              "waiting-for-author"
+              "hide:authors_turn"
             ],
-            "maintainerEngaged": false,
+            "maintainerEngaged": true,
             "priorityAuthor": false,
             "reviewRequested": false,
             "viewerReviewed": false
           },
           "flags": [
-            "STALE",
-            "WAITING-FOR-AUTHOR",
-            "NO-ISSUE"
+            "STALE-ON-AUTHOR",
+            "AUTHORS-TURN",
+            "NO-APPROVED-ISSUE"
           ],
           "number": 10,
           "reasons": [
             "hide:stale_on_author",
-            "hide:no_approved_issue"
+            "hide:no_approved_issue",
+            "hide:authors_turn"
           ]
         },
         {
@@ -1224,6 +1225,7 @@
             "firstTimer": false,
             "hideReasons": [
               "hide:no_approved_issue",
+              "hide:authors_turn",
               "hide:unresolved_from_reviewer",
               "changes-requested"
             ],
@@ -1233,13 +1235,15 @@
             "viewerReviewed": true
           },
           "flags": [
-            "NO-ISSUE",
-            "UNRESOLVED",
+            "AUTHORS-TURN",
+            "NO-APPROVED-ISSUE",
+            "UNRESOLVED-FROM-REVIEWER",
             "RESOLVED-W/O-REPLY: 1"
           ],
           "number": 11,
           "reasons": [
             "hide:no_approved_issue",
+            "hide:authors_turn",
             "hide:unresolved_from_reviewer"
           ]
         },
@@ -1348,7 +1352,7 @@
             "viewerReviewed": false
           },
           "flags": [
-            "BOT",
+            "BOT-AUTHORED",
             "MERGE-CONFLICT"
           ],
           "number": 12,

@@ -20,6 +20,8 @@ function pullRequest(overrides: Partial<PullRequest>): PullRequest {
       },
     ],
     files: [],
+    comments: [],
+    reviews: [],
     labels: [],
     mergeable: 'MERGEABLE',
     statusCheckRollup: 'SUCCESS',

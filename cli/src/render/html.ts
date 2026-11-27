@@ -522,34 +522,28 @@ function sameRepoLabel(ref: { owner: string; repo: string; number: number }, pr:
 // `title` attribute would work too, but browsers gate it behind a ~1-2s
 // hover delay we can't override; the CSS tooltip shows immediately. Keyed
 // by the chip's displayed
-// head text (see `renderFlag` and `renderHideReason` below) — both the
-// visible-row flags and the hidden-bucket reasons share this map since
-// several (e.g. `MERGE-CONFLICT`) name the same underlying predicate.
+// head text (see `renderFlag` and `renderHideReason` below). A flag of a
+// visible row and a reason in the hidden bucket that show the same fact
+// have the same text, so one entry describes both.
 const FLAG_DESCRIPTIONS: Record<string, string> = {
   DRAFT: 'Author opened this PR as a draft — not yet marked ready for review.',
-  BOT: 'Opened by a bot account that is not a recognized dependency-update bot.',
-  'BOT-AUTHORED': 'Opened by a bot account that is not a recognized dependency-update bot.',
+  'BOT-AUTHORED': 'Opened by a bot account.',
   BLOCKER: 'Carries a `release-blocker` or `blocker` label.',
   'MERGE-CONFLICT':
     'Branch has merge conflicts with the base branch — needs a rebase before it can be reviewed.',
-  STALE: 'Carries the `stale` label, or the author has gone silent past the configured threshold.',
   'STALE-ON-AUTHOR':
     'Carries the `stale` label, or the author has gone silent past the configured threshold.',
   QUESTION:
     'Carries the `awaiting-maintainer-input` label — the author is waiting on a maintainer to answer something.',
-  'WAITING-FOR-AUTHOR':
-    'Carries the `waiting-for-author` label — the ball is in the author’s court.',
+  'AUTHORS-TURN':
+    'A maintainer commented or reviewed, other than with an approval, after the last comment, review or commit of the author, and has not approved since — the ball is in the author’s court.',
   'CHANGES-REQUESTED':
     'You submitted a Request changes review and the author has not pushed or commented since, so it is waiting on them.',
   'NEEDS-LABEL':
     'CI is failing only on a label-gate check (e.g. a missing changelog/kind label) — otherwise mergeable.',
-  'NO-ISSUE':
-    'PR from an outside contributor links no open `help wanted` issue of the organization and does not carry the `no-issue-needed` label.',
   'NO-APPROVED-ISSUE':
     'PR from an outside contributor links no open `help wanted` issue of the organization and does not carry the `no-issue-needed` label.',
   'NO-TESTS': 'Source files changed, but no test files were added or modified alongside them.',
-  UNRESOLVED:
-    'An unresolved review thread exists and the author has pushed new commits since the last reviewer comment.',
   'UNRESOLVED-FROM-REVIEWER':
     'An unresolved review thread exists and the author has pushed new commits since the last reviewer comment.',
   'RESOLVED-W/O-REPLY':
@@ -746,17 +740,17 @@ const CSS = `
   .flag-ISSUE-CLOSED { background: #f5e8ff; color: #8250df; }
   .flag-BLOCKER { background: #cf222e; color: white; }
   .flag-MERGE-CONFLICT { background: #ffebe9; color: #82071e; }
-  .flag-STALE { background: #fff8c5; color: #66533d; }
+  .flag-STALE-ON-AUTHOR { background: #fff8c5; color: #66533d; }
   .flag-QUESTION { background: #ddf4ff; color: #0550ae; }
   .flag-POSSIBLE-QUESTION { background: #fff1e5; color: #66533d; }
-  .flag-DRAFT, .flag-BOT, .flag-HIDE { background: #eaeef2; color: #57606a; }
+  .flag-DRAFT, .flag-BOT-AUTHORED, .flag-HIDE { background: #eaeef2; color: #57606a; }
   /* P3 advisory flags — distinct muted tones so the column is scannable
      but the flags don't compete with BLOCKER/MERGE-CONFLICT for attention. */
   .flag-NEEDS-LABEL { background: #ddf4ff; color: #0550ae; }
-  .flag-WAITING-FOR-AUTHOR { background: #fff8c5; color: #66533d; }
-  .flag-NO-ISSUE { background: #fff1e5; color: #66533d; }
+  .flag-AUTHORS-TURN { background: #fff8c5; color: #66533d; }
+  .flag-NO-APPROVED-ISSUE { background: #fff1e5; color: #66533d; }
   .flag-NO-TESTS { background: #fff1e5; color: #66533d; }
-  .flag-UNRESOLVED { background: #fff8c5; color: #66533d; }
+  .flag-UNRESOLVED-FROM-REVIEWER { background: #fff8c5; color: #66533d; }
   .flag-RESOLVED-W-O-REPLY { background: #ffebe9; color: #82071e; }
   .flag-COPILOT { background: white; border: 1px solid #d0d7de; }
   td a .flag-COPILOT:hover { text-decoration: underline; }

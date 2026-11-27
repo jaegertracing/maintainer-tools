@@ -222,9 +222,8 @@ The full set of checks: `dco_missing`, `ci_failing`, `merge_conflict`,
 `resolved_without_reply`. The triage report also reads the derived fact
 `needs_issue`, which the predicates in `predicates/needs_issue.ts` and the
 rules in `policy.ts` decide; it has no check ID, because only the base fact
-of a check has one. The triage report also reads the base fact `is_duplicate` of
-`predicates/is_duplicate.ts`, which is not a check, because no action
-publishes it. To add a check, export its
+of a check has one. The triage report also reads the base facts `is_duplicate` and
+`authors_turn`, which are not checks, because no action publishes them. To add a check, export its
 predicate from a new file in `src/predicates/`, declare its base fact and its
 rules in `src/policy.ts` with the ID of the check as the name of the fact, and add
 its ID to `CHECK_IDS` in `types.ts`. A check with a check run is also listed
@@ -426,7 +425,8 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   `packages/checks/src/policy-comments.ts` recognizes as a policy comment,
   and the GitHub account of the author of each commit.
   The lifecycle policies of RFC 0003 read the linked issues and the
-  collaborators. No rule reads the text of a policy comment yet.
+  collaborators, and the turn policy leaves a policy comment out of the
+  activity on a PR.
 - **Deciding** is `classifySnapshot()`, a function of the snapshot and the
   config. It computes the issue collisions, and it classifies every PR. It
   passes the open PRs of the snapshot and the merged-PR counts to the rules
@@ -438,7 +438,7 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
 and the `over_quota` check decides the quota from them in
 `packages/checks/src/quota.ts`. A consumer that does not gather the open PRs
 as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
-`openPullRequests`, so for it `over_quota` and `is_duplicate` never hold. The `over_quota` check does not
+`openPullRequests`, so for it `over_quota`, `is_duplicate` and `authors_turn` never hold. The `over_quota` check does not
 read the `pr-quota-reached` label, because the label is the output of a
 separate evaluation of the quota policy by the pr-quota-manager workflow.
 `cli/src/issues.ts` has a part in both layers, so it has one
@@ -495,7 +495,7 @@ exactly one of nine priority-ordered buckets:
 7. **fyi** — catch-all for open PRs with no stronger signal.
 8. **dependency-bots** — author is `dependabot[bot]` / `renovate[bot]` /
    `renovate-bot[bot]`.
-9. **hidden** — drafts, bot-authored, `waiting-for-author`, or anything with
+9. **hidden** — drafts, bot-authored, or anything with
    a base fact that makes the `triage_hidden` output hold and has a summary.
    Rendered as its own collapsed section with a `reason` column, not merely
    counted.

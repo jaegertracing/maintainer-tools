@@ -70,6 +70,7 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
         messageHeadline: 'Test priority-author classification',
         messageBody: 'Signed-off-by: Contributor <contributor@example.com>',
         authorEmail: 'contributor@example.com',
+        authorLogin: 'contributor',
         committedDate: hoursAgo(1),
         parents: 1,
       },
@@ -229,7 +230,7 @@ function isFlaggedNoIssue(
   ctx: ClassifyContext = contextWithCollaborators,
 ): boolean {
   const result = classify(pr, ctx);
-  const isFlagged = result.flags.includes('NO-ISSUE');
+  const isFlagged = result.flags.includes('NO-APPROVED-ISSUE');
   assert.equal(result.facets.hideReasons.includes('hide:no_approved_issue'), isFlagged);
   return isFlagged;
 }
@@ -392,9 +393,265 @@ test('the allow-multiple-prs label of one issue does not exempt another issue of
   assert.deepEqual(numbersOfDuplicates(pullRequests), [9]);
 });
 
+function isAuthorsTurn(overrides: Partial<PullRequest>): boolean {
+  const result = classify(pullRequest(overrides), contextWithCollaborators);
+  const isFlagged = result.flags.includes('AUTHORS-TURN');
+  assert.equal(result.facets.hideReasons.includes('hide:authors_turn'), isFlagged);
+  return isFlagged;
+}
+
+// The pull request of `pullRequest()` has one commit, made an hour ago by
+// its author `contributor`.
+const authorsTurnCases: Array<[string, Partial<PullRequest>, boolean]> = [
+  ['a maintainer commented after the last push', commentedBy('writer', 0.5), true],
+  ['a maintainer commented before the last push', commentedBy('writer', 2), false],
+  [
+    'a maintainer requested changes after the last push',
+    reviewedByWriter('CHANGES_REQUESTED'),
+    true,
+  ],
+  ['a maintainer reviewed with comments after the last push', reviewedByWriter('COMMENTED'), true],
+  ['a maintainer approved after the last push', reviewedByWriter('APPROVED'), false],
+  [
+    'a maintainer approved after their own request for changes and their own comment',
+    {
+      comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }],
+      reviews: [
+        { author: 'writer', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) },
+        { author: 'Writer', state: 'APPROVED', submittedAt: hoursAgo(0.25) },
+      ],
+    },
+    false,
+  ],
+  [
+    'a maintainer approved after the request for changes of another maintainer',
+    {
+      reviews: [
+        { author: 'writer', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) },
+        { author: 'admin', state: 'APPROVED', submittedAt: hoursAgo(0.25) },
+      ],
+    },
+    true,
+  ],
+  [
+    'a maintainer commented after their own approval',
+    {
+      comments: [{ author: 'writer', createdAt: hoursAgo(0.25) }],
+      reviews: [{ author: 'writer', state: 'APPROVED', submittedAt: hoursAgo(0.5) }],
+    },
+    true,
+  ],
+  ['nobody but the author commented', commentedBy('contributor', 0.5), false],
+  ['a collaborator without write access commented', commentedBy('triager', 0.5), false],
+  ['a person who is not a collaborator commented', commentedBy('passer-by', 0.5), false],
+  [
+    'the author answered the maintainer',
+    {
+      comments: [
+        { author: 'writer', createdAt: hoursAgo(0.5) },
+        { author: 'Contributor', createdAt: hoursAgo(0.25) },
+      ],
+    },
+    false,
+  ],
+  [
+    'the latest comment of the maintainer is a policy comment',
+    {
+      comments: [
+        {
+          author: 'writer',
+          createdAt: hoursAgo(0.5),
+          body: '<!-- jaeger-pr-linked-issue -->\nThis PR is not linked to an issue.',
+        },
+      ],
+    },
+    false,
+  ],
+  [
+    'the only answer of the author is a policy comment',
+    {
+      comments: [
+        { author: 'writer', createdAt: hoursAgo(0.5) },
+        {
+          author: 'contributor',
+          createdAt: hoursAgo(0.25),
+          body: '<!-- jaeger-pr-linked-issue -->\nThis PR is not linked to an issue.',
+        },
+      ],
+    },
+    true,
+  ],
+  [
+    'the author quoted the stale notice in the answer to the maintainer',
+    {
+      comments: [
+        { author: 'writer', createdAt: hoursAgo(0.5) },
+        {
+          author: 'contributor',
+          createdAt: hoursAgo(0.25),
+          body: '> This pull request has been automatically marked as stale.\nStill working on it.',
+        },
+      ],
+    },
+    false,
+  ],
+  [
+    'the author merged the base branch after the comment of the maintainer',
+    {
+      comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }],
+      commits: [
+        { ...pullRequest().commits[0]!, committedDate: hoursAgo(1) },
+        {
+          ...pullRequest().commits[0]!,
+          committedDate: hoursAgo(0.25),
+          parents: 2,
+          authorLogin: 'Contributor',
+        },
+      ],
+    },
+    false,
+  ],
+  [
+    'the maintainer merged the base branch after their own comment',
+    {
+      comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }],
+      commits: [
+        { ...pullRequest().commits[0]!, committedDate: hoursAgo(1) },
+        {
+          ...pullRequest().commits[0]!,
+          committedDate: hoursAgo(0.25),
+          parents: 2,
+          authorLogin: 'writer',
+        },
+      ],
+    },
+    true,
+  ],
+  [
+    'a commit of a second account followed the comment of the maintainer',
+    {
+      comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }],
+      commits: [
+        {
+          ...pullRequest().commits[0]!,
+          committedDate: hoursAgo(0.25),
+          authorLogin: 'second-account',
+        },
+      ],
+    },
+    false,
+  ],
+  [
+    'a commit of no known account followed the comment of the maintainer',
+    {
+      comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }],
+      commits: [{ ...pullRequest().commits[0]!, committedDate: hoursAgo(0.25), authorLogin: null }],
+    },
+    false,
+  ],
+  [
+    'the author answered in a review thread, which GitHub records as a review',
+    {
+      reviews: [
+        { author: 'writer', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) },
+        { author: 'contributor', state: 'COMMENTED', submittedAt: hoursAgo(0.25) },
+      ],
+    },
+    false,
+  ],
+  [
+    'a maintainer commented on a PR without a commit or a comment of the author',
+    { commits: [], ...commentedBy('writer', 0.5) },
+    true,
+  ],
+  [
+    'the author is a maintainer who commented on their own PR',
+    { author: { login: 'writer', typename: 'User' }, ...commentedBy('writer', 0.5) },
+    false,
+  ],
+];
+
+function commentedBy(author: string, hours: number): Partial<PullRequest> {
+  return { comments: [{ author, createdAt: hoursAgo(hours) }] };
+}
+
+function reviewedByWriter(
+  state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED',
+): Partial<PullRequest> {
+  return { reviews: [{ author: 'writer', state, submittedAt: hoursAgo(0.5) }] };
+}
+
+for (const [activity, overrides, expected] of authorsTurnCases) {
+  test(`it is ${expected ? '' : 'not '}the turn of the author when ${activity}`, () => {
+    assert.equal(isAuthorsTurn(overrides), expected);
+  });
+}
+
+test('it is the turn of no author when the collaborators were not gathered', () => {
+  const result = classify(pullRequest(commentedBy('writer', 0.5)), context);
+
+  assert.deepEqual(result.facets.hideReasons, []);
+});
+
+test('the author who answers the requested changes of the viewer in a review thread has revised', () => {
+  const pr = pullRequest({
+    reviews: [
+      { author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) },
+      { author: 'contributor', state: 'COMMENTED', submittedAt: hoursAgo(0.25) },
+    ],
+  });
+
+  for (const contextOfRun of [context, contextWithCollaborators]) {
+    assert.equal(classify(pr, contextOfRun).bucket, 'changes-requested-revised');
+  }
+});
+
+test('the author has not revised when a maintainer merged the base branch after the requested changes of the viewer', () => {
+  const pr = pullRequest({
+    reviews: [{ author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) }],
+    commits: [
+      pullRequest().commits[0]!,
+      {
+        ...pullRequest().commits[0]!,
+        committedDate: hoursAgo(0.25),
+        parents: 2,
+        authorLogin: 'writer',
+      },
+    ],
+  });
+
+  assert.deepEqual(classify(pr, context).facets.hideReasons, ['changes-requested']);
+});
+
+test('the author has not revised when the pull request changed after the requested changes of the viewer without a commit of the author', () => {
+  const pr = pullRequest({
+    reviews: [{ author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) }],
+    commits: [],
+    updatedAt: hoursAgo(0.25),
+  });
+
+  assert.deepEqual(classify(pr, context).facets.hideReasons, ['changes-requested']);
+});
+
+test('the author has revised when a commit that is not the last one is newer than the requested changes of the viewer', () => {
+  const pr = pullRequest({
+    reviews: [{ author: 'maintainer-a', state: 'CHANGES_REQUESTED', submittedAt: hoursAgo(0.5) }],
+    commits: [
+      { ...pullRequest().commits[0]!, committedDate: hoursAgo(0.25) },
+      { ...pullRequest().commits[0]!, committedDate: hoursAgo(1) },
+    ],
+  });
+
+  assert.equal(classify(pr, context).bucket, 'changes-requested-revised');
+});
+
 const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   ['draft', { isDraft: true }, 'draft'],
-  ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],
+  [
+    'waiting for author',
+    { comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }] },
+    'hide:authors_turn',
+  ],
   ['merge conflict', { mergeable: 'CONFLICTING' }, 'hide:merge_conflict'],
   ['missing issue', { linkedIssues: [] }, 'hide:no_approved_issue'],
   [
@@ -449,7 +706,10 @@ for (const [login, typename] of [
 
     assert.equal(result.bucket, 'dependency-bots');
     assert.equal(result.facets.dependencyBot, true);
-    assert.ok(result.flags.includes('BOT'), 'every dependency bot must carry the BOT row flag');
+    assert.ok(
+      result.flags.includes('BOT-AUTHORED'),
+      'every dependency bot must carry the BOT-AUTHORED row flag',
+    );
   });
 }
 
@@ -459,7 +719,6 @@ test('dependency bots land in their own bucket even when draft, conflicted, or C
     isDraft: true,
     mergeable: 'CONFLICTING',
     statusCheckRollup: 'FAILURE',
-    labels: ['waiting-for-author'],
   });
 
   const result = classify(pr, context);
@@ -511,17 +770,17 @@ test('facets record every hide reason even though the bucket stops at the first'
     author: { login: 'priority-author', typename: 'User' },
     isDraft: true,
     mergeable: 'CONFLICTING',
-    labels: ['waiting-for-author'],
+    comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }],
   });
 
-  const result = classify(pr, context);
+  const result = classify(pr, contextWithCollaborators);
 
   assert.equal(result.bucket, 'hidden');
   assert.deepEqual(result.reasons, ['draft']);
   assert.deepEqual(result.facets.hideReasons, [
     'draft',
     'hide:merge_conflict',
-    'waiting-for-author',
+    'hide:authors_turn',
   ]);
   assert.equal(result.facets.priorityAuthor, true);
   assert.equal(result.copilot, null);

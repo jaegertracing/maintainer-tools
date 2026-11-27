@@ -14,6 +14,8 @@ function classifiedPR(repo: string, number: number): ClassifiedPR {
     number,
     labels: [],
     commits: [],
+    comments: [],
+    reviews: [],
     files: [],
     updatedAt: NOW.toISOString(),
   } as unknown as PullRequest;
