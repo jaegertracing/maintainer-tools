@@ -217,7 +217,7 @@ Three properties keep the checks trustworthy:
    and rate-limit budget.
 
 The full set of checks: `dco_missing`, `ci_failing`, `merge_conflict`,
-`stale_on_author`, `quota_exceeded`, `description_empty`, `no_linked_issue`,
+`stale_on_author`, `over_quota`, `description_empty`, `no_linked_issue`,
 `no_tests_for_code_change`, `unresolved_from_reviewer`,
 `resolved_without_reply`. To add a check, export its
 predicate from a new file in `src/predicates/`, declare its base fact and its
@@ -368,7 +368,7 @@ Three output surfaces, in decreasing volume:
 2. **Labels** — state. `waiting-for-author`, `awaiting-maintainer-input`,
    `pr-quota-reached`. Searchable, filterable. Currently read-only;
    write support lands in P5 (`pr-nudge` migration) and P6 (`pr-quota`).
-3. **Comments** — rare. Weekly digest, slash-command acks, `quota_exceeded`'s
+3. **Comments** — rare. Weekly digest, slash-command acks, `over_quota`'s
    one-shot explanation. Every bot comment ends with an HTML-comment
    footer the bot uses to find and **edit in place** rather than reposting.
 
@@ -428,7 +428,7 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   author is a property of the set and not of one PR.
 
 `cli/src/quota.ts` gathers the merged-PR counts with `fetchMergedCounts()`,
-and the `quota_exceeded` check decides the quota from them in
+and the `over_quota` check decides the quota from them in
 `packages/checks/src/quota.ts`. A consumer that does not gather the open PRs
 as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
 `openPullRequests`, so for it the quota is decided by the `pr-quota-reached`

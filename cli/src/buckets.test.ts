@@ -388,7 +388,7 @@ test('the newer pull request of an author with a quota of one is hidden', () => 
       classify(structuredClone(pr), {
         ...context,
         openPullRequests,
-      }).facets.hideReasons.includes('hide:quota_exceeded'),
+      }).facets.hideReasons.includes('hide:over_quota'),
     ),
     [true, false],
   );

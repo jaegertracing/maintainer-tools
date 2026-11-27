@@ -2,7 +2,7 @@
 //
 // For each (owner/repo, author) with more than one open PR,
 // fetchMergedCounts() fetches the merged count while the snapshot is
-// gathered. The `quota_exceeded` check of the checks package decides the
+// gathered. The `over_quota` check of the checks package decides the
 // quota from those counts, and logAuthorQuotas() prints what it decided.
 //
 // An author with one open PR gets no count, and neither does an exempt
