@@ -1,8 +1,8 @@
-// The decision tables in `packages/checks/decision-tables/` show a reviewer
-// which base facts lead to each output. No tool reads the tables, so their
-// generator is in this test and not in the package. The test writes the
-// tables when `UPDATE_DECISION_TABLES` is set, as `pnpm run decision-tables`
-// does.
+// The decision tables in `docs/decision-tables/` show which base facts
+// lead to each output, and the README beside them says who reads them and
+// how. No tool reads the tables, so their generator is in this test and not
+// in the package. The test writes the tables when `UPDATE_DECISION_TABLES`
+// is set, as `pnpm run decision-tables` does.
 
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,10 @@ import { isSameConclusion, OutputName, premiseText, ruleText } from './rules/mod
 import type { Conclusion, Rule } from './rules/model.js';
 import { allPossibleBaseFacts, baseFactsAffecting } from './rules/startup-check.js';
 
-const DECISION_TABLES_DIRECTORY = fileURLToPath(new URL('../decision-tables/', import.meta.url));
+const DECISION_TABLES_DIRECTORY = fileURLToPath(
+  new URL('../../../docs/decision-tables/', import.meta.url),
+);
+const README_FILE = 'README.md';
 
 // A "merged row" is one row of a decision table. It stands for a set of
 // combinations of base-fact values, and it is written with one character for
@@ -174,6 +177,7 @@ test('the committed decision tables are the ones that the rules generate', () =>
   }
   const committedTables = new Map(
     readdirSync(DECISION_TABLES_DIRECTORY)
+      .filter((file) => file !== README_FILE)
       .sort()
       .map((file) => [file, readFileSync(DECISION_TABLES_DIRECTORY + file, 'utf8')]),
   );
