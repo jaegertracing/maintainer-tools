@@ -2,18 +2,20 @@
 //
 // For each configured repo:
 //   1. listOpenPRs() — cheap pagination; returns each PR's updatedAt, head
-//      SHA, and head-commit status check rollup.
-//   2. For each PR, check the cache against all three fields; on miss,
+//      SHA, head-commit status check rollup, and linked issues.
+//   2. For each PR, check the cache against all four fields; on miss,
 //      fetch the full PR and overwrite.
 //
-// All three fields matter because GitHub does not advance `updatedAt`
-// when CI completes (rollup state changes on the commit, not the PR) or
-// when the base branch advances under the PR (mergeable flips silently).
-// Comparing the head SHA also catches force-pushes that somehow didn't
-// bump updatedAt.
+// All four fields matter because GitHub does not advance `updatedAt`
+// when CI completes (rollup state changes on the commit, not the PR),
+// when the base branch advances under the PR (mergeable flips silently),
+// or when a linked issue is closed or relabelled. Comparing the head SHA
+// also catches force-pushes that somehow didn't bump updatedAt.
 //
 // Logs each phase so the user can see what's happening — long fetch loops
 // against large repos would otherwise look hung.
+
+import { isDeepStrictEqual } from 'node:util';
 
 import {
   createGraphqlClient,
@@ -90,16 +92,18 @@ export async function scanRepos(
   return { prs: all, cacheMisses: misses, cacheHits: hits };
 }
 
-// Three-part freshness check. If updatedAt drifted, the PR moved (push,
+// Four-part freshness check. If updatedAt drifted, the PR moved (push,
 // comment, review, label). If headSha drifted, the branch was force-pushed
 // without bumping updatedAt — rare but possible. If headRollup drifted, CI
-// completed and the cached `statusCheckRollup` is stale.
+// completed and the cached `statusCheckRollup` is stale. If linkedIssues
+// drifted, a linked issue was closed, reopened or relabelled.
 function isFresh(cached: PullRequest, s: PrSummary): boolean {
   const cachedHead = cached.commits[cached.commits.length - 1];
   return (
     cached.updatedAt === s.updatedAt &&
     (cachedHead?.sha ?? null) === s.headSha &&
-    cached.statusCheckRollup === s.headRollup
+    cached.statusCheckRollup === s.headRollup &&
+    isDeepStrictEqual(cached.linkedIssues, s.linkedIssues)
   );
 }
 

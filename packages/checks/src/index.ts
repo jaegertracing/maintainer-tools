@@ -8,6 +8,7 @@ export type {
   FileChange,
   IssueMeta,
   IssueRef,
+  LinkedIssue,
   OpenPullRequests,
   PullRequest,
   PredicateContext,

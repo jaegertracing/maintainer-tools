@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import { createGraphqlClient } from '@jaegertracing/maintainer-tools-checks';
 import { retryRequest } from '../../packages/checks/src/retry.js';
 
@@ -65,3 +65,71 @@ for (const error of [
     assert.equal(attempts, 1);
   });
 }
+
+// mockGraphqlResponses() replaces `fetch` so that each GraphQL request
+// receives the next entry of `responses`. It returns the variables of the
+// requests, in the order in which they were sent.
+function mockGraphqlResponses(t: TestContext, responses: unknown[]): Record<string, unknown>[] {
+  const variablesOfRequests: Record<string, unknown>[] = [];
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+    const response = responses[variablesOfRequests.length];
+    variablesOfRequests.push(JSON.parse(init.body).variables);
+    return new Response(JSON.stringify({ data: response }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+  return variablesOfRequests;
+}
+
+test('a pull request carries its linked issues', async (t) => {
+  const noNodes = { nodes: [] };
+  mockGraphqlResponses(t, [
+    {
+      repository: {
+        pullRequest: {
+          number: 7,
+          title: 'Fix the thing',
+          url: 'https://github.com/example/repo/pull/7',
+          isDraft: false,
+          mergeable: 'MERGEABLE',
+          createdAt: '2026-09-10T08:00:00Z',
+          updatedAt: '2026-09-18T08:00:00Z',
+          additions: 1,
+          deletions: 0,
+          changedFiles: 1,
+          authorAssociation: 'CONTRIBUTOR',
+          author: { login: 'contributor', __typename: 'User' },
+          body: 'Resolves #3',
+          labels: noNodes,
+          files: noNodes,
+          reviewRequests: noNodes,
+          reviews: noNodes,
+          reviewThreads: {
+            totalCount: 0,
+            pageInfo: { hasNextPage: false, endCursor: null },
+            ...noNodes,
+          },
+          comments: noNodes,
+          closingIssuesReferences: {
+            nodes: [
+              {
+                number: 3,
+                state: 'OPEN',
+                repository: { name: 'repo', owner: { login: 'example' } },
+                labels: { nodes: [{ name: 'help wanted' }, { name: 'bug' }] },
+              },
+            ],
+          },
+          commits: noNodes,
+          headCommit: noNodes,
+        },
+      },
+    },
+  ]);
+
+  const pr = await createGraphqlClient('test-token').fetchPullRequest('example', 'repo', 7);
+
+  assert.deepEqual(pr.linkedIssues, [
+    { owner: 'example', repo: 'repo', number: 3, state: 'OPEN', labels: ['help wanted', 'bug'] },
+  ]);
+});
