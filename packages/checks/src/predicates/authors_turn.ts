@@ -28,7 +28,10 @@ export function commitsOfAuthor(pr: PullRequest): PullRequest['commits'] {
   );
 }
 
-export function authorsTurnPredicate(pr: PullRequest, context: PredicateContext): BaseFactValue {
+export function maintainerSpokeLastPredicate(
+  pr: PullRequest,
+  context: PredicateContext,
+): BaseFactValue {
   const author = pr.author?.login;
   const isAuthor = (login: string | null): boolean =>
     login !== null && author !== undefined && sameLogin(login, author);

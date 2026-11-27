@@ -326,6 +326,7 @@
           "flags": [
             "SELF-FILED",
             "ISSUE-CLOSED",
+            "AUTHORS-TURN",
             "NO-APPROVED-ISSUE",
             "NO-TESTS"
           ],
@@ -563,6 +564,7 @@
           },
           "flags": [
             "MERGE-CONFLICT",
+            "AUTHORS-TURN",
             "NO-APPROVED-ISSUE",
             "NO-TESTS"
           ],
@@ -792,6 +794,7 @@
           },
           "flags": [
             "ISSUE-COLLISION: 2",
+            "AUTHORS-TURN",
             "NO-APPROVED-ISSUE"
           ],
           "number": 7,
@@ -910,6 +913,7 @@
           },
           "flags": [
             "ISSUE-COLLISION: 2",
+            "AUTHORS-TURN",
             "NO-APPROVED-ISSUE"
           ],
           "number": 8,
@@ -1128,7 +1132,7 @@
             "hideReasons": [
               "hide:stale_on_author",
               "hide:no_approved_issue",
-              "hide:authors_turn"
+              "hide:maintainer_spoke_last"
             ],
             "maintainerEngaged": true,
             "priorityAuthor": false,
@@ -1145,7 +1149,7 @@
           "reasons": [
             "hide:stale_on_author",
             "hide:no_approved_issue",
-            "hide:authors_turn"
+            "hide:maintainer_spoke_last"
           ]
         },
         {
@@ -1243,7 +1247,7 @@
             "firstTimer": false,
             "hideReasons": [
               "hide:no_approved_issue",
-              "hide:authors_turn",
+              "hide:maintainer_spoke_last",
               "hide:unresolved_from_reviewer",
               "changes-requested"
             ],
@@ -1262,7 +1266,7 @@
           "pullRequestsOfSameIssue": [],
           "reasons": [
             "hide:no_approved_issue",
-            "hide:authors_turn",
+            "hide:maintainer_spoke_last",
             "hide:unresolved_from_reviewer"
           ]
         },

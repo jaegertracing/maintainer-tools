@@ -528,7 +528,9 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   QUESTION:
     'Carries the `awaiting-maintainer-input` label — the author is waiting on a maintainer to answer something.',
   'AUTHORS-TURN':
-    'A maintainer commented or reviewed, other than with an approval, after the last comment, review or commit of the author, and has not approved since — the ball is in the author’s court.',
+    'The next step is the author’s: a maintainer spoke last, or a policy blocks the PR (no approved issue, a duplicate, over the quota), which the author has to deal with first.',
+  'MAINTAINER-SPOKE-LAST':
+    'A maintainer commented or reviewed last, and the author has not pushed or commented since.',
   'CHANGES-REQUESTED':
     'You submitted a Request changes review and the author has not pushed or commented since, so it is waiting on them.',
   'NEEDS-LABEL':

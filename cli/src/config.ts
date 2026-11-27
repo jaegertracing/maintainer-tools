@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { parsePolicyAges, type PolicyAges } from '@jaegertracing/maintainer-tools-checks';
+
 export interface TriageConfig {
   // Login of the maintainer running the report ("you"). If omitted, the CLI
   // calls the GraphQL `viewer` query.
@@ -42,9 +44,13 @@ export interface TriageConfig {
   // from you, so the bucket carries no trust signal on its own; PRs fall
   // through to normal classification instead. Default false.
   ignoreReviewRequestedOnYou: boolean;
+  // The ages, in days, at which the policies act. An age that the file
+  // leaves out has its value of `DEFAULT_POLICY_AGES`.
+  ages: PolicyAges;
 }
 
 interface RawConfig {
+  ages?: unknown;
   viewer?: string;
   repos?: string[];
   maintainers?: string[];
@@ -109,7 +115,16 @@ export function loadConfig(explicitPath?: string): TriageConfig {
       'ignoreReviewRequestedOnYou',
       path,
     ),
+    ages: validateAges(raw.ages, path),
   };
+}
+
+function validateAges(value: unknown, configPath: string): PolicyAges {
+  try {
+    return parsePolicyAges(value);
+  } catch (err: unknown) {
+    throw new Error(`Config at ${configPath}: ${(err as Error).message}`, { cause: err });
+  }
 }
 
 function validateStringArray(value: unknown, field: string, configPath: string): string[] {

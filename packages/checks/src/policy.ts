@@ -11,17 +11,19 @@ import { loadRuleSet } from './rules/evaluate.js';
 import { Policy } from './rules/model.js';
 import type { BaseFact } from './rules/model.js';
 import { assertRuleSetIsValid } from './rules/startup-check.js';
-import { appliesFactName, CHECK_IDS } from './types.js';
+import { agesOf, appliesFactName, CHECK_IDS } from './types.js';
 import type { CheckId } from './types.js';
-import { authorsTurnPredicate } from './predicates/authors_turn.js';
+import { maintainerSpokeLastPredicate } from './predicates/authors_turn.js';
 import { ciFailingPredicate, labelOnlyFailurePredicate } from './predicates/ci_failing.js';
 import { dcoMissingPredicate } from './predicates/dco_missing.js';
 import { descriptionEmptyPredicate } from './predicates/description_empty.js';
+import { doNotExpirePredicate, quietPredicate } from './predicates/idle.js';
 import { mergeConflictPredicate } from './predicates/merge_conflict.js';
 import {
   authorCanWritePredicate,
   authorIsDependencyBotPredicate,
   collaboratorsNotGatheredPredicate,
+  linksOpenIssuePredicate,
   noApprovedIssuePredicate,
   noIssueNeededPredicate,
 } from './predicates/needs_issue.js';
@@ -62,9 +64,7 @@ const overQuota = policy.baseFact('over_quota', overQuotaPredicate, {
 const isDuplicate = policy.baseFact('is_duplicate', isDuplicatePredicate, {
   changedBy: 'author',
 });
-// The triage report flags a PR for which `authors_turn` holds as
-// AUTHORS-TURN.
-export const authorsTurn = policy.baseFact('authors_turn', authorsTurnPredicate, {
+const maintainerSpokeLast = policy.baseFact('maintainer_spoke_last', maintainerSpokeLastPredicate, {
   changedBy: 'author',
 });
 const descriptionEmpty = policy.baseFact('description_empty', descriptionEmptyPredicate, {
@@ -95,6 +95,15 @@ const collaboratorsNotGathered = policy.baseFact(
   collaboratorsNotGatheredPredicate,
   { changedBy: 'maintainer' },
 );
+const linksOpenIssue = policy.baseFact('links_open_issue', linksOpenIssuePredicate, {
+  changedBy: 'author',
+});
+const quiet = policy.baseFact('quiet', quietPredicate, {
+  changedBy: 'author',
+});
+const doNotExpire = policy.baseFact('do_not_expire', doNotExpirePredicate, {
+  changedBy: 'maintainer',
+});
 const missingIssueLabel = policy.baseFact('missing_issue_label', missingIssueLabelPredicate, {
   changedBy: 'author',
 });
@@ -157,6 +166,63 @@ policy
   .when(isPullRequest)
   .unless(missingIssueLabel)
   .unless(linkedIssueExempt);
+
+// The outputs of the reconciler of RFC 0003. Each policy keeps one label on
+// the pull requests that it holds for.
+
+// `needs_issue` has two labels: `unapproved-issue` when the pull request
+// links an open issue that no maintainer has approved, and `missing-issue`
+// when it links none.
+const missingIssueLabelOutput = policy
+  .label('missing-issue')
+  .when(needsIssue)
+  .unless(linksOpenIssue);
+const unapprovedIssueLabelOutput = policy
+  .label('unapproved-issue')
+  .when(needsIssue, linksOpenIssue);
+policy.exclusive(missingIssueLabelOutput, unapprovedIssueLabelOutput);
+policy.label('pr-quota-reached').when(overQuota);
+policy.label('duplicate').when(isDuplicate);
+
+// A pull request on which no person has acted for `idleDays` is idle.
+export const idle = policy.derivedFact('idle').when(quiet).unless(doNotExpire);
+const staleLabelOutput = policy.label('stale').when(idle);
+
+// A deadline is a notice form: the fact that put the label on the pull
+// request still holds, and the label is old enough.
+const flagLabelOld = policy.labelAge('flag_label_old', {
+  of: [missingIssueLabelOutput, unapprovedIssueLabelOutput],
+  days: (context) => agesOf(context).flagNoticeDays,
+});
+const flagExpired = policy.derivedFact('flag_expired').when(needsIssue, flagLabelOld);
+const staleLabelOld = policy.labelAge('stale_label_old', {
+  of: [staleLabelOutput],
+  days: (context) => agesOf(context).idleNoticeDays,
+});
+const idleExpired = policy.derivedFact('idle_expired').when(idle, staleLabelOld);
+
+// A blocked pull request cannot be reviewed until its author does something.
+export const blocked = policy
+  .derivedFact('blocked')
+  .when(needsIssue)
+  .when(isDuplicate)
+  .when(overQuota);
+
+// The next step is the author's when a maintainer spoke last, and also
+// while the pull request is blocked, because no review helps until the
+// author has dealt with what blocks it. The triage report flags such a PR
+// as AUTHORS-TURN.
+export const authorsTurn = policy
+  .derivedFact('authors_turn')
+  .when(maintainerSpokeLast)
+  .when(blocked);
+policy.label('waiting-for-author').when(authorsTurn);
+
+// The comment tells the author why the pull request is blocked. An idle
+// pull request is closed after a notice, so the notice has to exist.
+policy.comment.when(blocked).when(idle);
+
+policy.close.when(flagExpired).when(idleExpired).unless(doNotExpire);
 
 // The triage report hides a PR that a maintainer cannot act on until the
 // author does something.

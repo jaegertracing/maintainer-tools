@@ -16,6 +16,7 @@ import {
   noTestsForCodeChange,
   pullRequestsOfSameIssue,
   type OpenPullRequests,
+  type PolicyAges,
   resolvedWithoutReply,
   staleOnAuthor,
   supportingFacts,
@@ -101,6 +102,8 @@ export interface ClassifyContext {
   // The pull requests that are classified together with this one. Without
   // them no pull request is over a quota.
   openPullRequests?: OpenPullRequests;
+  // The ages of the config. Without them every age has its default.
+  ages?: PolicyAges;
 }
 
 export interface ClassifiedPR {
@@ -146,7 +149,11 @@ export interface Facets {
 export type RowFlag = string;
 
 export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
-  const verdict = ruleSet.evaluate(pr, { now: ctx.now, openPullRequests: ctx.openPullRequests });
+  const verdict = ruleSet.evaluate(pr, {
+    now: ctx.now,
+    openPullRequests: ctx.openPullRequests,
+    ages: ctx.ages,
+  });
   const sharingIssue = pullRequestsOfSameIssue(pr, ctx.openPullRequests?.pullRequests ?? [])
     .map(({ number, url }) => ({ number, url }))
     .sort((left, right) => left.number - right.number);
@@ -221,7 +228,7 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
     return mk('hidden', hideReasonsOfFacts);
   }
   // The mirror of `changes-requested-revised` below: the viewer asked for
-  // changes and the author has not answered yet. `authors_turn` hides such
+  // changes and the author has not answered yet. `maintainer_spoke_last` hides such
   // a PR when the run knows the viewer as a maintainer; this branch hides
   // it for a viewer whom the run does not, such as a run that could not
   // list the collaborators.

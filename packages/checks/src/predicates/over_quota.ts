@@ -3,8 +3,7 @@ import type { BaseFactValue } from '../rules/model.js';
 import type { PredicateContext, PullRequest } from '../types.js';
 
 // `over_quota` does not read the `pr-quota-reached` label, because the label
-// is the output of a separate evaluation of the quota policy by the
-// pr-quota-manager workflow.
+// is an output that the rules derive from this fact.
 export function overQuotaPredicate(
   pr: PullRequest,
   { openPullRequests }: PredicateContext,
