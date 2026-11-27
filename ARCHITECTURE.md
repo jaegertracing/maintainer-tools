@@ -422,8 +422,9 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   exceed a quota, the metadata of the issues that the PRs claim to close,
   the permission of each collaborator, the viewer, and the time of the run.
   A PR carries the issues that GitHub closes when it is merged, as
-  `linkedIssues`, and the text of each comment that
-  `packages/checks/src/policy-comments.ts` recognizes as a policy comment.
+  `linkedIssues`, the text of each comment that
+  `packages/checks/src/policy-comments.ts` recognizes as a policy comment,
+  and the GitHub account of the author of each commit.
   The lifecycle policies of RFC 0003 read the linked issues and the
   collaborators. No rule reads the text of a policy comment yet.
 - **Deciding** is `classifySnapshot()`, a function of the snapshot and the

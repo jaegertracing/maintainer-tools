@@ -81,8 +81,19 @@ function mockGraphqlResponses(t: TestContext, responses: unknown[]): Record<stri
   return variablesOfRequests;
 }
 
-test('a pull request carries its linked issues, and the text of a comment only when it is a policy comment', async (t) => {
+test('a pull request carries its linked issues, the text of a comment only when it is a policy comment, and the login of the author of each commit', async (t) => {
   const noNodes = { nodes: [] };
+  const commitNode = (oid: string, author: object | null) => ({
+    commit: {
+      oid,
+      messageHeadline: 'Fix the thing',
+      messageBody: '',
+      committedDate: '2026-09-10T08:00:00Z',
+      author,
+      statusCheckRollup: null,
+      parents: { totalCount: 1 },
+    },
+  });
   mockGraphqlResponses(t, [
     {
       repository: {
@@ -133,7 +144,13 @@ test('a pull request carries its linked issues, and the text of a comment only w
               },
             ],
           },
-          commits: noNodes,
+          commits: {
+            nodes: [
+              commitNode('a1', { email: 'c@example.com', user: { login: 'contributor' } }),
+              commitNode('b2', { email: 'unknown@example.com', user: null }),
+              commitNode('c3', null),
+            ],
+          },
           headCommit: noNodes,
         },
       },
@@ -153,6 +170,10 @@ test('a pull request carries its linked issues, and the text of a comment only w
     },
     { author: 'contributor', createdAt: '2026-09-12T08:00:00Z' },
   ]);
+  assert.deepEqual(
+    pr.commits.map((commit) => commit.authorLogin),
+    ['contributor', null, null],
+  );
 });
 
 test('the collaborators of a repository are read from every page', async (t) => {

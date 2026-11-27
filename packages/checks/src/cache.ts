@@ -84,7 +84,8 @@ interface CacheRow {
 //   7 — added reviews[].url and reviews[].body for Copilot review verdicts
 //   8 — added linkedIssues
 //   9 — added the body of a policy comment
-const SCHEMA_VERSION = 9;
+//  10 — added commits[].authorLogin
+const SCHEMA_VERSION = 10;
 
 interface CachePayload {
   v: number;

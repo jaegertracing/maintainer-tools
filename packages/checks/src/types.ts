@@ -110,6 +110,10 @@ export interface PullRequest {
     messageHeadline: string;
     messageBody: string;
     authorEmail: string | null;
+    // The GitHub account of the author of the commit, or null when GitHub
+    // attributes the commit to no account. Optional because a snapshot
+    // that was saved without the field has none.
+    authorLogin?: string | null;
     committedDate: string;
     parents: number;
   }>;
