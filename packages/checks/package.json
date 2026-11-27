@@ -29,7 +29,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "tsc-lint": "tsc -p tsconfig.json --noEmit"
+    "tsc-lint": "tsc -p tsconfig.json --noEmit",
+    "decision-tables": "UPDATE_DECISION_TABLES=1 tsx --test src/decision-tables.test.ts"
   },
   "dependencies": {
     "@octokit/graphql": "9.0.3",

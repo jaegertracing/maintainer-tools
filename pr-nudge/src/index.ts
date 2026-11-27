@@ -10,24 +10,14 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import {
+  CHECK_IDS,
   type CheckId,
   type CheckResult,
   createGraphqlClient,
   runAll,
 } from '@jaegertracing/maintainer-tools-checks';
 
-const KNOWN_IDS: ReadonlySet<CheckId> = new Set<CheckId>([
-  'dco_missing',
-  'ci_failing',
-  'merge_conflict',
-  'stale_on_author',
-  'quota_exceeded',
-  'description_empty',
-  'no_linked_issue',
-  'no_tests_for_code_change',
-  'unresolved_from_reviewer',
-  'resolved_without_reply',
-]);
+const KNOWN_IDS: ReadonlySet<CheckId> = new Set(CHECK_IDS);
 
 interface PrRef {
   owner: string;

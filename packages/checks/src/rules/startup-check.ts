@@ -3,6 +3,9 @@
 // base facts. A dependency cycle is reported earlier, by `derivedFactOrder()`
 // when the rule set is loaded, because nothing can be evaluated without an
 // order of the derived facts.
+//
+// `allPossibleBaseFacts()` and `baseFactsAffecting()` are exported for the
+// generator of the decision tables, which enumerates the same combinations.
 
 import { derivedFactNamesWithRule } from './evaluate.js';
 import type { BaseFacts, RuleSet, Verdict } from './evaluate.js';
@@ -12,7 +15,7 @@ import { InvalidRuleSetError } from './violations.js';
 import type { RuleSetViolation } from './violations.js';
 
 // Every combination of values of the named base facts.
-function allPossibleBaseFacts(names: readonly string[]): BaseFacts[] {
+export function allPossibleBaseFacts(names: readonly string[]): BaseFacts[] {
   let combinations: BaseFacts[] = [{}];
   for (const name of names) {
     combinations = combinations.flatMap((baseFacts) => [
@@ -35,7 +38,7 @@ function distinctConclusions(rules: readonly Rule[]): Conclusion[] {
 
 // The base facts that a conclusion depends on through its rules and the
 // rules of the derived facts that they read.
-function baseFactsAffecting(rules: readonly Rule[], conclusion: Conclusion): string[] {
+export function baseFactsAffecting(rules: readonly Rule[], conclusion: Conclusion): string[] {
   const derivedFactNames = derivedFactNamesWithRule(rules);
   const baseFactNames = new Set<string>();
   const visitedDerivedFactNames = new Set<string>();

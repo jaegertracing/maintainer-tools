@@ -1,5 +1,6 @@
 import { hasIssueRef } from '../issue-refs.js';
-import type { CheckResult, PullRequest } from '../types.js';
+import type { BaseFactValue } from '../rules/model.js';
+import type { PullRequest } from '../types.js';
 
 // Labels that exempt a PR from needing an issue link. Doc-only PRs,
 // CI/tooling changes, and explicitly-trivial work don't always have a
@@ -18,44 +19,35 @@ const EXEMPT_LABELS = new Set([
 // checked first.
 const MISSING_ISSUE_LABEL = 'missing-issue';
 
-export function noLinkedIssue(pr: PullRequest): CheckResult {
-  if (pr.labels.includes(MISSING_ISSUE_LABEL)) {
+export function missingIssueLabelPredicate(pr: PullRequest): boolean {
+  return pr.labels.includes(MISSING_ISSUE_LABEL);
+}
+
+export function linkedIssueExemptPredicate(pr: PullRequest): boolean {
+  return pr.labels.some((l) => EXEMPT_LABELS.has(l.toLowerCase()));
+}
+
+export function noLinkedIssuePredicate(pr: PullRequest): BaseFactValue {
+  if (missingIssueLabelPredicate(pr)) {
     return {
-      id: 'no_linked_issue',
-      triggered: true,
+      holds: true,
       summary: 'PR is not linked to an open `help wanted` issue (`missing-issue` label)',
-      // The label already tells the author what to fix, so a Check Run or a
-      // digest line would repeat it. The PR is hidden because it is not
-      // reviewable until the author links a qualifying issue.
-      publishesCheck: false,
-      inDigest: false,
-      hidesFromTriage: true,
     };
   }
-  if (pr.labels.some((l) => EXEMPT_LABELS.has(l.toLowerCase()))) {
+  if (linkedIssueExemptPredicate(pr)) {
     return {
-      id: 'no_linked_issue',
-      triggered: false,
+      holds: false,
       summary: 'Linked-issue check skipped (exempt label)',
-      publishesCheck: false,
-      inDigest: false,
-      hidesFromTriage: false,
     };
   }
   const triggered = !hasIssueRef(pr.body ?? '');
   return {
-    id: 'no_linked_issue',
-    triggered,
+    holds: triggered,
     summary: triggered
       ? 'PR does not reference an issue with `Fixes #N` / `Closes #N` / `Resolves #N`'
       : 'PR references a linked issue',
     details: triggered
       ? 'Add a line like `Fixes #1234` to the PR description so the linked issue closes on merge. Or apply a `docs`/`ci`/`trivial` label if the PR genuinely has no associated issue.'
       : undefined,
-    // Neutral, not failing — the rule isn't strict enough to fail CI.
-    publishesCheck: true,
-    checkConclusion: triggered ? 'neutral' : 'success',
-    inDigest: triggered,
-    hidesFromTriage: false,
   };
 }

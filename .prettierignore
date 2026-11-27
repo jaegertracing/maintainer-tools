@@ -14,3 +14,6 @@ pr-weekly-digest/dist/
 
 # A test compares this file byte for byte with the report that the CLI writes.
 cli/testdata/triage/report.json
+
+# A test compares the decision tables byte for byte with what the rules generate.
+packages/checks/decision-tables/

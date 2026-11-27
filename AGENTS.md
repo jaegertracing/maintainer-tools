@@ -87,14 +87,25 @@ matches its source.
 
 ### Predicate Library Conventions
 
-Predicates in `packages/checks/src/predicates/` must be **pure functions** of
-`(pr: PullRequest) => CheckResult`. No side effects, no I/O, no clock reads
-without an injected `now`. Side effects (Check Run writes, label changes,
-comments) belong in the _action_ subfolders that consume the library.
+The module of a check in `packages/checks/src/predicates/` exports the
+predicate of the check and declares nothing. The predicate must
+be a **pure function** of the `PullRequest` and the injected `now`. No side
+effects, no I/O, no clock reads. Side effects (Check Run writes, label
+changes, comments) belong in the _action_ subfolders that consume the library.
 
-Every `CheckResult` declares its surfaces explicitly (`publishesCheck`,
-`inDigest`, `hidesFromTriage`). The `summary` string is reused verbatim in
-the Checks panel and the digest — keep it short and self-contained.
+`src/policy.ts` declares every fact and every rule: one base fact for
+each check with `policy.baseFact(id, predicate, { changedBy })`, and the
+rules of the outputs (`policy.triageHidden.when(...)`,
+`policy.weeklyDigest.when(...)`). A check
+with a check run is listed in `predicates/index.ts`, and `policy.ts` declares
+the fact `<id>_applies` only when the check run is not published for every PR.
+`runAll()` reports them per check as
+`hidesFromTriage`, `inDigest` and `publishesCheck`. The `summary` string that
+a predicate returns is reused verbatim in the
+Checks panel and the digest — keep it short and self-contained. After a
+change of the rules, run `pnpm run decision-tables` in `packages/checks` and
+commit the regenerated `decision-tables/`. See "Predicate model" in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ### Comments
 

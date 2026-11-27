@@ -1,4 +1,5 @@
-import type { CheckResult, PullRequest } from '../types.js';
+import type { BaseFactValue } from '../rules/model.js';
+import type { PullRequest } from '../types.js';
 
 // Source-code file extensions we care about. Limited to the languages
 // the Jaeger org actually ships; expand as the org takes on more.
@@ -61,36 +62,26 @@ function isCodeFile(path: string): boolean {
 // Doc/CI/trivial PRs don't need tests.
 const EXEMPT_LABELS = new Set(['docs', 'documentation', 'ci', 'trivial', 'chore']);
 
-export function noTestsForCodeChange(pr: PullRequest): CheckResult {
+export function noTestsForCodeChangePredicate(pr: PullRequest): BaseFactValue {
   if (pr.labels.some((l) => EXEMPT_LABELS.has(l.toLowerCase()))) {
-    return mk(false, 'Test-coverage check skipped (PR labelled docs/ci/trivial)');
+    return {
+      holds: false,
+      summary: 'Test-coverage check skipped (PR labelled docs/ci/trivial)',
+    };
   }
   const codeFiles = pr.files.filter(isCodeFile).filter((f) => !isTestFile(f));
   if (codeFiles.length === 0) {
-    return mk(false, 'No source files changed');
+    return { holds: false, summary: 'No source files changed' };
   }
   const touchedTests = pr.files.some(isTestFile);
   const triggered = !touchedTests;
-  return mk(
-    triggered,
-    triggered
+  return {
+    holds: triggered,
+    summary: triggered
       ? `${codeFiles.length} source file(s) changed but no tests were added or modified`
       : 'Tests were added or modified alongside the source changes',
-    triggered
+    details: triggered
       ? 'Add or update tests covering the change. If the change genuinely doesn’t need tests (refactor, dep bump, etc.), apply a `trivial` or `chore` label to skip this check.'
       : undefined,
-  );
-}
-
-function mk(triggered: boolean, summary: string, details?: string): CheckResult {
-  return {
-    id: 'no_tests_for_code_change',
-    triggered,
-    summary,
-    details,
-    publishesCheck: true,
-    checkConclusion: triggered ? 'neutral' : 'success',
-    inDigest: triggered,
-    hidesFromTriage: false,
   };
 }

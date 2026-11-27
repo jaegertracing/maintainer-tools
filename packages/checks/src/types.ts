@@ -1,21 +1,34 @@
 // Shared types for the predicate library.
 //
-// Every check is a pure function `(pr: PullRequest) => CheckResult`. A
-// CheckResult declares which surfaces (Checks panel, weekly digest, triage
-// report) it publishes to, independently of whether the check `triggered`.
+// Every check is a base fact of a PR, declared in predicates/ with the surfaces
+// (Checks panel, weekly digest, triage report) that it appears on. A
+// CheckResult is the result of the rules for one check: whether its fact
+// holds (`triggered`), and which surfaces it publishes to.
 // See the RFC: docs/rfc/0001-maintainer-pr-triage-tooling.md ("Predicate library").
 
-export type CheckId =
-  | 'dco_missing'
-  | 'ci_failing'
-  | 'merge_conflict'
-  | 'stale_on_author'
-  | 'quota_exceeded'
-  | 'description_empty'
-  | 'no_linked_issue'
-  | 'no_tests_for_code_change'
-  | 'unresolved_from_reviewer'
-  | 'resolved_without_reply';
+// The checks, in the order in which `runAll()` returns their results.
+export const CHECK_IDS = [
+  'dco_missing',
+  'ci_failing',
+  'merge_conflict',
+  'stale_on_author',
+  'quota_exceeded',
+  'description_empty',
+  'no_linked_issue',
+  'no_tests_for_code_change',
+  'unresolved_from_reviewer',
+  'resolved_without_reply',
+] as const;
+
+export type CheckId = (typeof CHECK_IDS)[number];
+
+// A check "applies" to a pull request when `pr-nudge` publishes a check run
+// of the check for it. A check for which the policy declares the fact
+// `<id>_applies` applies to the pull requests that the fact holds for, and a
+// check with a check run and no such fact applies to every pull request.
+export function appliesFactName(id: CheckId): string {
+  return `${id}_applies`;
+}
 
 // Predicates are pure functions of the PR, so a predicate that compares
 // against the current time takes it from here instead of the wall clock. A
@@ -40,14 +53,16 @@ export interface CheckResult {
   // Optional longer remediation paragraph rendered behind the Checks panel
   // "Details" link.
   details?: string;
-  // Surface declarations — set by the predicate, read by each consumer.
+  // Surface declarations — derived from the evaluated rules by `runAll()`,
+  // read by each consumer.
   publishesCheck: boolean;
   checkConclusion?: CheckConclusion;
   inDigest: boolean;
   hidesFromTriage: boolean;
-  // Set by `ci_failing` when the only failing checks are label-gate checks
-  // (e.g. "check-label"). Such PRs are not hidden from triage — a maintainer
-  // needs to apply the label — but are shown in a dedicated group.
+  // Set for a triggered `ci_failing`: whether the only failing checks are
+  // label-gate checks (e.g. "check-label"), which is the fact
+  // `label_only_failure`. Such PRs are not hidden from triage — a
+  // maintainer needs to apply the label — but are shown in a dedicated group.
   labelOnlyFailure?: boolean;
 }
 
