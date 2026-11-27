@@ -222,7 +222,9 @@ The full set of checks: `dco_missing`, `ci_failing`, `merge_conflict`,
 `resolved_without_reply`. The triage report also reads the derived fact
 `needs_issue`, which the predicates in `predicates/needs_issue.ts` and the
 rules in `policy.ts` decide; it has no check ID, because only the base fact
-of a check has one. To add a check, export its
+of a check has one. The triage report also reads the base fact `is_duplicate` of
+`predicates/is_duplicate.ts`, which is not a check, because no action
+publishes it. To add a check, export its
 predicate from a new file in `src/predicates/`, declare its base fact and its
 rules in `src/policy.ts` with the ID of the check as the name of the fact, and add
 its ID to `CHECK_IDS` in `types.ts`. A check with a check run is also listed
@@ -428,13 +430,14 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   config. It computes the issue collisions, and it classifies every PR. It
   passes the open PRs of the snapshot and the merged-PR counts to the rules
   as `openPullRequests` of the predicate context, because the quota of an
-  author is a property of the set and not of one PR.
+  author and the duplicates of an issue are properties of the set and not of
+  one PR.
 
 `cli/src/quota.ts` gathers the merged-PR counts with `fetchMergedCounts()`,
 and the `over_quota` check decides the quota from them in
 `packages/checks/src/quota.ts`. A consumer that does not gather the open PRs
 as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
-`openPullRequests`, so for it `over_quota` never holds. The check does not
+`openPullRequests`, so for it `over_quota` and `is_duplicate` never hold. The `over_quota` check does not
 read the `pr-quota-reached` label, because the label is the output of a
 separate evaluation of the quota policy by the pr-quota-manager workflow.
 `cli/src/issues.ts` has a part in both layers, so it has one

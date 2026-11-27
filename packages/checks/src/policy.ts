@@ -30,6 +30,7 @@ import {
   noLinkedIssuePredicate,
 } from './predicates/no_linked_issue.js';
 import { noTestsForCodeChangePredicate } from './predicates/no_tests_for_code_change.js';
+import { isDuplicatePredicate } from './predicates/is_duplicate.js';
 import { overQuotaPredicate } from './predicates/over_quota.js';
 import { resolvedWithoutReplyPredicate } from './predicates/resolved_without_reply.js';
 import { staleOnAuthorPredicate } from './predicates/stale_on_author.js';
@@ -55,6 +56,9 @@ export const staleOnAuthor = policy.baseFact('stale_on_author', staleOnAuthorPre
   changedBy: 'author',
 });
 const overQuota = policy.baseFact('over_quota', overQuotaPredicate, {
+  changedBy: 'author',
+});
+const isDuplicate = policy.baseFact('is_duplicate', isDuplicatePredicate, {
   changedBy: 'author',
 });
 const descriptionEmpty = policy.baseFact('description_empty', descriptionEmptyPredicate, {
@@ -160,6 +164,8 @@ policy.triageHidden
   .when(overQuota)
   .when(descriptionEmpty)
   .when(needsIssue)
+  // Only the primary pull request of an issue is reviewed.
+  .when(isDuplicate)
   .when(unresolvedFromReviewer);
 
 // The weekly digest lists what the author has to fix. `actions/stale` owns

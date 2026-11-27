@@ -130,17 +130,17 @@ labels are collected under **(no priority)** and rendered last, visually
 de-emphasized. This lets maintainers focus on high-priority work while still
 seeing the full picture in a single report.
 
-| Bucket                                              | What it means                                                                                                                                                                                                                                                      | Default state |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| **Priority authors**                                | Author is another configured maintainer, intern, or priority author. Actionable PRs remain in this highest-priority bucket throughout review.                                                                                                                      | Expanded      |
-| **Review requested on you**                         | Someone added you to the Reviewers field.                                                                                                                                                                                                                          | Expanded      |
-| **You requested changes; author has revised**       | You requested changes, and the author has pushed or commented since.                                                                                                                                                                                               | Expanded      |
-| **You're the bottleneck**                           | You've reviewed this PR before; the author has acted since (commit pushed or commented).                                                                                                                                                                           | Expanded      |
-| **First-time contributors awaiting first response** | Author's `authorAssociation` is `FIRST_TIME_*`; no maintainer has engaged yet.                                                                                                                                                                                     | Expanded      |
-| **CODEOWNERS hits**                                 | PR touches files matching your configured codeowner globs.                                                                                                                                                                                                         | Collapsed     |
-| **FYI**                                             | Catch-all for everything else open.                                                                                                                                                                                                                                | Collapsed     |
-| **Dependency bots**                                 | Author is `dependabot`, `renovate`, or `renovate-bot`. Always lands here, even draft/CI-red/conflicted — Renovate and Dependabot manage their own PRs.                                                                                                             | Collapsed     |
-| **Hidden**                                          | Not actionable until the contributor moves. Drafts, non-dependency bots, and any PR a predicate marked as hide-from-triage (DCO missing, CI red, merge conflict, quota-exceeded, stale, empty description, missing issue). Shown collapsed with a `reason` column. | Collapsed     |
+| Bucket                                              | What it means                                                                                                                                                                                                                                                                 | Default state |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **Priority authors**                                | Author is another configured maintainer, intern, or priority author. Actionable PRs remain in this highest-priority bucket throughout review.                                                                                                                                 | Expanded      |
+| **Review requested on you**                         | Someone added you to the Reviewers field.                                                                                                                                                                                                                                     | Expanded      |
+| **You requested changes; author has revised**       | You requested changes, and the author has pushed or commented since.                                                                                                                                                                                                          | Expanded      |
+| **You're the bottleneck**                           | You've reviewed this PR before; the author has acted since (commit pushed or commented).                                                                                                                                                                                      | Expanded      |
+| **First-time contributors awaiting first response** | Author's `authorAssociation` is `FIRST_TIME_*`; no maintainer has engaged yet.                                                                                                                                                                                                | Expanded      |
+| **CODEOWNERS hits**                                 | PR touches files matching your configured codeowner globs.                                                                                                                                                                                                                    | Collapsed     |
+| **FYI**                                             | Catch-all for everything else open.                                                                                                                                                                                                                                           | Collapsed     |
+| **Dependency bots**                                 | Author is `dependabot`, `renovate`, or `renovate-bot`. Always lands here, even draft/CI-red/conflicted — Renovate and Dependabot manage their own PRs.                                                                                                                        | Collapsed     |
+| **Hidden**                                          | Not actionable until the contributor moves. Drafts, non-dependency bots, and any PR a predicate marked as hide-from-triage (DCO missing, CI red, merge conflict, quota-exceeded, stale, empty description, missing issue, duplicate). Shown collapsed with a `reason` column. | Collapsed     |
 
 An explicit review request on you **overrides** every hide rule and the
 Dependency bots bucket alike — if a maintainer tagged you, you'll see the
@@ -431,6 +431,23 @@ the repository. It does not read the `missing-issue` label that a workflow
 of `jaegertracing/jaeger` manages. When GitHub refuses the list of collaborators of a repository, the
 CLI cannot tell a maintainer from an outside contributor, so it flags no PR
 of that repository.
+
+---
+
+## Duplicates policy
+
+The triage report shows one open PR per issue, with the exceptions below.
+For each issue, the oldest open
+PR of the issue's repository that closes it is the primary one, and the
+triage report hides every other open PR of that repository that closes it,
+with the reason `hide:is_duplicate`. A PR of another repository is not
+counted. Two PRs created at the same time are ordered by number. A
+maintainer allows several PRs for one issue by labelling the issue
+`allow-multiple-prs`. As with every hide rule, an explicit review request on
+you keeps a duplicate visible.
+
+The triage CLI decides this from the issues that GitHub links to the open
+PRs of one run, so a run with `--pr` hides no PR as a duplicate.
 
 ---
 
