@@ -153,6 +153,8 @@ const LINKED_ISSUES_FIELD = `
     nodes {
       number
       state
+      title
+      author { login }
       repository { name owner { login } }
       labels(first: 50) { nodes { name } }
     }
@@ -163,6 +165,8 @@ interface LinkedIssuesConnection {
   nodes: Array<{
     number: number;
     state: 'OPEN' | 'CLOSED';
+    title: string;
+    author: { login: string } | null;
     repository: { name: string; owner: { login: string } };
     labels: { nodes: Array<{ name: string }> };
   }>;
@@ -174,6 +178,8 @@ function linkedIssuesOf(connection: LinkedIssuesConnection): LinkedIssue[] {
     repo: issue.repository.name,
     number: issue.number,
     state: issue.state,
+    title: issue.title,
+    author: issue.author?.login ?? null,
     labels: issue.labels.nodes.map((label) => label.name),
   }));
 }
