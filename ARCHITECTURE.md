@@ -416,6 +416,9 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   the open PRs as fetched, the merged-PR counts of the authors that can
   exceed a quota, the metadata of the issues that the PRs claim to close,
   the viewer, and the time of the run.
+  A PR carries the issues that GitHub closes when it is merged, as
+  `linkedIssues`. No rule reads them. They are gathered for the lifecycle
+  policies of RFC 0003.
 - **Deciding** is `classifySnapshot()`, a function of the snapshot and the
   config. It computes the issue collisions, and it classifies every PR. It
   passes the open PRs of the snapshot and the merged-PR counts to the rules

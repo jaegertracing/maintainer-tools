@@ -17,19 +17,22 @@ import type {
   AuthorTypename,
   IssueMeta,
   IssueRef,
+  LinkedIssue,
   PullRequest,
   ReviewState,
 } from './types.js';
 
-// Fields returned by listOpenPRs. Together (updatedAt, headSha, headRollup)
-// they form the cache freshness key — see scan.ts. `updatedAt` alone is not
-// enough because GitHub does not advance it when CI checks complete or when
-// the base branch advances under the PR.
+// Fields returned by listOpenPRs. Together (updatedAt, headSha, headRollup,
+// linkedIssues) they form the cache freshness key — see scan.ts. `updatedAt`
+// alone is not enough because GitHub does not advance it when CI checks
+// complete, when the base branch advances under the PR, or when a linked
+// issue is closed or relabelled.
 export interface PrSummary {
   number: number;
   updatedAt: string;
   headSha: string | null;
   headRollup: PullRequest['statusCheckRollup'];
+  linkedIssues: LinkedIssue[];
 }
 
 export interface GraphqlClient {
@@ -103,6 +106,7 @@ interface PullRequestNode {
       createdAt: string;
     }>;
   };
+  closingIssuesReferences: LinkedIssuesConnection;
   commits: {
     nodes: Array<{
       commit: {
@@ -133,6 +137,40 @@ interface PullRequestNode {
       };
     }>;
   };
+}
+
+// The `pr-linked-issue` action of jaeger reads the first 20 closing issue
+// references, and the lifecycle policies keep that limit.
+const MAX_LINKED_ISSUES = 20;
+
+const LINKED_ISSUES_FIELD = `
+  closingIssuesReferences(first: ${MAX_LINKED_ISSUES}) {
+    nodes {
+      number
+      state
+      repository { name owner { login } }
+      labels(first: 50) { nodes { name } }
+    }
+  }
+`;
+
+interface LinkedIssuesConnection {
+  nodes: Array<{
+    number: number;
+    state: 'OPEN' | 'CLOSED';
+    repository: { name: string; owner: { login: string } };
+    labels: { nodes: Array<{ name: string }> };
+  }>;
+}
+
+function linkedIssuesOf(connection: LinkedIssuesConnection): LinkedIssue[] {
+  return connection.nodes.map((issue) => ({
+    owner: issue.repository.owner.login,
+    repo: issue.repository.name,
+    number: issue.number,
+    state: issue.state,
+    labels: issue.labels.nodes.map((label) => label.name),
+  }));
 }
 
 const PR_QUERY = `
@@ -192,6 +230,7 @@ const PR_QUERY = `
             createdAt
           }
         }
+        ${LINKED_ISSUES_FIELD}
         commits(last: 100) {
           nodes {
             commit {
@@ -258,6 +297,7 @@ const LIST_QUERY = `
         nodes {
           number
           updatedAt
+          ${LINKED_ISSUES_FIELD}
           commits(last: 1) {
             nodes {
               commit {
@@ -284,6 +324,7 @@ const LIST_BY_LABEL_QUERY = `
         nodes {
           number
           updatedAt
+          ${LINKED_ISSUES_FIELD}
           commits(last: 1) {
             nodes {
               commit {
@@ -323,6 +364,7 @@ async function paginateListQuery(
   type ListNode = {
     number: number;
     updatedAt: string;
+    closingIssuesReferences: LinkedIssuesConnection;
     commits: {
       nodes: Array<{
         commit: {
@@ -351,6 +393,7 @@ async function paginateListQuery(
         updatedAt: n.updatedAt,
         headSha: head?.oid ?? null,
         headRollup: head?.statusCheckRollup?.state ?? null,
+        linkedIssues: linkedIssuesOf(n.closingIssuesReferences),
       });
     }
     cursor = data.repository.pullRequests.pageInfo.hasNextPage
@@ -596,6 +639,7 @@ export function createGraphqlClient(token: string): GraphqlClient {
           author: c.author?.login ?? null,
           createdAt: c.createdAt,
         })),
+        linkedIssues: linkedIssuesOf(pr.closingIssuesReferences),
         body: pr.body ?? '',
         reviewThreads: threads,
       };

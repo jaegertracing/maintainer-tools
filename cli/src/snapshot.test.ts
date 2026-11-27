@@ -36,6 +36,7 @@ const github: GraphqlClient = {
       updatedAt: '2026-05-01T00:00:00Z',
       headSha: 'abc',
       headRollup: 'SUCCESS',
+      linkedIssues: [],
     })),
   listOpenPRsByLabel: async () => [],
   fetchPullRequest: async (_owner, _repo, number) =>

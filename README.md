@@ -201,9 +201,10 @@ the file, so the report remains a single self-contained HTML file.
 ### How fresh the data is
 
 The CLI keeps an on-disk SQLite cache keyed on `(owner, repo, number,
-updatedAt, headSha, headRollup)`. A PR is re-fetched if any of those
-changed — that includes CI status flipping on the head commit, even when
-GitHub doesn't bump `updatedAt`. Use `--no-cache` to force a full refresh.
+updatedAt, headSha, headRollup, linkedIssues)`. A PR is re-fetched if any of
+those changed — that includes CI status flipping on the head commit and a
+linked issue being closed or relabelled, even when GitHub doesn't bump
+`updatedAt`. Use `--no-cache` to force a full refresh.
 
 ---
 

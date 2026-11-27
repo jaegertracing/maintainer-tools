@@ -125,6 +125,11 @@ export interface PullRequest {
   // maintainer has responded yet; not used by predicates.
   comments: Array<{ author: string | null; createdAt: string }>;
 
+  // The issues that GitHub closes when the PR is merged, which GitHub calls
+  // the closing issue references (first 20). Optional because a snapshot
+  // file from before the field existed does not have it.
+  linkedIssues?: LinkedIssue[];
+
   // PR description body. Used by `description_empty` and `no_linked_issue`.
   // May be empty string (PR opened with no body) or undefined (legacy
   // cache entry from before this field was added — predicates treat as
@@ -176,6 +181,13 @@ export interface PullRequest {
     // issues, as `owner/repo#number`. Empty or absent means no collision.
     collidingPrs?: string[];
   };
+}
+
+// An issue that GitHub closes when a pull request is merged, with the state
+// and the labels that the lifecycle policies read.
+export interface LinkedIssue extends IssueRef {
+  state: 'OPEN' | 'CLOSED';
+  labels: string[];
 }
 
 // One changed file's line counts. `changeType` is GitHub's PatchStatus enum,
