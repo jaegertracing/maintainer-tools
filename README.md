@@ -155,18 +155,18 @@ needing this table.
 
 Each row also carries inline **flags** when relevant:
 
-| Flag                    | Meaning                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------- |
-| `BLOCKER`               | PR labelled `release-blocker` / `blocker`.                                               |
-| `QUESTION`              | PR labelled `awaiting-maintainer-input`.                                                 |
-| `MERGE-CONFLICT`        | `mergeable === CONFLICTING`.                                                             |
-| `STALE`                 | Activity older than the staleness threshold.                                             |
-| `NO-ISSUE`              | The PR carries the `missing-issue` label, or its body has no `Fixes/Closes/Resolves #N`. |
-| `NO-TESTS`              | Source files changed but no test files touched.                                          |
-| `UNRESOLVED`            | Unresolved review thread with new commits since the last reviewer comment.               |
-| `RESOLVED-W/O-REPLY: N` | Author resolved `N` threads without replying to the reviewer.                            |
-| `DRAFT`                 | PR is a draft.                                                                           |
-| `BOT`                   | Bot author.                                                                              |
+| Flag                    | Meaning                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `BLOCKER`               | PR labelled `release-blocker` / `blocker`.                                   |
+| `QUESTION`              | PR labelled `awaiting-maintainer-input`.                                     |
+| `MERGE-CONFLICT`        | `mergeable === CONFLICTING`.                                                 |
+| `STALE`                 | Activity older than the staleness threshold.                                 |
+| `NO-ISSUE`              | The PR needs an issue under the [linked-issue policy](#linked-issue-policy). |
+| `NO-TESTS`              | Source files changed but no test files touched.                              |
+| `UNRESOLVED`            | Unresolved review thread with new commits since the last reviewer comment.   |
+| `RESOLVED-W/O-REPLY: N` | Author resolved `N` threads without replying to the reviewer.                |
+| `DRAFT`                 | PR is a draft.                                                               |
+| `BOT`                   | Bot author.                                                                  |
 
 When GitHub Copilot has reviewed the PR, the row also shows its verdict as a
 chip linking to the review: a traffic light and the finding counts by
@@ -386,18 +386,18 @@ nothing needs to be said.
 The shared library of PR-state checks. Each predicate is a pure function
 of a PR's current GraphQL state.
 
-| ID                         | What it detects                                                                                                                                                                                                                          | Used by                                                                                                                       |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `dco_missing`              | A non-merge commit lacks `Signed-off-by:`.                                                                                                                                                                                               | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                                                                     |
-| `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                                                                                                                                                             | Triage (hides), pr-weekly-digest (item)                                                                                       |
-| `merge_conflict`           | `mergeable === CONFLICTING`.                                                                                                                                                                                                             | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                                                                     |
-| `stale_on_author`          | PR carries the `stale` label or hasn't been touched for `staleDays`.                                                                                                                                                                     | Triage (hides)                                                                                                                |
-| `over_quota`               | The PR is beyond the tiered quota of open PRs of its author, by its rank among them.                                                                                                                                                     | Triage (hides)                                                                                                                |
-| `description_empty`        | PR body is empty or just template stubs.                                                                                                                                                                                                 | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                                                                     |
-| `no_linked_issue`          | A PR that carries the `missing-issue` label, whatever its other labels. Otherwise, a PR with no `Fixes/Closes/Resolves #N` in the body, unless it is labelled `docs` / `documentation` / `ci` / `trivial` / `chore` / `no-issue-needed`. | Triage (row flag; hides when labelled `missing-issue`). Without that label: pr-nudge (neutral Check), pr-weekly-digest (item) |
-| `no_tests_for_code_change` | Source files changed but no test files touched. Exempt for `docs` / `documentation` / `ci` / `trivial` / `chore` labelled PRs.                                                                                                           | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag)                                                          |
-| `unresolved_from_reviewer` | A review thread is unresolved and the author pushed commits since the last reviewer comment.                                                                                                                                             | pr-weekly-digest (item), triage (row flag)                                                                                    |
-| `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                                                                                                                                      | Triage (row flag with count)                                                                                                  |
+| ID                         | What it detects                                                                                                                                                                                                                          | Used by                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `dco_missing`              | A non-merge commit lacks `Signed-off-by:`.                                                                                                                                                                                               | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                            |
+| `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                                                                                                                                                             | Triage (hides), pr-weekly-digest (item)                                              |
+| `merge_conflict`           | `mergeable === CONFLICTING`.                                                                                                                                                                                                             | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                            |
+| `stale_on_author`          | PR carries the `stale` label or hasn't been touched for `staleDays`.                                                                                                                                                                     | Triage (hides)                                                                       |
+| `over_quota`               | The PR is beyond the tiered quota of open PRs of its author, by its rank among them.                                                                                                                                                     | Triage (hides)                                                                       |
+| `description_empty`        | PR body is empty or just template stubs.                                                                                                                                                                                                 | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                            |
+| `no_linked_issue`          | A PR that carries the `missing-issue` label, whatever its other labels. Otherwise, a PR with no `Fixes/Closes/Resolves #N` in the body, unless it is labelled `docs` / `documentation` / `ci` / `trivial` / `chore` / `no-issue-needed`. | Without the `missing-issue` label: pr-nudge (neutral Check), pr-weekly-digest (item) |
+| `no_tests_for_code_change` | Source files changed but no test files touched. Exempt for `docs` / `documentation` / `ci` / `trivial` / `chore` labelled PRs.                                                                                                           | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag)                 |
+| `unresolved_from_reviewer` | A review thread is unresolved and the author pushed commits since the last reviewer comment.                                                                                                                                             | pr-weekly-digest (item), triage (row flag)                                           |
+| `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                                                                                                                                      | Triage (row flag with count)                                                         |
 
 "Hides" means the predicate sends matching PRs to the triage report's
 **Hidden** bucket (still visible if you expand it; the reason chip(s) show
@@ -410,6 +410,27 @@ comment.
 A bot-author check (`renovate`, `dependabot`, `renovate-bot`, etc.) is handled
 directly in the triage classifier rather than as a predicate — those PRs
 get their own **Dependency bots** bucket.
+
+---
+
+## Linked-issue policy
+
+A PR from an outside contributor is reviewed only when it links an approved
+issue: an open issue of the same organization that carries the `help wanted`
+label. The triage report hides a PR that links no approved issue and flags
+it `NO-ISSUE`. Three kinds of PR need no issue:
+
+- a PR that a maintainer labelled `no-issue-needed`;
+- a PR whose author is a collaborator of the repository with the write,
+  maintain or admin permission;
+- a PR of a dependency bot.
+
+The triage CLI decides this from the issues that GitHub links to the PR
+(the ones that the PR closes when it merges) and from the collaborators of
+the repository. It does not read the `missing-issue` label that a workflow
+of `jaegertracing/jaeger` manages. When GitHub refuses the list of collaborators of a repository, the
+CLI cannot tell a maintainer from an outside contributor, so it flags no PR
+of that repository.
 
 ---
 

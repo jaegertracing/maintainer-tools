@@ -1,6 +1,14 @@
 {
   "now": "2026-06-01T12:00:00.000Z",
   "viewer": "maintainer-a",
+  "collaborators": {
+    "example/repo": {
+      "maintainer-a": "ADMIN",
+      "maintainer-b": "WRITE",
+      "priority-author": "WRITE",
+      "kim": "TRIAGE"
+    }
+  },
   "pullRequests": [
     {
       "repo": {
@@ -60,6 +68,15 @@
       "reviews": [],
       "comments": [],
       "body": "The exporter retried without a limit. This change adds a budget.\n\nFixes #100",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 100,
+          "state": "OPEN",
+          "labels": ["help wanted"]
+        }
+      ],
       "reviewThreads": []
     },
     {
@@ -104,6 +121,16 @@
         }
       ],
       "body": "Stops the exporter after five attempts.\n\nResolves #100 and relates to other/repo#7.\n\nCloses other/repo#7",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 100,
+          "state": "OPEN",
+          "labels": ["help wanted"]
+        },
+        { "owner": "other", "repo": "repo", "number": 7, "state": "OPEN", "labels": [] }
+      ],
       "reviewThreads": []
     },
     {
@@ -143,6 +170,15 @@
       "reviews": [],
       "comments": [],
       "body": "The log line said \"exproter\". This change corrects it.\n\nFixes #101",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 101,
+          "state": "CLOSED",
+          "labels": ["help wanted"]
+        }
+      ],
       "reviewThreads": []
     },
     {
@@ -199,6 +235,15 @@
       "reviews": [],
       "comments": [],
       "body": "The sampler read its rate from two settings. This change keeps one of them.\n\nFixes #102",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 102,
+          "state": "OPEN",
+          "labels": ["help wanted"]
+        }
+      ],
       "reviewThreads": []
     },
     {
@@ -238,6 +283,7 @@
       "reviews": [],
       "comments": [],
       "body": "## What\n\n## Why\n\n<!-- Describe the change above. -->\n",
+      "linkedIssues": [],
       "reviewThreads": []
     },
     {
@@ -297,7 +343,16 @@
         }
       ],
       "comments": [],
-      "body": "The queue did not report its size. This change adds a gauge for it.\n\nCloses #103",
+      "body": "The queue did not report its size. This change adds a gauge for it.\n\nCloses #103\n\nFixes #105",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 105,
+          "state": "OPEN",
+          "labels": ["help wanted"]
+        }
+      ],
       "reviewThreads": []
     },
     {
@@ -348,6 +403,9 @@
       "reviews": [],
       "comments": [],
       "body": "The writer sent one request for each span. This change sends them in batches.\n\nFixes #104",
+      "linkedIssues": [
+        { "owner": "example", "repo": "repo", "number": 104, "state": "OPEN", "labels": ["bug"] }
+      ],
       "reviewThreads": []
     },
     {
@@ -387,6 +445,7 @@
       "reviews": [],
       "comments": [],
       "body": "The README did not list the settings of the sampler. This change adds a table of them.",
+      "linkedIssues": [],
       "reviewThreads": []
     },
     {
@@ -431,6 +490,15 @@
         }
       ],
       "body": "The exporter page did not say how many times a request is retried. This change adds it.",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 106,
+          "state": "OPEN",
+          "labels": ["help wanted"]
+        }
+      ],
       "reviewThreads": []
     },
     {
@@ -470,6 +538,7 @@
       "reviews": [],
       "comments": [],
       "body": "The query service read the service names on every request. This change caches them.",
+      "linkedIssues": [],
       "reviewThreads": []
     },
     {
@@ -515,6 +584,7 @@
       ],
       "comments": [],
       "body": "The collector accepted an endpoint without a scheme. This change rejects it at startup.",
+      "linkedIssues": [],
       "reviewThreads": [
         {
           "isResolved": false,
@@ -597,6 +667,7 @@
       "reviews": [],
       "comments": [],
       "body": "This change updates the tracing library from v1.9.0 to v2.0.0.",
+      "linkedIssues": [],
       "reviewThreads": []
     },
     {
@@ -636,6 +707,7 @@
       "reviews": [],
       "comments": [],
       "body": "This draft shows the storage interface that the design document proposes.",
+      "linkedIssues": [],
       "reviewThreads": []
     },
     {
@@ -683,6 +755,7 @@
       ],
       "comments": [],
       "body": "No code reads the flag since the storage rewrite. This change deletes it.",
+      "linkedIssues": [],
       "reviewThreads": []
     },
     {
@@ -728,6 +801,15 @@
       ],
       "comments": [],
       "body": "A batch of spans had no upper bound. This change caps it at the configured size.",
+      "linkedIssues": [
+        {
+          "owner": "example",
+          "repo": "repo",
+          "number": 107,
+          "state": "OPEN",
+          "labels": ["help wanted"]
+        }
+      ],
       "reviewThreads": []
     }
   ],
@@ -763,6 +845,12 @@
       "author": "maintainer-a",
       "state": "OPEN",
       "title": "Sampler drops the first span",
+      "isPullRequest": false
+    },
+    "example/repo#105": {
+      "author": "maintainer-b",
+      "state": "OPEN",
+      "title": "Queue does not report its size",
       "isPullRequest": false
     }
   }

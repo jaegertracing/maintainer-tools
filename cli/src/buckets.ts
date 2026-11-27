@@ -10,7 +10,7 @@ import {
   isDependencyBotLogin,
   labelOnlyFailure,
   mergeConflict,
-  noLinkedIssue,
+  needsIssue,
   noTestsForCodeChange,
   type OpenPullRequests,
   resolvedWithoutReply,
@@ -408,7 +408,7 @@ function computeFlags(pr: PullRequest, verdict: Verdict, ctx: ClassifyContext): 
   // maintainer can spot it at a glance in the triage table. A predicate that
   // also hides the PR does so through a rule for `triage_hidden`.
   if (verdict.holds(labelOnlyFailure)) flags.push('NEEDS-LABEL');
-  if (verdict.holds(noLinkedIssue)) flags.push('NO-ISSUE');
+  if (verdict.holds(needsIssue)) flags.push('NO-ISSUE');
   if (verdict.holds(noTestsForCodeChange)) flags.push('NO-TESTS');
   if (verdict.holds(unresolvedFromReviewer)) flags.push('UNRESOLVED');
   if (verdict.holds(resolvedWithoutReply)) {

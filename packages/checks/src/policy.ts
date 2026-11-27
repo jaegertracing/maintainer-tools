@@ -18,6 +18,13 @@ import { dcoMissingPredicate } from './predicates/dco_missing.js';
 import { descriptionEmptyPredicate } from './predicates/description_empty.js';
 import { mergeConflictPredicate } from './predicates/merge_conflict.js';
 import {
+  authorCanWritePredicate,
+  authorIsDependencyBotPredicate,
+  collaboratorsNotGatheredPredicate,
+  noApprovedIssuePredicate,
+  noIssueNeededPredicate,
+} from './predicates/needs_issue.js';
+import {
   linkedIssueExemptPredicate,
   missingIssueLabelPredicate,
   noLinkedIssuePredicate,
@@ -53,9 +60,31 @@ const overQuota = policy.baseFact('over_quota', overQuotaPredicate, {
 const descriptionEmpty = policy.baseFact('description_empty', descriptionEmptyPredicate, {
   changedBy: 'author',
 });
-export const noLinkedIssue = policy.baseFact('no_linked_issue', noLinkedIssuePredicate, {
+// The digest and the check run of `pr-nudge` read `no_linked_issue`, which
+// looks for a closing keyword in the PR description. The triage report
+// reads `needs_issue`, which looks at the issues that GitHub links.
+const noLinkedIssue = policy.baseFact('no_linked_issue', noLinkedIssuePredicate, {
   changedBy: 'author',
 });
+const noApprovedIssue = policy.baseFact('no_approved_issue', noApprovedIssuePredicate, {
+  changedBy: 'author',
+});
+const noIssueNeeded = policy.baseFact('no_issue_needed', noIssueNeededPredicate, {
+  changedBy: 'maintainer',
+});
+const authorCanWrite = policy.baseFact('author_can_write', authorCanWritePredicate, {
+  changedBy: 'maintainer',
+});
+const authorIsDependencyBot = policy.baseFact(
+  'author_is_dependency_bot',
+  authorIsDependencyBotPredicate,
+  { changedBy: 'maintainer' },
+);
+const collaboratorsNotGathered = policy.baseFact(
+  'collaborators_not_gathered',
+  collaboratorsNotGatheredPredicate,
+  { changedBy: 'maintainer' },
+);
 const missingIssueLabel = policy.baseFact('missing_issue_label', missingIssueLabelPredicate, {
   changedBy: 'author',
 });
@@ -92,6 +121,17 @@ const ciFailingWithoutLabelOnlyFailure = policy
   .when(ciFailing)
   .unless(labelOnlyFailure);
 
+// A pull request from an outside contributor is not reviewed until it links
+// an open `help wanted` issue of the organization. A maintainer exempts one
+// pull request with the `no-issue-needed` label.
+export const needsIssue = policy
+  .derivedFact('needs_issue')
+  .when(noApprovedIssue)
+  .unless(noIssueNeeded)
+  .unless(authorCanWrite)
+  .unless(authorIsDependencyBot)
+  .unless(collaboratorsNotGathered);
+
 // The `missing-issue` label already tells the author what to fix, so a
 // digest line would repeat it.
 const noLinkedIssueWithoutMissingIssueLabel = policy
@@ -119,8 +159,7 @@ policy.triageHidden
   .when(staleOnAuthor)
   .when(overQuota)
   .when(descriptionEmpty)
-  // The PR is not reviewable until the author links a qualifying issue.
-  .when(noLinkedIssue, missingIssueLabel)
+  .when(needsIssue)
   .when(unresolvedFromReviewer);
 
 // The weekly digest lists what the author has to fix. `actions/stale` owns

@@ -219,7 +219,10 @@ Three properties keep the checks trustworthy:
 The full set of checks: `dco_missing`, `ci_failing`, `merge_conflict`,
 `stale_on_author`, `over_quota`, `description_empty`, `no_linked_issue`,
 `no_tests_for_code_change`, `unresolved_from_reviewer`,
-`resolved_without_reply`. To add a check, export its
+`resolved_without_reply`. The triage report also reads the derived fact
+`needs_issue`, which the predicates in `predicates/needs_issue.ts` and the
+rules in `policy.ts` decide; it has no check ID, because only the base fact
+of a check has one. To add a check, export its
 predicate from a new file in `src/predicates/`, declare its base fact and its
 rules in `src/policy.ts` with the ID of the check as the name of the fact, and add
 its ID to `CHECK_IDS` in `types.ts`. A check with a check run is also listed
@@ -419,8 +422,8 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   A PR carries the issues that GitHub closes when it is merged, as
   `linkedIssues`, and the text of each comment that
   `packages/checks/src/policy-comments.ts` recognizes as a policy comment.
-  No rule reads these inputs. They are gathered for the lifecycle policies
-  of RFC 0003.
+  The lifecycle policies of RFC 0003 read the linked issues and the
+  collaborators. No rule reads the text of a policy comment yet.
 - **Deciding** is `classifySnapshot()`, a function of the snapshot and the
   config. It computes the issue collisions, and it classifies every PR. It
   passes the open PRs of the snapshot and the merged-PR counts to the rules

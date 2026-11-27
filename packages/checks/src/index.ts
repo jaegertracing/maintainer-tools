@@ -32,7 +32,7 @@ export {
   dcoMissing,
   labelOnlyFailure,
   mergeConflict,
-  noLinkedIssue,
+  needsIssue,
   noTestsForCodeChange,
   resolvedWithoutReply,
   ruleSet,

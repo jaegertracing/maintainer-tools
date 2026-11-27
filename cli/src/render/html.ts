@@ -544,7 +544,9 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
   'NEEDS-LABEL':
     'CI is failing only on a label-gate check (e.g. a missing changelog/kind label) — otherwise mergeable.',
   'NO-ISSUE':
-    'PR description does not reference a linked issue via `Fixes #N` / `Closes #N` / `Resolves #N`, or the PR carries the `missing-issue` label.',
+    'PR from an outside contributor links no open `help wanted` issue of the organization and does not carry the `no-issue-needed` label.',
+  'NO-APPROVED-ISSUE':
+    'PR from an outside contributor links no open `help wanted` issue of the organization and does not carry the `no-issue-needed` label.',
   'NO-TESTS': 'Source files changed, but no test files were added or modified alongside them.',
   UNRESOLVED:
     'An unresolved review thread exists and the author has pushed new commits since the last reviewer comment.',

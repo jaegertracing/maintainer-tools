@@ -316,7 +316,8 @@
             "dependencyBot": false,
             "firstTimer": false,
             "hideReasons": [
-              "hide:over_quota"
+              "hide:over_quota",
+              "hide:no_approved_issue"
             ],
             "maintainerEngaged": false,
             "priorityAuthor": false,
@@ -326,11 +327,13 @@
           "flags": [
             "SELF-FILED",
             "ISSUE-CLOSED",
+            "NO-ISSUE",
             "NO-TESTS"
           ],
           "number": 3,
           "reasons": [
-            "hide:over_quota"
+            "hide:over_quota",
+            "hide:no_approved_issue"
           ]
         },
         {
@@ -549,7 +552,8 @@
             "hideReasons": [
               "hide:dco_missing",
               "hide:merge_conflict",
-              "hide:description_empty"
+              "hide:description_empty",
+              "hide:no_approved_issue"
             ],
             "maintainerEngaged": false,
             "priorityAuthor": false,
@@ -565,7 +569,8 @@
           "reasons": [
             "hide:dco_missing",
             "hide:merge_conflict",
-            "hide:description_empty"
+            "hide:description_empty",
+            "hide:no_approved_issue"
           ]
         },
         {
@@ -775,17 +780,21 @@
             "dependencyBot": false,
             "firstTimer": false,
             "hideReasons": [
-              "hide:ci_failing"
+              "hide:ci_failing",
+              "hide:no_approved_issue"
             ],
             "maintainerEngaged": false,
             "priorityAuthor": false,
             "reviewRequested": false,
             "viewerReviewed": false
           },
-          "flags": [],
+          "flags": [
+            "NO-ISSUE"
+          ],
           "number": 7,
           "reasons": [
-            "hide:ci_failing"
+            "hide:ci_failing",
+            "hide:no_approved_issue"
           ]
         },
         {
@@ -843,7 +852,7 @@
               "triggered": false
             },
             {
-              "hidesFromTriage": true,
+              "hidesFromTriage": false,
               "id": "no_linked_issue",
               "inDigest": false,
               "publishesCheck": false,
@@ -882,7 +891,7 @@
             "dependencyBot": false,
             "firstTimer": false,
             "hideReasons": [
-              "hide:no_linked_issue"
+              "hide:no_approved_issue"
             ],
             "maintainerEngaged": false,
             "priorityAuthor": false,
@@ -894,7 +903,7 @@
           ],
           "number": 8,
           "reasons": [
-            "hide:no_linked_issue"
+            "hide:no_approved_issue"
           ]
         },
         {
@@ -1099,6 +1108,7 @@
             "firstTimer": false,
             "hideReasons": [
               "hide:stale_on_author",
+              "hide:no_approved_issue",
               "waiting-for-author"
             ],
             "maintainerEngaged": false,
@@ -1113,7 +1123,8 @@
           ],
           "number": 10,
           "reasons": [
-            "hide:stale_on_author"
+            "hide:stale_on_author",
+            "hide:no_approved_issue"
           ]
         },
         {
@@ -1210,6 +1221,7 @@
             "dependencyBot": false,
             "firstTimer": false,
             "hideReasons": [
+              "hide:no_approved_issue",
               "hide:unresolved_from_reviewer",
               "changes-requested"
             ],
@@ -1219,11 +1231,13 @@
             "viewerReviewed": true
           },
           "flags": [
+            "NO-ISSUE",
             "UNRESOLVED",
             "RESOLVED-W/O-REPLY: 1"
           ],
           "number": 11,
           "reasons": [
+            "hide:no_approved_issue",
             "hide:unresolved_from_reviewer"
           ]
         },
@@ -1333,8 +1347,7 @@
           },
           "flags": [
             "BOT",
-            "MERGE-CONFLICT",
-            "NO-ISSUE"
+            "MERGE-CONFLICT"
           ],
           "number": 12,
           "reasons": [
@@ -1447,7 +1460,6 @@
           },
           "flags": [
             "DRAFT",
-            "NO-ISSUE",
             "NO-TESTS"
           ],
           "number": 13,
@@ -1672,9 +1684,7 @@
             "reviewRequested": false,
             "viewerReviewed": true
           },
-          "flags": [
-            "NO-ISSUE"
-          ],
+          "flags": [],
           "number": 15,
           "reasons": [
             "you requested changes; author has revised since"
