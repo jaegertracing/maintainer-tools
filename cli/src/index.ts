@@ -63,8 +63,7 @@ Options:
                       control the gathering: --save-snapshot, --no-cache,
                       --no-quota, --no-issues, --limit, --pr, --viewer.
   --no-quota          Skip the per-author quota computation. Faster, but
-                      relies solely on the \`pr-quota-reached\` label for
-                      identifying quota-blocked PRs.
+                      the report then flags no PR as over its quota.
   --no-issues         Skip referenced-issue enrichment. Drops the issue
                       column and the SELF-FILED / ISSUE-COLLISION /
                       ISSUE-CLOSED flags; saves one batched query per run.

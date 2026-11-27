@@ -96,7 +96,7 @@ export async function gatherSnapshot(
 
   let mergedCounts: TriageSnapshot['mergedCounts'];
   if (opts.skipQuota) {
-    log('quota: computation skipped (--no-quota); label-only mode');
+    log('quota: computation skipped (--no-quota); no PR is flagged as over its quota');
   } else {
     mergedCounts = await fetchMergedCounts(pullRequests, client, opts.quotaExemptLogins, { cache });
   }

@@ -394,6 +394,19 @@ test('the newer pull request of an author with a quota of one is hidden', () => 
   );
 });
 
+test('the `pr-quota-reached` label does not put a pull request over the quota', () => {
+  const pr = pullRequest({ labels: ['pr-quota-reached'] });
+  const openPullRequests: OpenPullRequests = {
+    pullRequests: [pr],
+    mergedCounts: {},
+    quotaExemptLogins: new Set(),
+  };
+
+  for (const ctx of [context, { ...context, openPullRequests }]) {
+    assert.deepEqual(classify(pr, ctx).facets.hideReasons, []);
+  }
+});
+
 test('a snapshot without the merged count of a quota candidate is rejected', () => {
   const prs = [pullRequest({ number: 1 }), pullRequest({ number: 2 })];
   const openPullRequests: OpenPullRequests = {

@@ -431,8 +431,10 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
 and the `over_quota` check decides the quota from them in
 `packages/checks/src/quota.ts`. A consumer that does not gather the open PRs
 as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
-`openPullRequests`, so for it the quota is decided by the `pr-quota-reached`
-label alone. `cli/src/issues.ts` has a part in both layers, so it has one
+`openPullRequests`, so for it `over_quota` never holds. The check does not
+read the `pr-quota-reached` label, because the label is the output of a
+separate evaluation of the quota policy by the pr-quota-manager workflow.
+`cli/src/issues.ts` has a part in both layers, so it has one
 function for each: `fetchIssueMeta()` and `attachIssueState()`.
 
 ### Comparing two versions of the classifier

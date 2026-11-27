@@ -179,8 +179,9 @@ function cellTargets(block: RepoBlock, bucket: Bucket): CellTargets {
 // readers who want the whole queue's size.
 const SUBTOTAL_EXCLUDED_BUCKETS: Bucket[] = ['dependency-bots', 'hidden'];
 
-// Labels the classifier already turns into a flag or a bucket, so a column
-// for them would repeat what the rows and the flags column say. The
+// Labels that the lifecycle automation applies. The report already shows
+// these states as flags or buckets, so a column for the label would repeat
+// them. The
 // `changelog:` labels only classify the release notes, the `ci:` labels only
 // steer workflows, and the configured priority labels already group the
 // Categorized view.

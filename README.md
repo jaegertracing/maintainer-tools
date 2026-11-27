@@ -392,7 +392,7 @@ of a PR's current GraphQL state.
 | `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                                                                                                                                                             | Triage (hides), pr-weekly-digest (item)                                                                                       |
 | `merge_conflict`           | `mergeable === CONFLICTING`.                                                                                                                                                                                                             | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                                                                     |
 | `stale_on_author`          | PR carries the `stale` label or hasn't been touched for `staleDays`.                                                                                                                                                                     | Triage (hides)                                                                                                                |
-| `over_quota`               | Author has more than their tiered quota of open PRs OR carries the `pr-quota-reached` label.                                                                                                                                             | Triage (hides)                                                                                                                |
+| `over_quota`               | The PR is beyond the tiered quota of open PRs of its author, by its rank among them.                                                                                                                                                     | Triage (hides)                                                                                                                |
 | `description_empty`        | PR body is empty or just template stubs.                                                                                                                                                                                                 | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                                                                     |
 | `no_linked_issue`          | A PR that carries the `missing-issue` label, whatever its other labels. Otherwise, a PR with no `Fixes/Closes/Resolves #N` in the body, unless it is labelled `docs` / `documentation` / `ci` / `trivial` / `chore` / `no-issue-needed`. | Triage (row flag; hides when labelled `missing-issue`). Without that label: pr-nudge (neutral Check), pr-weekly-digest (item) |
 | `no_tests_for_code_change` | Source files changed but no test files touched. Exempt for `docs` / `documentation` / `ci` / `trivial` / `chore` labelled PRs.                                                                                                           | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag)                                                          |
@@ -426,8 +426,11 @@ get their own **Dependency bots** bucket.
 | 3 or more                             | 10 (effectively unlimited)  |
 
 The triage CLI computes this itself (one GraphQL search query per
-multi-PR author per run); the `pr-quota-reached` label managed by the
-upstream workflow is treated as a corroborating signal.
+multi-PR author per run) and does not read the `pr-quota-reached` label
+that the upstream workflow manages. A run with `--no-quota` gathers no
+merged-PR counts, and a run with `--pr` gathers one PR, which cannot be
+ranked among the others of its author. Neither run flags a PR as over its
+quota.
 
 ---
 
