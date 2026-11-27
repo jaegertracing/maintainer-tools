@@ -49,7 +49,7 @@ No native build steps — everything pure JS + builtin Node modules.
 | `make lint`     | `tsc --noEmit` + prettier `--check`, in parallel                  |
 | `make tsc-lint` | TypeScript type-check only                                        |
 | `make fmt`      | Prettier `--write`                                                |
-| `make test`     | Run tests across workspaces (currently CLI classifier tests)      |
+| `make test`     | Run the tests of every workspace that has a `test` script         |
 
 ## Action Bundles
 

@@ -9,7 +9,13 @@ export { noTestsForCodeChange } from './no_tests_for_code_change.js';
 export { unresolvedFromReviewer } from './unresolved_from_reviewer.js';
 export { resolvedWithoutReply } from './resolved_without_reply.js';
 
-import type { CheckId, CheckResult, PullRequest } from '../types.js';
+import type {
+  CheckId,
+  CheckResult,
+  PredicateOptions,
+  PullRequest,
+  ResolvedPredicateOptions,
+} from '../types.js';
 import { dcoMissing } from './dco_missing.js';
 import { ciFailing } from './ci_failing.js';
 import { mergeConflict } from './merge_conflict.js';
@@ -20,17 +26,6 @@ import { noLinkedIssue } from './no_linked_issue.js';
 import { noTestsForCodeChange } from './no_tests_for_code_change.js';
 import { unresolvedFromReviewer } from './unresolved_from_reviewer.js';
 import { resolvedWithoutReply } from './resolved_without_reply.js';
-
-// Predicates are pure functions of the PR, so a predicate that compares
-// against the current time takes it from here instead of the wall clock. A
-// caller that passes no clock gets the real one, resolved once in runAll.
-export interface PredicateOptions {
-  now?: Date;
-}
-
-export interface ResolvedPredicateOptions {
-  now: Date;
-}
 
 // Renamed from P0_PREDICATES — the registry no longer reflects a single
 // phase. All in-tree predicates live here; callers pass an explicit

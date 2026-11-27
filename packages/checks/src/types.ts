@@ -17,6 +17,17 @@ export type CheckId =
   | 'unresolved_from_reviewer'
   | 'resolved_without_reply';
 
+// Predicates are pure functions of the PR, so a predicate that compares
+// against the current time takes it from here instead of the wall clock. A
+// caller that passes no clock gets the real one, resolved once in runAll.
+export interface PredicateOptions {
+  now?: Date;
+}
+
+export interface ResolvedPredicateOptions {
+  now: Date;
+}
+
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
 
 export interface CheckResult {
