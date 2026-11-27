@@ -49,6 +49,11 @@ export interface OpenPullRequests {
   mergedCounts?: Record<string, number>;
   // The logins whose pull requests are within every quota.
   quotaExemptLogins: ReadonlySet<string>;
+  // The permission of each collaborator of each repository, keyed by
+  // `owner/repo` and then by login. A repository whose collaborators the run
+  // did not gather has no entry. Absent in a snapshot file from before the
+  // field existed, and for a consumer that gathers no collaborators.
+  collaborators?: Record<string, Record<string, RepositoryPermission>>;
 }
 
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
@@ -189,6 +194,9 @@ export interface LinkedIssue extends IssueRef {
   state: 'OPEN' | 'CLOSED';
   labels: string[];
 }
+
+// What a collaborator may do in a repository, in GitHub's terms.
+export type RepositoryPermission = 'ADMIN' | 'MAINTAIN' | 'WRITE' | 'TRIAGE' | 'READ';
 
 // One changed file's line counts. `changeType` is GitHub's PatchStatus enum,
 // lowercased.

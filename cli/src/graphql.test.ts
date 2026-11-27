@@ -133,3 +133,36 @@ test('a pull request carries its linked issues', async (t) => {
     { owner: 'example', repo: 'repo', number: 3, state: 'OPEN', labels: ['help wanted', 'bug'] },
   ]);
 });
+
+test('the collaborators of a repository are read from every page', async (t) => {
+  const page = (login: string, permission: string, endCursor: string | null) => ({
+    repository: {
+      collaborators: {
+        pageInfo: { hasNextPage: endCursor !== null, endCursor },
+        edges: [{ permission, node: { login } }],
+      },
+    },
+  });
+  const variablesOfRequests = mockGraphqlResponses(t, [
+    page('alice', 'ADMIN', 'cursor-1'),
+    page('bob', 'READ', null),
+  ]);
+
+  assert.deepEqual(await createGraphqlClient('test-token').fetchCollaborators('example', 'repo'), {
+    alice: 'ADMIN',
+    bob: 'READ',
+  });
+  assert.deepEqual(
+    variablesOfRequests.map(({ cursor }) => cursor),
+    [null, 'cursor-1'],
+  );
+});
+
+test('a repository without a list of collaborators is an error', async (t) => {
+  mockGraphqlResponses(t, [{ repository: { collaborators: null } }]);
+
+  await assert.rejects(
+    createGraphqlClient('test-token').fetchCollaborators('example', 'repo'),
+    /no list of collaborators for example\/repo/,
+  );
+});

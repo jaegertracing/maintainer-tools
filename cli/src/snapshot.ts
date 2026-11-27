@@ -6,7 +6,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import type { GraphqlClient, IssueMeta, PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import type {
+  GraphqlClient,
+  IssueMeta,
+  RepositoryPermission,
+  PullRequest,
+} from '@jaegertracing/maintainer-tools-checks';
 import type { PrCache } from '@jaegertracing/maintainer-tools-checks/cache';
 
 import { fetchIssueMeta } from './issues.js';
@@ -32,6 +37,12 @@ export interface TriageSnapshot {
   // `refKey()`. An issue that GitHub did not resolve has no entry. Absent
   // when the run skipped the issues (--no-issues).
   issues?: Record<string, IssueMeta>;
+  // The permission of each collaborator of each repository that has an open
+  // pull request, keyed by `owner/repo` and then by login. A repository
+  // whose list could not be fetched has no entry; GitHub refuses the list
+  // to a token without push access. Absent in a snapshot file from before
+  // the field existed.
+  collaborators?: Record<string, Record<string, RepositoryPermission>>;
 }
 
 export interface GatherOptions {
@@ -97,7 +108,35 @@ export async function gatherSnapshot(
     issues = await fetchIssueMeta(pullRequests, client, { cache });
   }
 
-  return { now: new Date().toISOString(), viewer, pullRequests, mergedCounts, issues };
+  const collaborators = await fetchCollaboratorsOfRepos(pullRequests, client);
+
+  return {
+    now: new Date().toISOString(),
+    viewer,
+    pullRequests,
+    mergedCounts,
+    issues,
+    collaborators,
+  };
+}
+
+async function fetchCollaboratorsOfRepos(
+  pullRequests: PullRequest[],
+  client: GraphqlClient,
+): Promise<NonNullable<TriageSnapshot['collaborators']>> {
+  const repos = new Map(pullRequests.map((pr) => [`${pr.repo.owner}/${pr.repo.name}`, pr.repo]));
+  const collaborators: NonNullable<TriageSnapshot['collaborators']> = {};
+  for (const [key, repo] of repos) {
+    try {
+      const permissions = await client.fetchCollaborators(repo.owner, repo.name);
+      collaborators[key] = permissions;
+      log(`collaborators: ${Object.keys(permissions).length} in ${key}`);
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      log(`collaborators: not gathered for ${key} (${reason})`);
+    }
+  }
+  return collaborators;
 }
 
 // readSnapshot() returns the pull requests in the order in which
