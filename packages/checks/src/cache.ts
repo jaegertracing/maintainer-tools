@@ -83,7 +83,8 @@ interface CacheRow {
 //       hold at most the first 100 threads
 //   7 — added reviews[].url and reviews[].body for Copilot review verdicts
 //   8 — added linkedIssues
-const SCHEMA_VERSION = 8;
+//   9 — added the body of a policy comment
+const SCHEMA_VERSION = 9;
 
 interface CachePayload {
   v: number;

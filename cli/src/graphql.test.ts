@@ -81,7 +81,7 @@ function mockGraphqlResponses(t: TestContext, responses: unknown[]): Record<stri
   return variablesOfRequests;
 }
 
-test('a pull request carries its linked issues', async (t) => {
+test('a pull request carries its linked issues, and the text of a comment only when it is a policy comment', async (t) => {
   const noNodes = { nodes: [] };
   mockGraphqlResponses(t, [
     {
@@ -109,7 +109,20 @@ test('a pull request carries its linked issues', async (t) => {
             pageInfo: { hasNextPage: false, endCursor: null },
             ...noNodes,
           },
-          comments: noNodes,
+          comments: {
+            nodes: [
+              {
+                author: { login: 'github-actions' },
+                createdAt: '2026-09-11T08:00:00Z',
+                body: '<!-- jaeger-pr-linked-issue -->\nThis PR links no approved issue.',
+              },
+              {
+                author: { login: 'contributor' },
+                createdAt: '2026-09-12T08:00:00Z',
+                body: 'I linked the issue.',
+              },
+            ],
+          },
           closingIssuesReferences: {
             nodes: [
               {
@@ -131,6 +144,14 @@ test('a pull request carries its linked issues', async (t) => {
 
   assert.deepEqual(pr.linkedIssues, [
     { owner: 'example', repo: 'repo', number: 3, state: 'OPEN', labels: ['help wanted', 'bug'] },
+  ]);
+  assert.deepEqual(pr.comments, [
+    {
+      author: 'github-actions',
+      createdAt: '2026-09-11T08:00:00Z',
+      body: '<!-- jaeger-pr-linked-issue -->\nThis PR links no approved issue.',
+    },
+    { author: 'contributor', createdAt: '2026-09-12T08:00:00Z' },
   ]);
 });
 
