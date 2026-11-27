@@ -89,7 +89,7 @@ matches its source.
 
 The module of a check in `packages/checks/src/predicates/` exports the
 predicate of the check and declares nothing. The predicate must
-be a **pure function** of the `PullRequest` and the injected `now`. No side
+be a **pure function** of the `PullRequest` and the `PredicateContext`. No side
 effects, no I/O, no clock reads. Side effects (Check Run writes, label
 changes, comments) belong in the _action_ subfolders that consume the library.
 

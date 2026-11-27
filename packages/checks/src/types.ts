@@ -32,6 +32,23 @@ export function appliesFactName(id: CheckId): string {
 // against the current time takes it from here instead of the wall clock.
 export interface PredicateContext {
   now: Date;
+  // A predicate about several pull requests, such as the quota of an author,
+  // reads the others from here. A consumer that does not gather the open
+  // pull requests as a set omits the field, and such a predicate then
+  // decides from the pull request alone.
+  openPullRequests?: OpenPullRequests;
+}
+
+// The open pull requests that one run evaluates together, with the merged-PR
+// counts that the run gathered and the logins that the config exempts from
+// the quota.
+export interface OpenPullRequests {
+  pullRequests: readonly PullRequest[];
+  // Merged-PR count of each author that can exceed a quota, keyed by
+  // `owner/repo|login`. Absent when the run did not gather the counts.
+  mergedCounts?: Record<string, number>;
+  // The logins whose pull requests are within every quota.
+  quotaExemptLogins: ReadonlySet<string>;
 }
 
 export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
@@ -143,16 +160,10 @@ export interface PullRequest {
     conclusion: string | null;
   }>;
 
-  // Optional computed annotations. Filled in by enrichment passes that have
-  // cross-PR context the per-PR GraphQL query can't supply (e.g. the quota
-  // computation in cli/src/quota.ts, which needs the author's other open
-  // PRs in the same repo plus their merged-PR history). Predicates may
-  // consult these if set, but should remain functional when they're not.
+  // Optional computed annotations. Filled in by the issue pass of the triage
+  // CLI (cli/src/issues.ts), which has cross-PR context that the per-PR
+  // GraphQL query can't supply.
   computed?: {
-    // True iff a cross-PR quota computation has determined this PR is
-    // beyond the author's allowed concurrent-open-PR cap for this repo.
-    // Independent of (but congruent with) the `pr-quota-reached` label.
-    quotaExceeded?: boolean;
     // Issues this PR claims to close, parsed from the body. Closing keywords
     // only — a bare `#N` mention is not a claim, and in practice most bare
     // mentions point at other PRs ("follow-up to #123") rather than issues.
