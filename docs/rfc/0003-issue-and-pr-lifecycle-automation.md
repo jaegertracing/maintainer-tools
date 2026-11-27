@@ -460,7 +460,7 @@ In the second column an arrow is a reason, and a name with a colon is a base fac
 | Stale | no person has acted for 60 days ⇒ `idle` · `idle` ⇒ label `stale` · `idle` ∧ the `stale` label is at least 14 days old ⇒ `idle_expired` · `idle_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `idle` | Yes, once activity means activity by a person. `actions/stale` cannot make that distinction. |
 | Duplicates | `is_duplicate`: an older open PR of the same repository closes an issue that the PR closes, and the issue does not carry `allow-multiple-prs` · `is_duplicate` ⇒ label `duplicate` | None. The predicate reads `allow-multiple-prs` | Yes. Two open PRs on one issue are duplicates whatever else is true of them: a PR that is flagged, over quota or stale counts like any other. The policy counts issues of the PR's own repository only, as `pr-duplicates` does. The label is read for each issue, because a PR can close two issues and only one of them may carry the label. |
 | Author quota | `over_quota`: the position of the PR among the author's open PRs, in creation order, exceeds the quota for the author's merged PR count · `over_quota` ⇒ label `pr-quota-reached` | None today | Yes. The rule needs a count and a rank. |
-| Waiting for author | `authors_turn`: a conversation comment or a review that is not an approval, of a maintainer who has not approved since, is newer than the author's latest comment, review and push · `authors_turn` ⇒ label `waiting-for-author` | None today | Yes. It replaces a reaction to single events. Whether a comment asks for anything is a judgment that neither form has. |
+| Waiting for author | `maintainer_spoke_last`: a conversation comment or a review that is not an approval, of a maintainer who has not approved since, is newer than the author's latest comment, review and push · `maintainer_spoke_last` ⇒ `authors_turn` · `blocked` ⇒ `authors_turn`, because no review helps until the author has dealt with what blocks the PR · `authors_turn` ⇒ label `waiting-for-author` | None today | Yes. It replaces a reaction to single events. Whether a comment asks for anything is a judgment that neither form has. |
 | Blocked, and the comment | `needs_issue` ⇒ `blocked` · `over_quota` ⇒ `blocked` · `is_duplicate` ⇒ `blocked` · `blocked` ⇒ the comment exists · `idle` ⇒ the comment exists | None today | Yes, as a statement: for every label of the plan that gives notice, a policy comment exists that was created after the PR got the label. Creating the comment is the non-declarative part. |
 | Changelog label | no `changelog:` label ⇒ the check fails | None | In part. The reconciler can observe that the invariant is broken and cannot restore it, because only a person can choose the label. It remains a failing required check. |
 
@@ -470,7 +470,7 @@ The policies use one definition of a maintainer: a person whom the repository li
 
 ### The comment
 
-The reconciler keeps one comment on a PR. `blocked` is a reason for it, and so is `idle`: a PR is closed two weeks after the `stale` label, so the notice has to exist, and `actions/stale` posts such a notice today.
+The reconciler keeps one visible comment on a PR. `blocked` is a reason for it, and so is `idle`: a PR is closed two weeks after the `stale` label, so the notice has to exist, and `actions/stale` posts such a notice today.
 
 The name of a rule does not carry the data that a comment needs. The comment of today names the linked issue that is closed and the PR that came first on an issue. A base fact therefore has two texts. `says` is its static wording. The summary is what the predicate found on this PR, and the predicate returns it with the boolean:
 
@@ -484,7 +484,15 @@ The name of a rule does not carry the data that a comment needs. The comment of 
 };
 ```
 
-The comment has one paragraph for each base fact that leads to it, through `blocked` or directly: the `says` wording of the fact and the summary of its predicate. When `should_close` holds, it ends with a sentence that says why the PR is closed, built from the `says` wording of the reasons. The cost of the summary is that it is code that the decision tables do not show: a table says that a PR gets a comment, and not what the comment says.
+The comment has one paragraph for each base fact that leads to it, through `blocked` or directly: the `says` wording of the fact and the summary of its predicate. While the PR stays open, the comment ends with the deadline of each notice period that runs, and it states none for a PR that carries `do-not-expire`. The cost of the summary is that it is code that the decision tables do not show: a table says that a PR gets a comment, and not what the comment says.
+
+The reconciler posts a new comment, which notifies the author, in three cases, and it then minimizes its older comments:
+
+- The author was not told about a reason: no policy comment is newer than the label of that reason.
+- The PR is closed. The comment says that the PR is closed, lists the reasons that hold, and says that the PR can be reopened once they no longer hold. It stands next to the closing at the end of the thread, where an edited older comment would be folded away on a long thread.
+- Nothing blocks the PR any more, and an earlier comment of the reconciler said otherwise. The author of a PR that left the quota or got its issue approved learns that a review can now happen.
+
+In every other case the reconciler edits its newest visible comment in place, which sends no notification: the author knows every reason, and only the text differs. A comment that a person minimized still counts as what the author was told, and it is neither edited nor made visible again.
 
 ### Plan and apply
 
@@ -512,9 +520,9 @@ The power of Prolog is in finding a proof: unification, backtracking, recursion.
 
 ```
 inputs (observed)
-  └─► do_not_expire, needs_issue, links_open_issue, idle, authors_turn, over_quota, is_duplicate
+  └─► do_not_expire, needs_issue, links_open_issue, idle, maintainer_spoke_last, over_quota, is_duplicate
         └─► flag_expired, idle_expired       use the age of a label
-              └─► blocked, should_close
+              └─► blocked, authors_turn, should_close
                     └─► labels, comment
 ```
 
@@ -666,7 +674,7 @@ Enumeration of booleans is a complete decision procedure at this size, so the ch
 Three things remain outside the rules. Each is in the machinery once, not in each policy.
 
 - **Creating a comment cannot be repeated safely.** Adding a label twice is harmless. Creating a comment twice leaves two comments, and each notifies the author. The notification invariant makes a single run correct. Two runs at the same time would both observe that the comment is missing. The reconciler therefore runs under one concurrency group per repository. This is also why the invariant speaks of the creation time of the comment: GitHub notifies for a new comment and not for an edit, so "the author was told about this label" is the fact that a policy comment exists that was created after the PR got the label. GitHub records both times to the second, and the reconciler writes the label before the comment, so a comment that was created in the same second as the label counts. The time at which the PR got the label is the start of the current unbroken period of the label in the timeline, and the two flag labels count as one. A label that was removed and applied again has a new period, so the author is told again.
-- **The order of changes within one run.** A run can fail between two changes. The next run observes the half-finished item as it would any other and finishes the work, provided that no intermediate state makes a rule hold by accident. `apply()` therefore uses one fixed order: add labels, remove labels, create or edit the comment, minimize older comments, close. Adding before removing keeps the flagged period unbroken across a swap from `missing-issue` to `unapproved-issue`. The label precedes the comment so that the comment is newer than the label. Closing is last, after the comment has been edited to say that the PR is closed, so the reconciler needs no separate closing comment and cannot post one twice.
+- **The order of changes within one run.** A run can fail between two changes. The next run observes the half-finished item as it would any other and finishes the work, provided that no intermediate state makes a rule hold by accident. `apply()` therefore uses one fixed order: add labels, remove labels, create or edit the comment, minimize older comments, close. Adding before removing keeps the flagged period unbroken across a swap from `missing-issue` to `unapproved-issue`. The label precedes the comment so that the comment is newer than the label. Closing is last, after the comment that says that the PR is closed. A run that stopped between the two finds its newest comment with the text of the plan, so the next run closes the PR and posts no second comment.
 - **Closing reaches a person and cannot be taken back.** `should_close` is derived like any other output, but a wrong conclusion has already sent a notification by the time the next run sees better facts. Three guards follow. A run with incomplete facts ends before it derives anything. And the rules never conclude "open": the reconciler does not reopen a PR. A person reopens it, and if it still violates and its label is still at least seven days old, the next run closes it again, as #10257 specifies. A run also fetches fresh, in the same run, every PR that the plan closes from cached facts, and derives the plan again.
 
 ### Reading, explaining and extending the rules
