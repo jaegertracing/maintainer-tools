@@ -72,7 +72,9 @@ interface CacheRow {
 //   9 — added the body of a policy comment
 //  10 — added commits[].authorLogin
 //  11 — added linkedIssues[].title and linkedIssues[].author
-const SCHEMA_VERSION = 11;
+//  12 — added labelEvents, comments[].id, comments[].isMinimized,
+//       comments[].authorIsBot, and the body of a comment of the Actions bot
+const SCHEMA_VERSION = 12;
 
 interface CachePayload {
   v: number;

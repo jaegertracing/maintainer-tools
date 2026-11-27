@@ -423,8 +423,11 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
   A PR carries the issues that GitHub closes when it is merged, as
   `linkedIssues`, each with its state, labels, title and author. A PR also
   carries the text of each comment that
-  `packages/checks/src/policy-comments.ts` recognizes as a policy comment,
-  and the GitHub account of the author of each commit.
+  `packages/checks/src/policy-comments.ts` recognizes as a policy comment
+  or that the bot of GitHub Actions posted, and the GitHub account of the
+  author of each commit. For the reconciler of RFC 0003 a PR also carries
+  `labelEvents`, the times at which a label was added or removed, and the
+  node ID and the minimized state of each comment.
   The lifecycle policies of RFC 0003 read the linked issues and the
   collaborators, and the turn policy leaves a policy comment out of the
   activity on a PR. The issue column and the `ISSUE-COLLISION`,

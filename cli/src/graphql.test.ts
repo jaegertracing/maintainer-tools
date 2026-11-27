@@ -114,7 +114,31 @@ test('a pull request carries its linked issues, the text of a comment only when 
           labels: noNodes,
           files: noNodes,
           reviewRequests: noNodes,
-          reviews: noNodes,
+          reviews: {
+            nodes: [
+              {
+                author: { login: 'copilot-pull-request-reviewer', __typename: 'Bot' },
+                state: 'COMMENTED',
+                submittedAt: '2026-09-11T09:00:00Z',
+                url: 'https://github.com/example/repo/pull/7#pullrequestreview-1',
+                body: '',
+              },
+              {
+                author: { login: 'maintainer', __typename: 'User' },
+                state: 'CHANGES_REQUESTED',
+                submittedAt: '2026-09-11T10:00:00Z',
+                url: 'https://github.com/example/repo/pull/7#pullrequestreview-2',
+                body: '',
+              },
+              {
+                author: null,
+                state: 'COMMENTED',
+                submittedAt: '2026-09-11T11:00:00Z',
+                url: 'https://github.com/example/repo/pull/7#pullrequestreview-3',
+                body: '',
+              },
+            ],
+          },
           reviewThreads: {
             totalCount: 0,
             pageInfo: { hasNextPage: false, endCursor: null },
@@ -123,14 +147,39 @@ test('a pull request carries its linked issues, the text of a comment only when 
           comments: {
             nodes: [
               {
-                author: { login: 'github-actions' },
+                id: 'IC_1',
+                author: { login: 'maintainer', __typename: 'User' },
                 createdAt: '2026-09-11T08:00:00Z',
                 body: '<!-- jaeger-pr-linked-issue -->\nThis PR links no approved issue.',
+                isMinimized: true,
               },
               {
-                author: { login: 'contributor' },
+                id: 'IC_2',
+                author: { login: 'contributor', __typename: 'User' },
                 createdAt: '2026-09-12T08:00:00Z',
                 body: 'I linked the issue.',
+                isMinimized: false,
+              },
+              {
+                id: 'IC_3',
+                author: { login: 'github-actions', __typename: 'Bot' },
+                createdAt: '2026-09-13T08:00:00Z',
+                body: 'This PR is currently **on hold**.',
+                isMinimized: false,
+              },
+            ],
+          },
+          timelineItems: {
+            nodes: [
+              {
+                __typename: 'LabeledEvent',
+                createdAt: '2026-09-11T08:00:00Z',
+                label: { name: 'missing-issue' },
+              },
+              {
+                __typename: 'UnlabeledEvent',
+                createdAt: '2026-09-12T09:00:00Z',
+                label: { name: 'missing-issue' },
               },
             ],
           },
@@ -191,11 +240,40 @@ test('a pull request carries its linked issues, the text of a comment only when 
   ]);
   assert.deepEqual(pr.comments, [
     {
-      author: 'github-actions',
+      author: 'maintainer',
       createdAt: '2026-09-11T08:00:00Z',
       body: '<!-- jaeger-pr-linked-issue -->\nThis PR links no approved issue.',
+      id: 'IC_1',
+      isMinimized: true,
+      authorIsBot: false,
     },
-    { author: 'contributor', createdAt: '2026-09-12T08:00:00Z' },
+    {
+      author: 'contributor',
+      createdAt: '2026-09-12T08:00:00Z',
+      id: 'IC_2',
+      isMinimized: false,
+      authorIsBot: false,
+    },
+    {
+      author: 'github-actions',
+      createdAt: '2026-09-13T08:00:00Z',
+      body: 'This PR is currently **on hold**.',
+      id: 'IC_3',
+      isMinimized: false,
+      authorIsBot: true,
+    },
+  ]);
+  assert.deepEqual(
+    pr.reviews.map((review) => [review.author, review.authorIsBot]),
+    [
+      ['copilot-pull-request-reviewer', true],
+      ['maintainer', false],
+      [null, false],
+    ],
+  );
+  assert.deepEqual(pr.labelEvents, [
+    { label: 'missing-issue', event: 'labeled', at: '2026-09-11T08:00:00Z' },
+    { label: 'missing-issue', event: 'unlabeled', at: '2026-09-12T09:00:00Z' },
   ]);
   assert.deepEqual(
     pr.commits.map((commit) => commit.authorLogin),

@@ -78,7 +78,7 @@ interface PullRequestNode {
   };
   reviews: {
     nodes: Array<{
-      author: { login: string } | null;
+      author: { login: string; __typename: AuthorTypename } | null;
       state: ReviewState;
       submittedAt: string | null;
       url: string;
@@ -98,9 +98,18 @@ interface PullRequestNode {
   };
   comments: {
     nodes: Array<{
-      author: { login: string } | null;
+      id: string;
+      author: { login: string; __typename: AuthorTypename } | null;
       createdAt: string;
       body: string;
+      isMinimized: boolean;
+    }>;
+  };
+  timelineItems: {
+    nodes: Array<{
+      __typename: 'LabeledEvent' | 'UnlabeledEvent';
+      createdAt: string;
+      label: { name: string };
     }>;
   };
   closingIssuesReferences: LinkedIssuesConnection;
@@ -135,6 +144,10 @@ interface PullRequestNode {
     }>;
   };
 }
+
+// The login that GraphQL returns for `github-actions[bot]`, the account
+// that posts the comments of the lifecycle actions.
+const ACTIONS_BOT_LOGIN = 'github-actions';
 
 // The `pr-linked-issue` action of jaeger reads the first 20 closing issue
 // references, and the lifecycle policies keep that limit.
@@ -206,7 +219,7 @@ const PR_QUERY = `
         }
         reviews(last: 50) {
           nodes {
-            author { login }
+            author { login __typename }
             state
             submittedAt
             url
@@ -229,9 +242,18 @@ const PR_QUERY = `
         }
         comments(last: 50) {
           nodes {
-            author { login }
+            id
+            author { login __typename }
             createdAt
             body
+            isMinimized
+          }
+        }
+        timelineItems(last: 100, itemTypes: [LABELED_EVENT, UNLABELED_EVENT]) {
+          nodes {
+            __typename
+            ... on LabeledEvent { createdAt label { name } }
+            ... on UnlabeledEvent { createdAt label { name } }
           }
         }
         ${LINKED_ISSUES_FIELD}
@@ -607,13 +629,26 @@ export function createGraphqlClient(token: string): GraphqlClient {
             state: r.state,
             // submittedAt is non-null by the filter above.
             submittedAt: r.submittedAt as string,
+            authorIsBot: r.author?.__typename === 'Bot',
             url: r.url,
             body: r.body,
           })),
-        comments: pr.comments.nodes.map((c) => ({
-          author: c.author?.login ?? null,
-          createdAt: c.createdAt,
-          ...(isPolicyComment(c.body) ? { body: c.body } : {}),
+        comments: pr.comments.nodes.map((c) => {
+          const authorIsBot = c.author?.__typename === 'Bot';
+          const isOfActionsBot = authorIsBot && c.author?.login === ACTIONS_BOT_LOGIN;
+          return {
+            author: c.author?.login ?? null,
+            createdAt: c.createdAt,
+            ...(isPolicyComment(c.body) || isOfActionsBot ? { body: c.body } : {}),
+            id: c.id,
+            isMinimized: c.isMinimized,
+            authorIsBot,
+          };
+        }),
+        labelEvents: pr.timelineItems.nodes.map((event) => ({
+          label: event.label.name,
+          event: event.__typename === 'LabeledEvent' ? 'labeled' : 'unlabeled',
+          at: event.createdAt,
         })),
         linkedIssues: linkedIssuesOf(pr.closingIssuesReferences),
         body: pr.body ?? '',
