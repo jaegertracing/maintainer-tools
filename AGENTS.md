@@ -104,7 +104,7 @@ The consumers evaluate the rules with
 a predicate returns is reused verbatim in the
 Checks panel and the digest — keep it short and self-contained. After a
 change of the rules, run `pnpm run decision-tables` in `packages/checks` and
-commit the regenerated `decision-tables/`. See "Predicate model" in
+commit the regenerated `docs/decision-tables/`. See "Predicate model" in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ### Comments
