@@ -20,11 +20,14 @@
 // no enrichment, which keeps the query budget proportional to the small
 // subset that could actually be quota-blocked.
 
-import type { GraphqlClient, PullRequest } from '@jaegertracing/maintainer-tools-checks';
+import {
+  hasLogin,
+  type GraphqlClient,
+  type PullRequest,
+} from '@jaegertracing/maintainer-tools-checks';
 import type { PrCache } from '@jaegertracing/maintainer-tools-checks/cache';
 
 import { log } from './log.js';
-import { hasLogin } from './logins.js';
 
 export function calculateQuota(mergedCount: number): number {
   if (mergedCount === 0) return 1;

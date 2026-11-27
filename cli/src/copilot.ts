@@ -4,9 +4,7 @@
 // severity is an `<img alt="Medium severity">`. This module turns the latest
 // such review into a small structured summary for the triage report.
 
-import type { PullRequest } from '@jaegertracing/maintainer-tools-checks';
-
-import { sameLogin } from './logins.js';
+import { sameLogin, type PullRequest } from '@jaegertracing/maintainer-tools-checks';
 
 // GraphQL reports bot actors without the `[bot]` suffix that the REST API and
 // the web UI show, so both spellings are accepted.

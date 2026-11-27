@@ -15,12 +15,12 @@ import { createRequire } from 'node:module';
 import {
   computeComposition,
   dcoMissing,
+  sameLogin,
   type PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
 
 import { BUCKET_LABELS, BUCKET_ORDER, type ClassifiedPR } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
-import { sameLogin } from '../logins.js';
 import { diffSummary, renderDiff } from './diff.js';
 import { escape } from './escape.js';
 import { ageInDays, formatAge, hideReasonLabel, NO_PRIORITY_LABEL } from './shared.js';

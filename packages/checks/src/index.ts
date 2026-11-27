@@ -11,6 +11,7 @@ export type {
   PullRequest,
   PredicateContext,
 } from './types.js';
+export { hasLogin, sameLogin } from './logins.js';
 export {
   classifyPath,
   computeComposition,
