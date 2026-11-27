@@ -238,10 +238,9 @@ The rows that B loses are migration cost and one footnote of operational cost. M
 
 ### Inputs, facts and outputs
 
-The design has the shape of a logic program, in the sense of Datalog. It has three layers. Base fact, derived fact, rule and output are concepts of Datalog, which calls them extensional fact, intensional fact, rule and output relation. The correspondence has one exception: a base fact of a PR may be computed from a declared fact of an issue, and an extensional fact of Datalog is never computed from another fact.
-
+The design has the shape of a logic program, in the sense of Datalog. It has three layers. Base fact, derived fact, rule and output are concepts of Datalog, which calls them extensional fact, intensional fact, rule and output relation.
 - **Inputs** are what the reconciler observes and never changes: the labels that people own, the author and the author's permission, the closing issue references and the state and labels of those issues, the other open PRs, the events of the timeline with their times and actors, and the current time.
-- **Facts** are named booleans: `needs_issue`, `links_open_issue`, `idle`, `flag_expired`, `over_quota`, `is_duplicate`, `blocked`. A fact is of one of two kinds, and never of both. A "base fact" takes its value from a "predicate", a function that computes the value from the inputs, and the predicates are the only code in a policy. A predicate may also read a fact of a lower layer of another item, when it declares that fact; the predicate of `is_duplicate` is the one case, and "No inference is needed" shows it. A "derived fact" is decided by rules from other facts. The lifecycle states of the previous section are derived facts. Most facts are about a PR. A fact can also be about an issue, such as `has_duplicate_prs`, and the reconciler then evaluates it once for each issue.
+- **Facts** are named booleans: `needs_issue`, `links_open_issue`, `idle`, `flag_expired`, `over_quota`, `is_duplicate`, `blocked`. A fact is of one of two kinds, and never of both. A "base fact" takes its value from a "predicate", a function that computes the value from the inputs, and the predicates are the only code in a policy. The set of open PRs of the run is one of the inputs, and the predicates of `over_quota` and `is_duplicate` read it. A "derived fact" is decided by rules from other facts. The lifecycle states of the previous section are derived facts. The facts of the PR policies are about a PR. A fact can also be about an issue, as in the sketch of an issue policy in "Reading, explaining and extending the rules", and the reconciler then evaluates it once for each issue.
 - **Outputs** are what the reconciler owns and changes: each of its labels, its comment, and `should_close`.
 
 The separation of the layers forbids one thing: a rule never reads an output. It does not limit how a derived fact or an output is decided. Any number of small rules may contribute to the same one.
@@ -268,8 +267,7 @@ These statements exist in `packages/checks/src/rules`, the rule form that the fi
 - `policy.issueBaseFact()` and `policy.issueDerivedFact()`, for the facts of an issue.
 - The outputs `policy.comment` and `policy.shouldClose`, and `policy.label(name)`, which is a method because each label is an output.
 - `policy.labelAge()`, which declares the age of a label as a base fact, and `policy.exclusive()`, which declares two outputs that must not hold together.
-- Two more options of a base fact. `says` is the static wording of the fact, which is the same for every item. `reads` names the facts of other items that the predicate reads.
-- A second parameter of a predicate that declares `reads`, named `lower` in the sketches, through which the predicate reads those facts.
+- One more option of a base fact. `says` is the static wording of the fact, which is the same for every item.
 
 The calls chain. A policy adds a reason or a veto to a derived fact of another policy with a separate statement. A base fact has no `.when` and no `.unless`, so no rule can decide it. An output cannot be passed to `.when` or `.unless`, because the types of the builder refuse it, so a rule that reads an output does not compile.
 
@@ -397,7 +395,7 @@ policy.triageHidden.when(ciFailingWithoutLabelOnlyFailure);
 
 `policy.triageHidden.unless(labelOnlyFailure)` would be wrong, because it would also show a PR that has a merge conflict.
 
-The layers stay acyclic by one rule: a rule, reason or veto alike, reads facts of lower layers. It never reads its own conclusion, a fact of the same or a higher layer, or an output. A veto is a negation, and Datalog calls negation that is restricted in this way "stratified"; the restriction is what gives every fact exactly one value. Each rule records its premises, and a predicate that reads a fact of another item declares it. The reconciler orders the layers from those two when it loads the rules, and it fails on a cycle.
+The layers stay acyclic by one rule: a rule, reason or veto alike, reads facts of lower layers. It never reads its own conclusion, a fact of the same or a higher layer, or an output. A veto is a negation, and Datalog calls negation that is restricted in this way "stratified"; the restriction is what gives every fact exactly one value. Each rule records its premises. The reconciler orders the layers from them when it loads the rules, and it fails on a cycle.
 
 ### What "complete" means
 
@@ -421,7 +419,7 @@ Three limits of the tables showed in the prototype.
 
 - **A table stays readable only when it names the rules of its own output.** A table that named every rule that held in the layers below would have a different last column in almost every row, and no rows would merge. `should_close` depends on eight base facts, which is 256 combinations, and its table has 24 rows. The table of `comment` has 21.
 - **A table still grows fast.** Each reason that is added to an output roughly doubles its table, because the base facts of the new reason combine with the rows that exist.
-- **A table does not cross from an issue to a PR.** The base facts are enumerated as independent booleans, and the enumeration cannot follow a fact of an issue into a PR. In the table of `label:duplicate`, `is_duplicate` is one column and `allow-multiple-prs` does not appear. `has_duplicate_prs` has a table of its own.
+- **A table does not show what a predicate reads.** The base facts are enumerated as independent booleans, and a predicate is opaque to the enumeration. In the table of `label:duplicate`, `is_duplicate` is one column and `allow-multiple-prs` does not appear, because the predicate reads that label of the issue.
 
 The same enumeration runs two checks. A rule, a derived fact or an output that holds in no row is reported as one that never holds. A declared exclusion, such as `policy.exclusive(missingIssueLabel, unapprovedIssueLabel)`, fails in any row in which both hold.
 
@@ -460,7 +458,7 @@ In the second column an arrow is a reason, and a name with a colon is a base fac
 | Linked issue | no linked issue is open and carries `help wanted` ⇒ `needs_issue` · `links_open_issue`: the PR links an open issue in a `jaegertracing` repository · `needs_issue ∧ links_open_issue` ⇒ label `unapproved-issue` · `needs_issue` ⇒ label `missing-issue` | `no_issue_needed` ⇒ not `needs_issue` · `author_can_write` ⇒ not `needs_issue` · `author_is_dependency_bot` ⇒ not `needs_issue` · `collaborators_not_gathered` ⇒ not `needs_issue` · `links_open_issue` ⇒ not label `missing-issue` | Yes |
 | Linked-issue deadline | `needs_issue` ∧ the flag label is at least 7 days old ⇒ `flag_expired` · `flag_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `should_close` | Yes. Closing cannot be undone by the next run; see "What is not declarative". |
 | Stale | no person has acted for 60 days ⇒ `idle` · `idle` ⇒ label `stale` · `idle` ∧ the `stale` label is at least 14 days old ⇒ `idle_expired` · `idle_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `idle` | Yes, once activity means activity by a person. `actions/stale` cannot make that distinction. |
-| Duplicates | two or more open PRs close the issue ⇒ `has_duplicate_prs`, a fact of the issue · `is_duplicate`: an older open PR closes a `has_duplicate_prs` issue that the PR closes · `is_duplicate` ⇒ label `duplicate` | `allow_multiple_prs` ⇒ not `has_duplicate_prs` | Yes. Two open PRs on one issue are duplicates whatever else is true of them: a PR that is flagged, over quota or stale counts like any other. The policy counts issues of the PR's own repository only, as `pr-duplicates` does. The veto attaches to the issue, because a PR can close two issues and only one of them may carry the label. |
+| Duplicates | `is_duplicate`: an older open PR of the same repository closes an issue that the PR closes, and the issue does not carry `allow-multiple-prs` · `is_duplicate` ⇒ label `duplicate` | None. The predicate reads `allow-multiple-prs` | Yes. Two open PRs on one issue are duplicates whatever else is true of them: a PR that is flagged, over quota or stale counts like any other. The policy counts issues of the PR's own repository only, as `pr-duplicates` does. The label is read for each issue, because a PR can close two issues and only one of them may carry the label. |
 | Author quota | `over_quota`: the position of the PR among the author's open PRs, in creation order, exceeds the quota for the author's merged PR count · `over_quota` ⇒ label `pr-quota-reached` | None today | Yes. The rule needs a count and a rank. |
 | Waiting for author | `authors_turn`: a conversation comment or a review that is not an approval, of a maintainer who has not approved since, is newer than the author's latest comment, review and push · `authors_turn` ⇒ label `waiting-for-author` | None today | Yes. It replaces a reaction to single events. Whether a comment asks for anything is a judgment that neither form has. |
 | Blocked, and the comment | `needs_issue` ⇒ `blocked` · `over_quota` ⇒ `blocked` · `is_duplicate` ⇒ `blocked` · `blocked` ⇒ the comment exists · `idle` ⇒ the comment exists | None today | Yes, as a statement: for every label of the plan that gives notice, a policy comment exists that was created after the PR got the label. Creating the comment is the non-declarative part. |
@@ -514,40 +512,24 @@ The power of Prolog is in finding a proof: unification, backtracking, recursion.
 
 ```
 inputs (observed)
-  ├─► do_not_expire, needs_issue, links_open_issue, idle, authors_turn, over_quota    of a PR
-  └─► allow_multiple_prs ─► has_duplicate_prs                                         of an issue
-        └─► is_duplicate                     of a PR; reads has_duplicate_prs of the issues that it closes
-              └─► flag_expired, idle_expired       use the age of a label
-                    └─► blocked, should_close
-                          └─► labels, comment
+  └─► do_not_expire, needs_issue, links_open_issue, idle, authors_turn, over_quota, is_duplicate
+        └─► flag_expired, idle_expired       use the age of a label
+              └─► blocked, should_close
+                    └─► labels, comment
 ```
 
-One arrow needs a remark. `is_duplicate` is a base fact of a PR, and its predicate reads `has_duplicate_prs`, a derived fact of an issue that is computed from every open PR that closes the issue. A predicate is therefore not always a function of the inputs alone. Such a predicate declares what it reads:
+Two base facts of a PR depend on other PRs: `over_quota` and `is_duplicate`. Their predicates read the set of open PRs of the run, which is an input, and no fact of another item. The predicate of `is_duplicate` also reads the `allow-multiple-prs` label of each issue that the PR closes:
 
 ```ts
 // duplicates.ts
-const severalPrsCloseIssue = policy.issueBaseFact(
-  'several_prs_close_issue',
-  (issue, lower) => pullRequestsClosing(issue, lower).length >= 2,
-  { says: 'two or more open pull requests close the issue', changedBy: 'author' },
-);
-const hasDuplicatePrs = policy
-  .issueDerivedFact('has_duplicate_prs')
-  .when(severalPrsCloseIssue)
-  .unless(allowMultiplePrs);
-
 export const isDuplicate = policy.baseFact(
   'is_duplicate',
-  (pr, lower) => issuesWithOlderPullRequest(pr, lower).length > 0,
-  {
-    says: 'an older open pull request closes the same issue',
-    changedBy: 'author',
-    reads: [hasDuplicatePrs],
-  },
+  (pr, { openPullRequests }) => olderPullRequestsOfSameIssue(pr, openPullRequests).length > 0,
+  { says: 'an older open pull request closes the same issue', changedBy: 'author' },
 );
 ```
 
-The declared `reads` gives the predicate a place in the layer order, like a rule, and it can take part in a cycle, which the reconciler reports when it loads the rules. This is the only place where a fact of one item is read for another.
+No fact of one item is read for another, so every predicate is a function of the inputs.
 
 The rules over a set range over every PR that is open when the run observes the repository. A PR that the run closes still counts in that run. The next run no longer lists it, and it then frees a place in the author's quota or leaves another PR as the oldest on its issue. Because the set does not depend on the plan, no rule is restricted in what it may conclude from the set: `is_duplicate ⇒ should_close` would be a legal rule.
 
@@ -562,7 +544,7 @@ Rules written by different people at different times can contradict each other. 
 - *Inputs* are what the reconciler never changes: linked issues and their labels, the labels that people own (`help wanted`, `no-issue-needed`, `do-not-expire`, `allow-multiple-prs`), authorship and permissions, creation times, comments and pushes by people, and the clock.
 - *Outputs* are what the reconciler owns: its labels, its comment, and the closing of a PR.
 
-Three construction rules follow. A predicate reads inputs, and it may read a fact of a lower layer of another item when it declares that fact. A rule reads facts of lower layers. Neither reads an output, and the label age below is the one exception. A rule is a reason or a veto, and nothing else: it cannot say "remove" or "reopen". And one fixed precedence combines them: a veto wins.
+Three construction rules follow. A predicate reads inputs. A rule reads facts of lower layers. Neither reads an output, and the label age below is the one exception. A rule is a reason or a veto, and nothing else: it cannot say "remove" or "reopen". And one fixed precedence combines them: a veto wins.
 
 Under these rules the plan is a function of the inputs, and two rules cannot contradict each other. Two reasons for the same fact add up. Two vetoes add up. A reason and a veto that both hold are not a conflict, because the result is defined before either is written. In the example, `stale` has the reason "no person has acted for 60 days", and closing follows from `idle_expired`, which requires the same `idle` fact. Activity by a person makes `idle` false, so the label loses its reason and the closing loses its reason in the same pass. No rule removes anything, and neither rule reads what the other produced.
 
@@ -623,12 +605,12 @@ A solver would earn its place under conditions that this design removes. If rule
 
 The reconciler checks its rule set when it loads, before it queries GitHub and before it changes anything. A rule set that fails the check does not run. The alternative is to learn on a live PR that an item cannot progress, or that two rules keep undoing each other, which is how the motivating case was learned.
 
-A "violation" is a defect of the rule set, independent of any particular PR, that makes the plan undefined, unstable or impossible to carry out. Six kinds exist for this rule form. The rule form of the first migration step reports three of them. Its evaluator reports the dependency cycle when it loads a policy, and its startup check reports the output that no person can clear and the rule that never holds. In that rule form a rule that reads an output cannot be written: only `.when` and `.unless` record a rule, and they accept facts only. The reconciler adds the check for it together with the label ages and the `reads` option, which let a rule or a predicate name an output. The other two kinds concern labels and label ages, and the reconciler adds them with those outputs. The TypeScript compiler refuses part of them before the rules ever load, because the builder's types limit what a statement can name.
+A "violation" is a defect of the rule set, independent of any particular PR, that makes the plan undefined, unstable or impossible to carry out. Six kinds exist for this rule form. The rule form of the first migration step reports three of them. Its evaluator reports the dependency cycle when it loads a policy, and its startup check reports the output that no person can clear and the rule that never holds. In that rule form a rule that reads an output cannot be written: only `.when` and `.unless` record a rule, and they accept facts only. The reconciler adds the check for it together with the label ages, which let a rule name an output. The other two kinds concern labels and label ages, and the reconciler adds them with those outputs. The TypeScript compiler refuses part of them before the rules ever load, because the builder's types limit what a statement can name.
 
 | Kind | Example | Refused by the compiler | Reported when the rule set loads |
 |---|---|---|---|
-| A dependency cycle, through a reason or a veto | `idle_expired ⇒ not idle` together with `idle ∧ stale_label_old ⇒ idle_expired` | In part ¹ | A depth-first walk over what each rule and each predicate reads fails with the rules on the cycle |
-| A rule that reads an output | A predicate that tests for the `stale` label | An output passed to `.when` or `.unless`, or named in `reads`. The inputs of a predicate of the reconciler do not contain the labels, the comment or the open state that the reconciler owns. A predicate of the checks receives the whole PR, so the compiler refuses nothing there | A label age outside the notice form, and any rule that is added to the policy without the builder |
+| A dependency cycle, through a reason or a veto | `idle_expired ⇒ not idle` together with `idle ∧ stale_label_old ⇒ idle_expired` | In part ¹ | A depth-first walk over what each rule reads fails with the rules on the cycle |
+| A rule that reads an output | A predicate that tests for the `stale` label | An output passed to `.when` or `.unless`. The inputs of a predicate of the reconciler do not contain the labels, the comment or the open state that the reconciler owns. A predicate of the checks receives the whole PR, so the compiler refuses nothing there | A label age outside the notice form, and any rule that is added to the policy without the builder |
 | Two outputs that exclude each other and both hold | `missing-issue` and `unapproved-issue`; open and closed | Open against closed, because no statement can conclude "open" | Declared pairs, by enumeration: a row in which both hold fails, with the rules that held |
 | An output that no person can clear | A `blocked` PR that nothing a person does can unblock | A label that the reconciler does not own | A conclusion that is no output and that nothing reads. By enumeration: an output that holds in a row and still holds for every value of the base facts whose change source is the author or a maintainer |
 | Non-convergence: deriving again after the plan is applied gives a different plan | A deadline that reads the age of a label which its own plan removes | No | By enumeration: each row is derived, the label ages are set to what the labels of that plan leave, and the row is derived again |
@@ -652,7 +634,7 @@ seeded: label-age-outside-notice-form
 
 **The representation that this requires.** A check at load time cannot look inside a function. The statements of the builder therefore produce data, in two parts.
 
-- A **base fact** is a named boolean, such as `quiet_for_60_days` for "no person has acted on the pull request for 60 days". Its predicate is opaque code. What the check knows about it is declared: its change source (`changedBy`), which facts of other items its predicate reads (`reads`), and, for a label age, which labels it measures.
+- A **base fact** is a named boolean, such as `quiet_for_60_days` for "no person has acted on the pull request for 60 days". Its predicate is opaque code. What the check knows about it is declared: its change source (`changedBy`) and, for a label age, which labels it measures.
 - A **rule** is data: its conclusion, its premises, which are the names of the facts that must all hold, and whether it is a veto. It contains no code.
 
 A threshold lives inside a predicate, so the check sees booleans only. A base fact whose predicate reads other items, such as `is_duplicate`, is one free boolean of the enumeration.
@@ -673,7 +655,6 @@ Enumeration of booleans is a complete decision procedure at this size, so the ch
 
 - A predicate that computes the wrong boolean or the wrong summary from GitHub's data. It is a function, and the types limit what it receives, not what it does. The check trusts the name.
 - A predicate that reads an output through the data that it receives. A predicate of the checks receives the whole PR, and `stale_on_author` reads the `stale` label in this way.
-- A predicate that reads a fact which it did not declare. The declared `reads` is enforced when the predicate runs, not when the rule set loads.
 - A policy module that nothing imports. Its statements never reach the `Policy` object, and the check sees a rule set without them.
 - A rule that is missing. The decision tables show the rows with no reason, and a person has to judge them.
 - A false alarm in a row that cannot occur. The base facts are enumerated as independent, and some are not: a `stale` label cannot be 14 days old on a PR that somebody touched yesterday. Such rows also appear in the decision tables.
@@ -1077,7 +1058,7 @@ The cutover is one PR per repository, and reverting it is the rollback: the old 
 - **All the rules of one output are not written in one place.** They are spread over the policies, and a veto can silence a reason that another policy added. The generated decision table of the output is the place to read them, and a reviewer who skips the diff of that table misses the consequences of a rule.
 - **A decision table roughly doubles with each reason that is added to its output.** The tables of `should_close` and `comment` have 24 and 21 rows in the prototype. They also show rows that cannot occur, and they do not show the text of a comment, which comes from the summaries of the base facts.
 - **The project owns the evaluator and the startup check.** In the prototype they are 210 and 223 lines, with 114 lines of shared data types. The code is loops and a graph walk and not an inference engine, and it is still code to maintain.
-- **The startup check proves properties of the rule set, not of the predicates or of the world.** "Violations are reported at startup" lists what it cannot catch. Its convergence check covers one PR, and the declared `reads` of a predicate is enforced only when the predicate runs.
+- **The startup check proves properties of the rule set, not of the predicates or of the world.** "Violations are reported at startup" lists what it cannot catch. Its convergence check covers one PR.
 - **The observer of the prototype reads bounded lists.** It reads the first 20 closing references of a PR and the last 100 reviews and commits, and it evaluates a PR beyond those bounds on part of its facts. That breaks step 1 of "Plan and apply", in which an absent fact is never read as a false one. Write mode therefore requires an observer that follows each list to its end. Shadow mode does not, because it changes nothing.
 - **A notice period runs from the label, not from the comment.** A run that applies a label and fails before it creates the comment leaves the PR without a notice. The next run creates the comment, and the author loses the time between the two runs. If no run succeeds for the whole period, the run that creates the comment also closes the PR. A label that a maintainer applies by hand starts the period in the same way.
 - **A push is dated by the committed date of its commit.** GraphQL returns no time of a push, except of a force push. A merge from the base branch that the author makes arrives as a push, so it is activity for the idle rule and it passes the turn to the maintainers, although it answers nothing that a maintainer asked.
