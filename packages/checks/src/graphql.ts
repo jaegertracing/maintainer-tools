@@ -119,7 +119,7 @@ interface PullRequestNode {
         messageHeadline: string;
         messageBody: string;
         committedDate: string;
-        author: { email: string | null } | null;
+        author: { email: string | null; user: { login: string } | null } | null;
         statusCheckRollup: { state: PullRequest['statusCheckRollup'] } | null;
         parents: { totalCount: number };
       };
@@ -244,7 +244,7 @@ const PR_QUERY = `
               messageHeadline
               messageBody
               committedDate
-              author { email }
+              author { email user { login } }
               statusCheckRollup { state }
               parents { totalCount }
             }
@@ -657,6 +657,7 @@ export function createGraphqlClient(token: string): GraphqlClient {
           messageBody: n.commit.messageBody,
           committedDate: n.commit.committedDate,
           authorEmail: n.commit.author?.email ?? null,
+          authorLogin: n.commit.author?.user?.login ?? null,
           parents: n.commit.parents.totalCount,
         })),
         reviewRequests: pr.reviewRequests.nodes.flatMap<PullRequest['reviewRequests'][number]>(
