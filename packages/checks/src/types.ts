@@ -128,7 +128,14 @@ export interface PullRequest {
   }>;
   // Issue-style PR comments (last 50). Used by triage to decide whether a
   // maintainer has responded yet; not used by predicates.
-  comments: Array<{ author: string | null; createdAt: string }>;
+  comments: Array<{
+    author: string | null;
+    createdAt: string;
+    // The text of a comment that `isPolicyComment()` recognizes as a
+    // policy comment. The text of any other comment is not kept, because
+    // nothing reads it.
+    body?: string;
+  }>;
 
   // The issues that GitHub closes when the PR is merged, which GitHub calls
   // the closing issue references (first 20). Optional because a snapshot

@@ -12,6 +12,7 @@
 import { graphql, type withCustomRequest } from '@octokit/graphql';
 import { retryRequest } from './retry.js';
 import { refKey } from './issue-refs.js';
+import { isPolicyComment } from './policy-comments.js';
 import type {
   AuthorAssociation,
   AuthorTypename,
@@ -107,6 +108,7 @@ interface PullRequestNode {
     nodes: Array<{
       author: { login: string } | null;
       createdAt: string;
+      body: string;
     }>;
   };
   closingIssuesReferences: LinkedIssuesConnection;
@@ -231,6 +233,7 @@ const PR_QUERY = `
           nodes {
             author { login }
             createdAt
+            body
           }
         }
         ${LINKED_ISSUES_FIELD}
@@ -678,6 +681,7 @@ export function createGraphqlClient(token: string): GraphqlClient {
         comments: pr.comments.nodes.map((c) => ({
           author: c.author?.login ?? null,
           createdAt: c.createdAt,
+          ...(isPolicyComment(c.body) ? { body: c.body } : {}),
         })),
         linkedIssues: linkedIssuesOf(pr.closingIssuesReferences),
         body: pr.body ?? '',
