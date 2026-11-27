@@ -85,7 +85,8 @@ interface CacheRow {
 //   8 — added linkedIssues
 //   9 — added the body of a policy comment
 //  10 — added commits[].authorLogin
-const SCHEMA_VERSION = 10;
+//  11 — added linkedIssues[].title and linkedIssues[].author
+const SCHEMA_VERSION = 11;
 
 interface CachePayload {
   v: number;

@@ -204,6 +204,11 @@ export interface PullRequest {
 export interface LinkedIssue extends IssueRef {
   state: 'OPEN' | 'CLOSED';
   labels: string[];
+  // The title of the issue and the login of the account that opened it. The
+  // login is null when GitHub has deleted the account. Both are absent in a
+  // snapshot file from before they existed.
+  title?: string;
+  author?: string | null;
 }
 
 // What a collaborator may do in a repository, in GitHub's terms.

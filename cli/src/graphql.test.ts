@@ -139,8 +139,18 @@ test('a pull request carries its linked issues, the text of a comment only when 
               {
                 number: 3,
                 state: 'OPEN',
+                title: 'The thing is broken',
+                author: { login: 'reporter' },
                 repository: { name: 'repo', owner: { login: 'example' } },
                 labels: { nodes: [{ name: 'help wanted' }, { name: 'bug' }] },
+              },
+              {
+                number: 4,
+                state: 'CLOSED',
+                title: 'An issue of a deleted account',
+                author: null,
+                repository: { name: 'repo', owner: { login: 'example' } },
+                labels: { nodes: [] },
               },
             ],
           },
@@ -160,7 +170,24 @@ test('a pull request carries its linked issues, the text of a comment only when 
   const pr = await createGraphqlClient('test-token').fetchPullRequest('example', 'repo', 7);
 
   assert.deepEqual(pr.linkedIssues, [
-    { owner: 'example', repo: 'repo', number: 3, state: 'OPEN', labels: ['help wanted', 'bug'] },
+    {
+      owner: 'example',
+      repo: 'repo',
+      number: 3,
+      state: 'OPEN',
+      title: 'The thing is broken',
+      author: 'reporter',
+      labels: ['help wanted', 'bug'],
+    },
+    {
+      owner: 'example',
+      repo: 'repo',
+      number: 4,
+      state: 'CLOSED',
+      title: 'An issue of a deleted account',
+      author: null,
+      labels: [],
+    },
   ]);
   assert.deepEqual(pr.comments, [
     {
