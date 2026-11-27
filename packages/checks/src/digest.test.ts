@@ -10,6 +10,8 @@ function pullRequest(overrides: Partial<PullRequest>): PullRequest {
   return {
     author: { login: 'contributor', typename: 'User' },
     body: 'A description that is long enough to count as one.',
+    comments: [],
+    reviews: [],
     commits: [{ sha: 'abc1234def', messageHeadline: 'Add a feature', messageBody: '', parents: 1 }],
     files: ['pkg/feature.go'],
     labels: [],

@@ -27,7 +27,9 @@ export {
 } from './composition.js';
 export { extractIssueRefs, hasIssueRef, issueUrl, parseRefKey, refKey } from './issue-refs.js';
 export { checkRunConclusion } from './predicates/index.js';
+export { commitsOfAuthor } from './predicates/authors_turn.js';
 export {
+  authorsTurn,
   CHECK_FACTS,
   dcoMissing,
   labelOnlyFailure,

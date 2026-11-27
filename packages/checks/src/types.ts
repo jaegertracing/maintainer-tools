@@ -131,7 +131,7 @@ export interface PullRequest {
     body?: string;
   }>;
   // Issue-style PR comments (last 50). Used by triage to decide whether a
-  // maintainer has responded yet; not used by predicates.
+  // maintainer has responded yet.
   comments: Array<{
     author: string | null;
     createdAt: string;

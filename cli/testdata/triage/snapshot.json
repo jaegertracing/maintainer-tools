@@ -538,7 +538,7 @@
       ],
       "reviewRequests": [],
       "reviews": [],
-      "comments": [],
+      "comments": [{ "author": "maintainer-b", "createdAt": "2026-04-25T12:00:00Z" }],
       "body": "The query service read the service names on every request. This change caches them.",
       "linkedIssues": [],
       "reviewThreads": []

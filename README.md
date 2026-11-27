@@ -155,18 +155,18 @@ needing this table.
 
 Each row also carries inline **flags** when relevant:
 
-| Flag                    | Meaning                                                                      |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| `BLOCKER`               | PR labelled `release-blocker` / `blocker`.                                   |
-| `QUESTION`              | PR labelled `awaiting-maintainer-input`.                                     |
-| `MERGE-CONFLICT`        | `mergeable === CONFLICTING`.                                                 |
-| `STALE`                 | Activity older than the staleness threshold.                                 |
-| `NO-ISSUE`              | The PR needs an issue under the [linked-issue policy](#linked-issue-policy). |
-| `NO-TESTS`              | Source files changed but no test files touched.                              |
-| `UNRESOLVED`            | Unresolved review thread with new commits since the last reviewer comment.   |
-| `RESOLVED-W/O-REPLY: N` | Author resolved `N` threads without replying to the reviewer.                |
-| `DRAFT`                 | PR is a draft.                                                               |
-| `BOT`                   | Bot author.                                                                  |
+| Flag                       | Meaning                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `BLOCKER`                  | PR labelled `release-blocker` / `blocker`.                                   |
+| `QUESTION`                 | PR labelled `awaiting-maintainer-input`.                                     |
+| `MERGE-CONFLICT`           | `mergeable === CONFLICTING`.                                                 |
+| `STALE-ON-AUTHOR`          | Activity older than the staleness threshold.                                 |
+| `NO-APPROVED-ISSUE`        | The PR needs an issue under the [linked-issue policy](#linked-issue-policy). |
+| `NO-TESTS`                 | Source files changed but no test files touched.                              |
+| `UNRESOLVED-FROM-REVIEWER` | Unresolved review thread with new commits since the last reviewer comment.   |
+| `RESOLVED-W/O-REPLY: N`    | Author resolved `N` threads without replying to the reviewer.                |
+| `DRAFT`                    | PR is a draft.                                                               |
+| `BOT-AUTHORED`             | Bot author.                                                                  |
 
 When GitHub Copilot has reviewed the PR, the row also shows its verdict as a
 chip linking to the review: a traffic light and the finding counts by
@@ -418,7 +418,7 @@ get their own **Dependency bots** bucket.
 A PR from an outside contributor is reviewed only when it links an approved
 issue: an open issue of the same organization that carries the `help wanted`
 label. The triage report hides a PR that links no approved issue and flags
-it `NO-ISSUE`. Three kinds of PR need no issue:
+it `NO-APPROVED-ISSUE`. Three kinds of PR need no issue:
 
 - a PR that a maintainer labelled `no-issue-needed`;
 - a PR whose author is a collaborator of the repository with the write,
@@ -448,6 +448,32 @@ you keeps a duplicate visible.
 
 The triage CLI decides this from the issues that GitHub links to the open
 PRs of one run, so a run with `--pr` hides no PR as a duplicate.
+
+---
+
+## Turn policy
+
+It is the turn of the author when a maintainer spoke after the author last
+acted. A maintainer is a collaborator of the repository with the write,
+maintain or admin permission who is not the author. A maintainer speaks with
+a comment on the PR or with a review that is not an approval. An approval
+supersedes what the same maintainer said before it, and what another
+maintainer said still stands. The author
+acts with a comment, with a review, which is how GitHub records a reply in a
+review thread, or with a commit. A merge of the base branch is a commit like
+any other when the author made it. A merge commit that GitHub attributes to
+another account, which is what a maintainer adds with "Update branch", is not
+the author acting. Every other commit counts, also one of a second account
+or of an email that belongs to no account. A comment that carries the hidden
+marker of the linked-issue or the duplicates notice is the activity of
+nobody, whoever posted it. Every other notice of the automation is a comment
+of the GitHub Actions bot, which is neither the author nor a maintainer.
+
+The triage report hides a PR on which it is the turn of the author, with the
+reason `hide:authors_turn`, and flags it `AUTHORS-TURN`. The flag does
+not come from the `waiting-for-author` label. When GitHub refuses the
+list of collaborators of a repository, the CLI knows no maintainer, so it is
+the turn of no author there.
 
 ---
 

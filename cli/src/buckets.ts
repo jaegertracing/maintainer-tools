@@ -6,6 +6,8 @@
 // contributor moves.
 //
 import {
+  authorsTurn,
+  commitsOfAuthor,
   hasLogin,
   isDependencyBotLogin,
   labelOnlyFailure,
@@ -168,7 +170,6 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   const hideReasons: string[] = [];
   if (pr.isDraft) hideReasons.push('draft');
   hideReasons.push(...hideReasonsOfFacts);
-  if (pr.labels.includes('waiting-for-author')) hideReasons.push('waiting-for-author');
   if (changesRequestedPending) hideReasons.push('changes-requested');
   if (isBotAuthor(pr) && !isDependencyBot(pr)) hideReasons.push('bot-authored');
   const facets: Facets = {
@@ -210,13 +211,11 @@ export function classify(pr: PullRequest, ctx: ClassifyContext): ClassifiedPR {
   if (hideReasonsOfFacts.length > 0 && !explicitlyRequested) {
     return mk('hidden', hideReasonsOfFacts);
   }
-  if (pr.labels.includes('waiting-for-author') && !explicitlyRequested) {
-    return mk('hidden', ['waiting-for-author']);
-  }
   // The mirror of `changes-requested-revised` below: the viewer asked for
-  // changes and the author has not answered yet. That is waiting on the author,
-  // the same as the `waiting-for-author` label above, but derived from review
-  // state instead of from a label the nudge workflow has to apply first.
+  // changes and the author has not answered yet. `authors_turn` hides such
+  // a PR when the run knows the viewer as a maintainer; this branch hides
+  // it for a viewer whom the run does not, such as a run that could not
+  // list the collaborators.
   // Without this the PR fell through to `fyi`, whose description is "needs a
   // first look" — the one thing it demonstrably does not need.
   if (!explicitlyRequested && changesRequestedPending) {
@@ -346,10 +345,19 @@ function authorActedSinceViewerReview(
   // Did the author push commits after the viewer's review?
   const authorLogin = pr.author?.login;
   if (!authorLogin) return false;
-  const headCommittedAt = Date.parse(
-    pr.commits[pr.commits.length - 1]?.committedDate ?? pr.updatedAt,
-  );
-  if (headCommittedAt > latest) return true;
+  if (commitsOfAuthor(pr).some((commit) => Date.parse(commit.committedDate) > latest)) return true;
+  // Or answered in a review thread since? GitHub records such a reply as a
+  // review of the author.
+  for (const review of pr.reviews) {
+    if (
+      review.author &&
+      sameLogin(review.author, authorLogin) &&
+      !sameLogin(review.author, viewer) &&
+      Date.parse(review.submittedAt) > latest
+    ) {
+      return true;
+    }
+  }
   // Or commented since?
   for (const c of pr.comments) {
     if (
@@ -397,20 +405,20 @@ function computeFlags(pr: PullRequest, verdict: Verdict, ctx: ClassifyContext): 
   const flags: RowFlag[] = [];
   flags.push(...issueFlags(pr, ctx));
   if (pr.isDraft) flags.push('DRAFT');
-  if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT');
+  if (isBotAuthor(pr) || isDependencyBot(pr)) flags.push('BOT-AUTHORED');
   if (pr.labels.some((l) => l === 'release-blocker' || l === 'blocker')) flags.push('BLOCKER');
   if (verdict.holds(mergeConflict)) flags.push('MERGE-CONFLICT');
-  if (verdict.holds(staleOnAuthor)) flags.push('STALE');
+  if (verdict.holds(staleOnAuthor)) flags.push('STALE-ON-AUTHOR');
   if (pr.labels.includes('awaiting-maintainer-input')) flags.push('QUESTION');
-  if (pr.labels.includes('waiting-for-author')) flags.push('WAITING-FOR-AUTHOR');
+  if (verdict.holds(authorsTurn)) flags.push('AUTHORS-TURN');
 
   // P3 predicates: each fires as a visible row flag when triggered, so a
   // maintainer can spot it at a glance in the triage table. A predicate that
   // also hides the PR does so through a rule for `triage_hidden`.
   if (verdict.holds(labelOnlyFailure)) flags.push('NEEDS-LABEL');
-  if (verdict.holds(needsIssue)) flags.push('NO-ISSUE');
+  if (verdict.holds(needsIssue)) flags.push('NO-APPROVED-ISSUE');
   if (verdict.holds(noTestsForCodeChange)) flags.push('NO-TESTS');
-  if (verdict.holds(unresolvedFromReviewer)) flags.push('UNRESOLVED');
+  if (verdict.holds(unresolvedFromReviewer)) flags.push('UNRESOLVED-FROM-REVIEWER');
   if (verdict.holds(resolvedWithoutReply)) {
     // Per the RFC, surface the offender count so a maintainer can decide
     // whether to re-open. Recomputed here from pr.reviewThreads rather

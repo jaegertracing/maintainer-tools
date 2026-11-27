@@ -17,16 +17,16 @@ export interface XlsxOptions {
 // numeric (the offender count) so it sorts and filters as a number.
 const FLAG_COLUMNS = [
   'DRAFT',
-  'BOT',
+  'BOT-AUTHORED',
   'BLOCKER',
   'MERGE-CONFLICT',
-  'STALE',
+  'STALE-ON-AUTHOR',
   'QUESTION',
-  'WAITING-FOR-AUTHOR',
+  'AUTHORS-TURN',
   'NEEDS-LABEL',
-  'NO-ISSUE',
+  'NO-APPROVED-ISSUE',
   'NO-TESTS',
-  'UNRESOLVED',
+  'UNRESOLVED-FROM-REVIEWER',
 ] as const;
 
 const RESOLVED_COL = 'RESOLVED-W/O-REPLY';
