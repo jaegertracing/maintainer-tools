@@ -455,7 +455,7 @@ In the second column an arrow is a reason, and a name with a colon is a base fac
 
 | Policy | Base facts and reasons | Vetoes | Fits |
 |---|---|---|---|
-| Linked issue | no linked issue is open and carries `help wanted` ⇒ `needs_issue` · `links_open_issue`: the PR links an open issue in a `jaegertracing` repository · `needs_issue ∧ links_open_issue` ⇒ label `unapproved-issue` · `needs_issue` ⇒ label `missing-issue` | `no_issue_needed` ⇒ not `needs_issue` · `author_can_write` ⇒ not `needs_issue` · `author_is_dependency_bot` ⇒ not `needs_issue` · `links_open_issue` ⇒ not label `missing-issue` | Yes |
+| Linked issue | no linked issue is open and carries `help wanted` ⇒ `needs_issue` · `links_open_issue`: the PR links an open issue in a `jaegertracing` repository · `needs_issue ∧ links_open_issue` ⇒ label `unapproved-issue` · `needs_issue` ⇒ label `missing-issue` | `no_issue_needed` ⇒ not `needs_issue` · `author_can_write` ⇒ not `needs_issue` · `author_is_dependency_bot` ⇒ not `needs_issue` · `collaborators_not_gathered` ⇒ not `needs_issue` · `links_open_issue` ⇒ not label `missing-issue` | Yes |
 | Linked-issue deadline | `needs_issue` ∧ the flag label is at least 7 days old ⇒ `flag_expired` · `flag_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `should_close` | Yes. Closing cannot be undone by the next run; see "What is not declarative". |
 | Stale | no person has acted for 60 days ⇒ `idle` · `idle` ⇒ label `stale` · `idle` ∧ the `stale` label is at least 14 days old ⇒ `idle_expired` · `idle_expired` ⇒ `should_close` | `do_not_expire` ⇒ not `idle` | Yes, once activity means activity by a person. `actions/stale` cannot make that distinction. |
 | Duplicates | two or more open PRs close the issue ⇒ `has_duplicate_prs`, a fact of the issue · `is_duplicate`: an older open PR closes a `has_duplicate_prs` issue that the PR closes · `is_duplicate` ⇒ label `duplicate` | `allow_multiple_prs` ⇒ not `has_duplicate_prs` | Yes. Two open PRs on one issue are duplicates whatever else is true of them: a PR that is flagged, over quota or stale counts like any other. The policy counts issues of the PR's own repository only, as `pr-duplicates` does. The veto attaches to the issue, because a PR can close two issues and only one of them may carry the label. |
@@ -466,7 +466,7 @@ In the second column an arrow is a reason, and a name with a colon is a base fac
 
 `do-not-expire` appears twice, each time as one `.unless(doNotExpire)`. Today the same exemption is a list in each stale step and a condition in #10257.
 
-The policies use one definition of a maintainer: a person whom the repository lists as a collaborator with `admin`, `maintain` or `write`. `author_can_write` and the turn read the same list.
+The policies use one definition of a maintainer: a person whom the repository lists as a collaborator with `admin`, `maintain` or `write`. `author_can_write` and the turn read the same list. GitHub gives the list only to a token with push access to the repository. A run without the list knows no maintainer, so `collaborators_not_gathered` holds for every PR of that repository: no PR needs an issue and it is the turn of no author, because the alternative is to treat every maintainer as an outside contributor.
 
 ### The comment
 
