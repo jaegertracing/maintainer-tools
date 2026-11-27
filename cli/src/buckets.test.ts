@@ -334,6 +334,25 @@ test('every open PR that closes an issue is a duplicate, except the oldest', () 
   }
 });
 
+test('every open PR that shares an issue is flagged ISSUE-COLLISION, the oldest included', () => {
+  const pullRequests = [
+    pullRequestClosing(linkedIssue(), 7, hoursAgo(2)),
+    pullRequestClosing(linkedIssue(), 9, hoursAgo(3)),
+    pullRequestClosing(linkedIssue(), 8, hoursAgo(1)),
+    pullRequestClosing(linkedIssue({ number: 101 }), 10, hoursAgo(1)),
+  ];
+  const openPullRequests: OpenPullRequests = { pullRequests, quotaExemptLogins: new Set() };
+
+  assert.deepEqual(
+    pullRequests.map((pr) =>
+      classify(pr, { ...context, openPullRequests }).flags.filter((flag) =>
+        flag.startsWith('ISSUE-COLLISION'),
+      ),
+    ),
+    [['ISSUE-COLLISION: 3'], ['ISSUE-COLLISION: 3'], ['ISSUE-COLLISION: 3'], []],
+  );
+});
+
 test('the creation times of two PRs are compared as times and not as text', () => {
   const pullRequests = [
     pullRequestClosing(linkedIssue(), 7, '2026-05-01T10:00:00Z'),
@@ -908,24 +927,37 @@ test('author replies are case-insensitive for bottleneck detection', () => {
 });
 
 test('priority-author issue flags use case-insensitive membership', () => {
-  const ref = { owner: 'example', repo: 'repo', number: 1 };
   const pr = pullRequest({
     author: { login: 'priority-author', typename: 'User' },
-    computed: {
-      issueRefs: [ref],
-      issueMeta: {
-        'example/repo#1': {
-          author: 'priority-author',
-          state: 'OPEN',
-          title: 'Example issue',
-          isPullRequest: false,
-        },
-      },
-    },
+    linkedIssues: [linkedIssue({ author: 'priority-author' })],
   });
 
   assert.equal(classify(pr, context).flags.includes('SELF-FILED'), false);
 });
+
+const issueFlagCases: Array<[string, LinkedIssue[], string[]]> = [
+  [
+    'the author of the PR opened a linked issue',
+    [linkedIssue({ author: 'Contributor' })],
+    ['SELF-FILED'],
+  ],
+  ['somebody else opened the linked issue', [linkedIssue({ author: 'reporter' })], []],
+  ['the account that opened the linked issue is deleted', [linkedIssue({ author: null })], []],
+  ['the author of the linked issue was not gathered', [linkedIssue()], []],
+  ['a linked issue is closed', [linkedIssue(), linkedIssue({ state: 'CLOSED' })], ['ISSUE-CLOSED']],
+  ['the PR links no issue', [], []],
+];
+
+for (const [text, linkedIssues, expected] of issueFlagCases) {
+  test(`the issue flags of a PR are [${expected.join(', ')}] when ${text}`, () => {
+    const { flags } = classify(pullRequest({ linkedIssues }), context);
+
+    assert.deepEqual(
+      flags.filter((flag) => flag === 'SELF-FILED' || flag === 'ISSUE-CLOSED'),
+      expected,
+    );
+  });
+}
 
 test('the stale check uses the injected clock, not the wall clock', () => {
   const past = new Date('2020-01-10T00:00:00Z');

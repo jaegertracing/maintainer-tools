@@ -8,13 +8,11 @@ import { dirname } from 'node:path';
 
 import type {
   GraphqlClient,
-  IssueMeta,
   RepositoryPermission,
   PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
 import type { PrCache } from '@jaegertracing/maintainer-tools-checks/cache';
 
-import { fetchIssueMeta } from './issues.js';
 import { log } from './log.js';
 import { fetchMergedCounts } from './quota.js';
 import { scanRepos } from './scan.js';
@@ -28,15 +26,11 @@ export interface TriageSnapshot {
   now: string;
   // Login of the maintainer that the report is for.
   viewer: string;
-  // The open pull requests as GitHub returned them, without `computed`.
+  // The open pull requests as GitHub returned them.
   pullRequests: PullRequest[];
   // Merged-PR count of each author that can exceed a quota, keyed by
   // `owner/repo|login`. Absent when the run skipped the quota (--no-quota).
   mergedCounts?: Record<string, number>;
-  // Metadata of each issue that a pull request claims to close, keyed by
-  // `refKey()`. An issue that GitHub did not resolve has no entry. Absent
-  // when the run skipped the issues (--no-issues).
-  issues?: Record<string, IssueMeta>;
   // The permission of each collaborator of each repository that has an open
   // pull request, keyed by `owner/repo` and then by login. A repository
   // whose list could not be fetched has no entry; GitHub refuses the list
@@ -58,7 +52,6 @@ export interface GatherOptions {
   // The run fetches no merged-PR count for these logins, see quota.ts.
   quotaExemptLogins: Set<string>;
   skipQuota: boolean;
-  skipIssues: boolean;
 }
 
 export async function gatherSnapshot(
@@ -101,13 +94,6 @@ export async function gatherSnapshot(
     mergedCounts = await fetchMergedCounts(pullRequests, client, opts.quotaExemptLogins, { cache });
   }
 
-  let issues: TriageSnapshot['issues'];
-  if (opts.skipIssues) {
-    log('issues: enrichment skipped (--no-issues)');
-  } else {
-    issues = await fetchIssueMeta(pullRequests, client, { cache });
-  }
-
   const collaborators = await fetchCollaboratorsOfRepos(pullRequests, client);
 
   return {
@@ -115,7 +101,6 @@ export async function gatherSnapshot(
     viewer,
     pullRequests,
     mergedCounts,
-    issues,
     collaborators,
   };
 }

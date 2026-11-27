@@ -180,23 +180,6 @@ export interface PullRequest {
     // nodes. null means in-progress / neutral / skipped.
     conclusion: string | null;
   }>;
-
-  // Optional computed annotations. Filled in by the issue pass of the triage
-  // CLI (cli/src/issues.ts), which has cross-PR context that the per-PR
-  // GraphQL query can't supply.
-  computed?: {
-    // Issues this PR claims to close, parsed from the body. Closing keywords
-    // only — a bare `#N` mention is not a claim, and in practice most bare
-    // mentions point at other PRs ("follow-up to #123") rather than issues.
-    issueRefs?: IssueRef[];
-    // Metadata for each entry in `issueRefs`, keyed by `refKey()`. Absent
-    // keys mean the lookup failed or was skipped; consumers degrade to
-    // showing the bare reference.
-    issueMeta?: Record<string, IssueMeta>;
-    // Other open PRs in the same scan that claim to close one of the same
-    // issues, as `owner/repo#number`. Empty or absent means no collision.
-    collidingPrs?: string[];
-  };
 }
 
 // An issue that GitHub closes when a pull request is merged, with the state
@@ -229,15 +212,6 @@ export interface IssueRef {
   owner: string;
   repo: string;
   number: number;
-}
-
-export interface IssueMeta {
-  author: string | null;
-  state: 'OPEN' | 'CLOSED' | 'MERGED';
-  title: string;
-  // True when the referenced number turned out to be a PR. GitHub's closing
-  // keywords accept any number, and contributors do write `Fixes #<pr>`.
-  isPullRequest: boolean;
 }
 
 // Subset of GraphQL Actor __typename we care about.

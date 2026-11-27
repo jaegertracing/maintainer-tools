@@ -102,10 +102,9 @@
             "reviewRequested": false,
             "viewerReviewed": false
           },
-          "flags": [
-            "ISSUE-COLLISION: 2"
-          ],
+          "flags": [],
           "number": 1,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "first-time contributor; no maintainer response yet"
           ]
@@ -212,10 +211,10 @@
             "viewerReviewed": false
           },
           "flags": [
-            "ISSUE-COLLISION: 2",
             "NO-TESTS"
           ],
           "number": 2,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "no stronger signal"
           ]
@@ -331,6 +330,7 @@
             "NO-TESTS"
           ],
           "number": 3,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "hide:over_quota",
             "hide:no_approved_issue"
@@ -446,6 +446,7 @@
             "MERGE-CONFLICT"
           ],
           "number": 4,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "viewer in reviewRequests"
           ]
@@ -566,6 +567,7 @@
             "NO-TESTS"
           ],
           "number": 5,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "hide:dco_missing",
             "hide:merge_conflict",
@@ -675,11 +677,11 @@
             "viewerReviewed": true
           },
           "flags": [
-            "ISSUE-CLOSED",
             "QUESTION",
             "NEEDS-LABEL"
           ],
           "number": 6,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "viewer reviewed; author has acted since"
           ]
@@ -789,9 +791,16 @@
             "viewerReviewed": false
           },
           "flags": [
+            "ISSUE-COLLISION: 2",
             "NO-APPROVED-ISSUE"
           ],
           "number": 7,
+          "pullRequestsOfSameIssue": [
+            {
+              "number": 8,
+              "url": "https://github.com/example/repo/pull/8"
+            }
+          ],
           "reasons": [
             "hide:ci_failing",
             "hide:no_approved_issue"
@@ -900,9 +909,16 @@
             "viewerReviewed": false
           },
           "flags": [
+            "ISSUE-COLLISION: 2",
             "NO-APPROVED-ISSUE"
           ],
           "number": 8,
+          "pullRequestsOfSameIssue": [
+            {
+              "number": 7,
+              "url": "https://github.com/example/repo/pull/7"
+            }
+          ],
           "reasons": [
             "hide:no_approved_issue",
             "hide:is_duplicate"
@@ -1009,6 +1025,7 @@
           },
           "flags": [],
           "number": 9,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "PR touches viewer CODEOWNERS paths"
           ]
@@ -1124,6 +1141,7 @@
             "NO-APPROVED-ISSUE"
           ],
           "number": 10,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "hide:stale_on_author",
             "hide:no_approved_issue",
@@ -1241,6 +1259,7 @@
             "RESOLVED-W/O-REPLY: 1"
           ],
           "number": 11,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "hide:no_approved_issue",
             "hide:authors_turn",
@@ -1356,6 +1375,7 @@
             "MERGE-CONFLICT"
           ],
           "number": 12,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "dependency bot"
           ]
@@ -1469,6 +1489,7 @@
             "NO-TESTS"
           ],
           "number": 13,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "draft"
           ]
@@ -1585,6 +1606,7 @@
           },
           "flags": [],
           "number": 14,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "priority author"
           ]
@@ -1692,6 +1714,7 @@
           },
           "flags": [],
           "number": 15,
+          "pullRequestsOfSameIssue": [],
           "reasons": [
             "you requested changes; author has revised since"
           ]

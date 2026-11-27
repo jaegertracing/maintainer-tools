@@ -33,7 +33,10 @@ function isOlder(left: PullRequest, right: PullRequest): boolean {
   );
 }
 
-function olderPullRequestsOfSameIssue(
+// The other open pull requests that share an issue with `pr` under the
+// duplicates policy: those of its repository that close an issue of that
+// repository that `pr` closes too, unless the issue allows several.
+export function pullRequestsOfSameIssue(
   pr: PullRequest,
   pullRequests: readonly PullRequest[],
 ): PullRequest[] {
@@ -50,7 +53,7 @@ function olderPullRequestsOfSameIssue(
   return pullRequests.filter(
     (other) =>
       repositoryKeyOf(other) === repositoryKeyOf(pr) &&
-      isOlder(other, pr) &&
+      other.number !== pr.number &&
       (other.linkedIssues ?? []).some((issue) => issueKeys.has(issueKey(issue))),
   );
 }
@@ -59,7 +62,10 @@ export function isDuplicatePredicate(
   pr: PullRequest,
   { openPullRequests }: PredicateContext,
 ): BaseFactValue {
-  const olderPullRequests = olderPullRequestsOfSameIssue(pr, openPullRequests?.pullRequests ?? []);
+  const olderPullRequests = pullRequestsOfSameIssue(
+    pr,
+    openPullRequests?.pullRequests ?? [],
+  ).filter((other) => isOlder(other, pr));
   const holds = olderPullRequests.length > 0;
   return {
     holds,

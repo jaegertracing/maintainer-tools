@@ -55,12 +55,10 @@ function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
       { isResolved: false, resolvedBy: null, comments: [] },
       { isResolved: true, resolvedBy: 'x', comments: [] },
     ],
-    computed: {
-      issueRefs: [
-        { owner: 'example', repo: 'repo', number: 3 },
-        { owner: 'other', repo: 'repo', number: 9 },
-      ],
-    },
+    linkedIssues: [
+      { owner: 'example', repo: 'repo', number: 3, state: 'OPEN', labels: [] },
+      { owner: 'other', repo: 'repo', number: 9, state: 'OPEN', labels: [] },
+    ],
     ...overrides,
   };
 }

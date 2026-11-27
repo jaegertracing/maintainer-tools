@@ -61,12 +61,9 @@ Options:
                       instead of gathering one from GitHub. Needs no
                       token and no cache, and excludes the flags that
                       control the gathering: --save-snapshot, --no-cache,
-                      --no-quota, --no-issues, --limit, --pr, --viewer.
+                      --no-quota, --limit, --pr, --viewer.
   --no-quota          Skip the per-author quota computation. Faster, but
                       the report then flags no PR as over its quota.
-  --no-issues         Skip referenced-issue enrichment. Drops the issue
-                      column and the SELF-FILED / ISSUE-COLLISION /
-                      ISSUE-CLOSED flags; saves one batched query per run.
   --limit <n>         Cap PRs scanned per repo (for testing). PRs are
                       list-ordered by updated-desc, so this samples the
                       most recently active.
@@ -116,7 +113,6 @@ async function runTriage(argv: string[]): Promise<void> {
       'save-snapshot': { type: 'string' },
       snapshot: { type: 'string' },
       'no-quota': { type: 'boolean', default: false },
-      'no-issues': { type: 'boolean', default: false },
       limit: { type: 'string' },
       pr: { type: 'string' },
       explain: { type: 'boolean', default: false },
@@ -162,7 +158,6 @@ async function runTriage(argv: string[]): Promise<void> {
       limit,
       quotaExemptLogins: policy.priorityAuthors,
       skipQuota: values['no-quota'],
-      skipIssues: values['no-issues'],
     });
     cache?.close();
   }
@@ -210,15 +205,9 @@ async function runTriage(argv: string[]): Promise<void> {
 function rejectConflictingSnapshotFlags(values: Record<string, unknown>, output: string): void {
   // A run that loads the snapshot from a file gathers nothing, so a flag that
   // controls the gathering would be silently ignored.
-  const gatheringFlag = [
-    'save-snapshot',
-    'no-cache',
-    'no-quota',
-    'no-issues',
-    'limit',
-    'pr',
-    'viewer',
-  ].find((flag) => values[flag]);
+  const gatheringFlag = ['save-snapshot', 'no-cache', 'no-quota', 'limit', 'pr', 'viewer'].find(
+    (flag) => values[flag],
+  );
   if (values.snapshot && gatheringFlag) {
     throw new Error(`--snapshot cannot be combined with --${gatheringFlag}.`);
   }

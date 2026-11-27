@@ -25,9 +25,6 @@ const pullRequests = [
   pullRequest(5, 'maintainer-b', ''),
 ];
 
-const issue10 = { author: 'bob', state: 'OPEN', title: 'A bug', isPullRequest: false } as const;
-
-// GitHub resolves issue #10 and does not resolve issue #11.
 const github: GraphqlClient = {
   fetchViewerLogin: async () => 'maintainer-a',
   listOpenPRs: async () =>
@@ -42,7 +39,6 @@ const github: GraphqlClient = {
   fetchPullRequest: async (_owner, _repo, number) =>
     structuredClone(pullRequests.find((pr) => pr.number === number)!),
   countMergedPRs: async (_owner, _repo, author) => (author === 'alice' ? 2 : 99),
-  fetchIssues: async () => new Map([['example/repo#10', issue10]]),
   fetchCollaborators: async () => ({ 'maintainer-b': 'WRITE' }),
 };
 
@@ -50,7 +46,6 @@ const options: GatherOptions = {
   repos: ['example/repo'],
   quotaExemptLogins: new Set(['maintainer-b']),
   skipQuota: false,
-  skipIssues: false,
 };
 
 test('the snapshot holds everything that the run takes from GitHub', async () => {
@@ -62,7 +57,6 @@ test('the snapshot holds everything that the run takes from GitHub', async () =>
   // Only alice can exceed a quota: bob has one open pull request, and
   // maintainer-b is exempt.
   assert.deepEqual(snapshot.mergedCounts, { 'example/repo|alice': 2 });
-  assert.deepEqual(snapshot.issues, { 'example/repo#10': issue10 });
   assert.deepEqual(snapshot.collaborators, { 'example/repo': { 'maintainer-b': 'WRITE' } });
   assert.ok(Date.parse(snapshot.now) >= startMs && Date.parse(snapshot.now) <= Date.now());
 });
@@ -99,18 +93,6 @@ test('the snapshot has no merged counts when the run skips the quota', async () 
   );
 
   assert.equal(snapshot.mergedCounts, undefined);
-  assert.deepEqual(snapshot.issues, { 'example/repo#10': issue10 });
-});
-
-test('the snapshot has no issues when the run skips them', async () => {
-  const snapshot = await gatherSnapshot(
-    { ...github, fetchIssues: async () => assert.fail('the issues are skipped') },
-    null,
-    { ...options, skipIssues: true },
-  );
-
-  assert.deepEqual(snapshot.mergedCounts, { 'example/repo|alice': 2 });
-  assert.equal(snapshot.issues, undefined);
 });
 
 test('readSnapshot returns the pull requests in the order of the config repositories', (t) => {
