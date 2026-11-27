@@ -167,7 +167,7 @@ Each predicate declares which surface(s) it publishes to (Check = GitHub Checks 
 | `stale_on_you` | You're a requested reviewer, last activity > N days ago, was from author | — | — | — | no (own bucket) |
 | `bot_authored` | Author is a bot account not recognized as a dependency bot | — | — | — | yes |
 | `waiting_for_author` *(migrated)* | OR of "author must act" predicates; suppressed by `awaiting-maintainer-input` label or the unanswered-author-comment heuristic | — | — | manages `waiting-for-author` | yes (unless suppressed) |
-| `over_quota` *(migrated)* | PR carries `quota-exceeded` label or author has > M open PRs in repo | — | — | manages `quota-exceeded`. Posts a one-shot comment when the cap is first hit. | yes |
+| `over_quota` *(migrated)* | author has > M open PRs in repo | — | — | manages `quota-exceeded`. Posts a one-shot comment when the cap is first hit. | yes |
 
 The two migrated checks default to the same contributor-facing behavior as their current JS implementations to avoid regressions during cutover. `stale_on_author` is triage-only — `actions/stale` continues to own the nudge half.
 

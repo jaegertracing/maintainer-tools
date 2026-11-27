@@ -34,8 +34,8 @@ export interface PredicateContext {
   now: Date;
   // A predicate about several pull requests, such as the quota of an author,
   // reads the others from here. A consumer that does not gather the open
-  // pull requests as a set omits the field, and such a predicate then
-  // decides from the pull request alone.
+  // pull requests as a set omits the field, and the fact of such a predicate
+  // then does not hold.
   openPullRequests?: OpenPullRequests;
 }
 

@@ -262,7 +262,7 @@
               "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
-              "summary": "PR on hold — author has reached the new-contributor open-PR quota (computed)",
+              "summary": "PR on hold — author has reached the new-contributor open-PR quota",
               "triggered": true
             },
             {
@@ -1040,12 +1040,12 @@
               "triggered": true
             },
             {
-              "hidesFromTriage": true,
+              "hidesFromTriage": false,
               "id": "over_quota",
               "inDigest": false,
               "publishesCheck": false,
-              "summary": "PR on hold — author has reached the new-contributor open-PR quota (label)",
-              "triggered": true
+              "summary": "PR not quota-blocked",
+              "triggered": false
             },
             {
               "checkConclusion": "success",
@@ -1099,7 +1099,6 @@
             "firstTimer": false,
             "hideReasons": [
               "hide:stale_on_author",
-              "hide:over_quota",
               "waiting-for-author"
             ],
             "maintainerEngaged": false,
@@ -1114,8 +1113,7 @@
           ],
           "number": 10,
           "reasons": [
-            "hide:stale_on_author",
-            "hide:over_quota"
+            "hide:stale_on_author"
           ]
         },
         {

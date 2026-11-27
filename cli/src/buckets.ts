@@ -115,7 +115,7 @@ export interface ClassifyContext {
   // See TriageConfig.ignoreReviewRequestedOnYou.
   ignoreReviewRequestedOnYou: boolean;
   // The pull requests that are classified together with this one. Without
-  // them the quota is decided from its label alone.
+  // them no pull request is over a quota.
   openPullRequests?: OpenPullRequests;
 }
 
