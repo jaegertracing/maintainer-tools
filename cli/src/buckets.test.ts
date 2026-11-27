@@ -298,6 +298,100 @@ test('no PR needs an issue when the collaborators of its repository were not gat
   assert.equal(isFlaggedNoIssue(otherRepository), false);
 });
 
+function numbersOfDuplicates(pullRequests: PullRequest[]): number[] {
+  const openPullRequests: OpenPullRequests = { pullRequests, quotaExemptLogins: new Set() };
+  return pullRequests
+    .filter((pr) =>
+      classify(pr, { ...context, openPullRequests }).facets.hideReasons.includes(
+        'hide:is_duplicate',
+      ),
+    )
+    .map((pr) => pr.number);
+}
+
+function pullRequestClosing(
+  issue: LinkedIssue,
+  number: number,
+  createdAt: string,
+  overrides: Partial<PullRequest> = {},
+): PullRequest {
+  return pullRequest({ number, createdAt, linkedIssues: [issue], ...overrides });
+}
+
+test('every open PR that closes an issue is a duplicate, except the oldest', () => {
+  const pullRequests = [
+    pullRequestClosing(linkedIssue(), 7, hoursAgo(2)),
+    pullRequestClosing(linkedIssue(), 9, hoursAgo(3)),
+    pullRequestClosing(linkedIssue(), 8, hoursAgo(1)),
+    pullRequestClosing(linkedIssue({ number: 101 }), 10, hoursAgo(1)),
+  ];
+
+  assert.deepEqual(numbersOfDuplicates(pullRequests), [7, 8]);
+  // A consumer that evaluates each PR alone passes no open PRs.
+  for (const pr of pullRequests) {
+    assert.deepEqual(classify(pr, context).facets.hideReasons, []);
+  }
+});
+
+test('the creation times of two PRs are compared as times and not as text', () => {
+  const pullRequests = [
+    pullRequestClosing(linkedIssue(), 7, '2026-05-01T10:00:00Z'),
+    pullRequestClosing(linkedIssue(), 8, '2026-05-01T10:00:00.000Z'),
+    pullRequestClosing(linkedIssue(), 9, '2026-05-01T09:59:59.500Z'),
+  ];
+
+  assert.deepEqual(numbersOfDuplicates(pullRequests), [7, 8]);
+});
+
+test('of two PRs created at the same time, the one with the higher number is the duplicate', () => {
+  const createdAt = hoursAgo(1);
+  const pullRequests = [
+    pullRequestClosing(linkedIssue(), 8, createdAt),
+    pullRequestClosing(linkedIssue(), 7, createdAt),
+  ];
+
+  assert.deepEqual(numbersOfDuplicates(pullRequests), [8]);
+});
+
+test('an issue labelled allow-multiple-prs has no duplicate PR', () => {
+  const issue = linkedIssue({ labels: ['help wanted', 'allow-multiple-prs'] });
+  const pullRequests = [
+    pullRequestClosing(issue, 7, hoursAgo(2)),
+    pullRequestClosing(issue, 8, hoursAgo(1)),
+  ];
+
+  assert.deepEqual(numbersOfDuplicates(pullRequests), []);
+});
+
+test('only PRs of the repository of the issue are duplicates', () => {
+  const uiRepository = { owner: 'example', name: 'ui' };
+  const pullRequests = [
+    pullRequestClosing(linkedIssue(), 7, hoursAgo(3), { repo: uiRepository }),
+    pullRequestClosing(linkedIssue(), 8, hoursAgo(2)),
+    pullRequestClosing(linkedIssue(), 9, hoursAgo(1), { repo: uiRepository }),
+    pullRequestClosing(linkedIssue(), 10, hoursAgo(1)),
+  ];
+
+  assert.deepEqual(numbersOfDuplicates(pullRequests), [10]);
+});
+
+test('the allow-multiple-prs label of one issue does not exempt another issue of the PR', () => {
+  const issueAllowingMultiplePrs = linkedIssue({
+    number: 101,
+    labels: ['help wanted', 'allow-multiple-prs'],
+  });
+  const pullRequests = [
+    pullRequestClosing(linkedIssue(), 7, hoursAgo(2)),
+    pullRequestClosing(issueAllowingMultiplePrs, 8, hoursAgo(2)),
+    pullRequestClosing(linkedIssue(), 9, hoursAgo(1), {
+      linkedIssues: [issueAllowingMultiplePrs, linkedIssue()],
+    }),
+    pullRequestClosing(issueAllowingMultiplePrs, 10, hoursAgo(1)),
+  ];
+
+  assert.deepEqual(numbersOfDuplicates(pullRequests), [9]);
+});
+
 const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   ['draft', { isDraft: true }, 'draft'],
   ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],

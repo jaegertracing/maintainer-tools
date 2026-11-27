@@ -891,7 +891,8 @@
             "dependencyBot": false,
             "firstTimer": false,
             "hideReasons": [
-              "hide:no_approved_issue"
+              "hide:no_approved_issue",
+              "hide:is_duplicate"
             ],
             "maintainerEngaged": false,
             "priorityAuthor": false,
@@ -903,7 +904,8 @@
           ],
           "number": 8,
           "reasons": [
-            "hide:no_approved_issue"
+            "hide:no_approved_issue",
+            "hide:is_duplicate"
           ]
         },
         {

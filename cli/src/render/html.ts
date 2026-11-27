@@ -561,6 +561,8 @@ const FLAG_DESCRIPTIONS: Record<string, string> = {
     'Author has reached the new-contributor open-PR quota; this PR is on hold until an older one closes.',
   'ISSUE-COLLISION':
     'Another open PR claims to close the same issue. The count includes this PR, so `2` means one other PR is duplicating the work.',
+  'IS-DUPLICATE':
+    'An older open PR closes an issue that this PR closes, and the issue does not carry the `allow-multiple-prs` label.',
   'SELF-FILED':
     'The author of this PR also opened the issue it closes — often a manufactured task rather than a problem the project had already identified. Not applied to maintainers, interns, or priority authors.',
   'ISSUE-CLOSED':

@@ -74,7 +74,7 @@
           "repo": "repo",
           "number": 100,
           "state": "OPEN",
-          "labels": ["help wanted"]
+          "labels": ["help wanted", "allow-multiple-prs"]
         }
       ],
       "reviewThreads": []
@@ -127,7 +127,7 @@
           "repo": "repo",
           "number": 100,
           "state": "OPEN",
-          "labels": ["help wanted"]
+          "labels": ["help wanted", "allow-multiple-prs"]
         },
         { "owner": "other", "repo": "repo", "number": 7, "state": "OPEN", "labels": [] }
       ],
@@ -445,7 +445,9 @@
       "reviews": [],
       "comments": [],
       "body": "The README did not list the settings of the sampler. This change adds a table of them.",
-      "linkedIssues": [],
+      "linkedIssues": [
+        { "owner": "example", "repo": "repo", "number": 104, "state": "OPEN", "labels": ["bug"] }
+      ],
       "reviewThreads": []
     },
     {
