@@ -26,6 +26,7 @@ const pullRequests = [
 ];
 
 const github: GraphqlClient = {
+  usage: () => ({ requests: 0, pointsSpent: 0 }),
   fetchViewerLogin: async () => 'maintainer-a',
   listOpenPRs: async () =>
     pullRequests.map((pr) => ({

@@ -35,7 +35,24 @@ export interface PrSummary {
   linkedIssues: LinkedIssue[];
 }
 
+// What the requests of one client cost. Each response of GitHub reports the
+// hourly budget that the request was charged to: when it resets, and the
+// points used and left in it. GitHub charges the requests of one token to
+// more than one budget, and a run of 10 requests saw two of them.
+export interface ApiUsage {
+  requests: number;
+  // The points that each budget lost between its earliest response and its
+  // latest, added up. The sum leaves out the first request of each budget,
+  // whose cost no earlier response shows, and it includes whatever else
+  // spent the budgets of the token in that time.
+  pointsSpent: number;
+  // The points left in the budget that has the fewest. It is undefined
+  // until a response reports a budget.
+  pointsRemaining?: number;
+}
+
 export interface GraphqlClient {
+  usage(): ApiUsage;
   fetchViewerLogin(): Promise<string>;
   listOpenPRs(owner: string, repo: string): Promise<PrSummary[]>;
   // Same shape as `listOpenPRs`, but server-side filtered to PRs carrying
@@ -491,11 +508,55 @@ export function createGraphqlClient(token: string): GraphqlClient {
       hook: (
         request: Parameters<typeof withCustomRequest>[0],
         options: Parameters<typeof graphql.defaults>[0] & { url: string },
-      ) => retryRequest(() => request(options)),
+      ) => countedRequest(() => retryRequest(() => request(options))),
     },
   });
 
+  // A request that was retried counts once.
+  let requests = 0;
+  // The budgets that the responses reported, by their reset time. The
+  // responses of concurrent requests arrive in any order, so a budget keeps
+  // the lowest and the highest figures and not the first and the last.
+  const budgets = new Map<
+    string,
+    { lowestPointsUsed: number; highestPointsUsed: number; lowestPointsRemaining: number }
+  >();
+  const countedRequest = async <T>(send: () => Promise<T>): Promise<T> => {
+    requests++;
+    const response = await send();
+    const headers = (response as { headers?: Record<string, string | undefined> }).headers;
+    const resetTime = headers?.['x-ratelimit-reset'];
+    if (resetTime !== undefined) {
+      const pointsUsed = Number(headers?.['x-ratelimit-used']);
+      const pointsRemaining = Number(headers?.['x-ratelimit-remaining']);
+      const budget = budgets.get(resetTime);
+      budgets.set(resetTime, {
+        lowestPointsUsed: Math.min(budget?.lowestPointsUsed ?? pointsUsed, pointsUsed),
+        highestPointsUsed: Math.max(budget?.highestPointsUsed ?? pointsUsed, pointsUsed),
+        lowestPointsRemaining: Math.min(
+          budget?.lowestPointsRemaining ?? pointsRemaining,
+          pointsRemaining,
+        ),
+      });
+    }
+    return response;
+  };
+
   return {
+    usage: () => {
+      const reported = [...budgets.values()];
+      return {
+        requests,
+        pointsSpent: reported.reduce(
+          (sum, budget) => sum + budget.highestPointsUsed - budget.lowestPointsUsed,
+          0,
+        ),
+        ...(reported.length > 0 && {
+          pointsRemaining: Math.min(...reported.map((budget) => budget.lowestPointsRemaining)),
+        }),
+      };
+    },
+
     async fetchViewerLogin() {
       const data = await gql<{ viewer: { login: string } }>(VIEWER_QUERY);
       return data.viewer.login;
