@@ -6,6 +6,7 @@
 // contributor moves.
 //
 import {
+  hasLogin,
   labelOnlyFailure,
   mergeConflict,
   noLinkedIssue,
@@ -15,13 +16,13 @@ import {
   supportingFacts,
   type PullRequest,
   ruleSet,
+  sameLogin,
   OutputName,
   unresolvedFromReviewer,
   type Verdict,
 } from '@jaegertracing/maintainer-tools-checks';
 
 import { type CopilotReview, copilotReview } from './copilot.js';
-import { hasLogin, sameLogin } from './logins.js';
 
 export type Bucket =
   | 'priority-authors'

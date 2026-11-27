@@ -9,6 +9,7 @@ import {
   issueUrl,
   parseRefKey,
   refKey,
+  sameLogin,
   type PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
 import {
@@ -20,7 +21,6 @@ import {
   type ClassifiedPR,
 } from '../buckets.js';
 import { copilotLabel, copilotTooltip } from '../copilot.js';
-import { sameLogin } from '../logins.js';
 import {
   type BucketSection,
   formatAge,
