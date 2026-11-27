@@ -21,10 +21,10 @@ packages/checks/                  shared predicate library
 
 Two kinds of consumer sit on top of it:
 
-1. **GitHub Actions** — `pr-nudge/`, later `pr-quota/`, `pr-weekly-digest/`.
+1. **GitHub Actions** — `pr-weekly-digest/`, later `pr-quota/`.
    Each is a self-contained subfolder with its own `action.yml` and a
    committed `dist/index.js` produced by `@vercel/ncc`. Triggered by repo
-   events; writes back via the GitHub API (Check Runs, labels, comments).
+   events; writes back via the GitHub API (labels, comments).
 2. **Local CLI** — `cli/`, exposed as `maintainer-tools triage`. Runs on a
    maintainer's laptop; reads the same library, scans configured repos via
    the SQLite cache, classifies each open PR into one of nine attention
@@ -158,32 +158,14 @@ decision table lists its base facts, in the order of those rules.
   holds the injected clock and, when the consumer gathers them, the open PRs
   of the run. It returns
   the boolean, or an object with the boolean, the `summary` line that every
-  surface prints verbatim, and the `details` paragraph behind the "Details"
-  link of a check run (`BaseFactValue`). `changedBy` is the change source of
+  surface prints verbatim, and the `details` paragraph that tells the
+  author how to make the fact stop holding (`BaseFactValue`). `changedBy` is the change source of
   the fact.
 - `policy.derivedFact(name)` declares a derived fact, which takes its rules
   from `.when()` and `.unless()`.
 - `policy.triageHidden` is the Hidden bucket of the triage report, and
   `policy.weeklyDigest` is the digest comment. An output takes `.when()` and
   `.unless()` like a derived fact, and it cannot be passed to them.
-- A check run is not an output. `predicates/index.ts` lists the checks that
-  have a check run, each with the conclusion of the run when the fact of the
-  check holds: `failure`, or `neutral` for a check that is not strict enough
-  to fail CI. The run concludes `success` when the fact does not hold.
-- A check "applies" to a PR when `pr-nudge` publishes a check run of the
-  check for it. A check with a check run applies to every PR, unless the
-  policy declares the fact `<id>_applies`, and then it applies to the PRs
-  that the fact holds for. The policy declares it for the linked-issue check
-  as a derived fact with one veto for each exemption. Its reason reads a base fact that holds for
-  every PR, because a veto alone gives a fact no reason to hold:
-
-  ```typescript
-  policy
-    .derivedFact(appliesFactName('no_linked_issue'))
-    .when(isPullRequest)
-    .unless(missingIssueLabel)
-    .unless(linkedIssueExempt);
-  ```
 
 - `policy.label(name)`, `policy.comment` and `policy.close` are the outputs
   of the reconciler. `policy.labelAge(name, { of, days })` declares a label
@@ -224,9 +206,7 @@ fact. Code that handles every check in a loop takes the fact from
 `supportingFacts(verdict, output)` returns the base facts that
 make the output hold, directly or through a derived fact, and have a
 summary: the triage report names them as the reasons of the Hidden bucket,
-and the digest prints one line for each. `checkRunConclusion(id, verdict)`
-is the conclusion of the check run of a check, or undefined when the check
-has no check run or does not apply to the PR.
+and the digest prints one line for each.
 
 Three properties keep the checks trustworthy:
 
@@ -251,8 +231,7 @@ of a check has one. The triage report also reads the base fact `is_duplicate` an
 `authors_turn`, which are not checks, because no action publishes them. To add a check, export its
 predicate from a new file in `src/predicates/`, declare its base fact and its
 rules in `src/policy.ts` with the ID of the check as the name of the fact, and add
-its ID to `CHECK_IDS` in `types.ts`. A check with a check run is also listed
-in `CONCLUSION_WHEN_CHECK_HOLDS` in `predicates/index.ts`.
+its ID to `CHECK_IDS` in `types.ts`.
 
 ## Data flow
 
@@ -275,7 +254,7 @@ in `CONCLUSION_WHEN_CHECK_HOLDS` in `predicates/index.ts`.
          │ Verdict
          ▼
 ┌──────────────────┐
-│ Consumer-specific│   ← pr-nudge/src/index.ts (Check Runs)
+│ Consumer-specific│   ← pr-weekly-digest/src/index.ts (comment)
 │ side effects     │     CLI (HTML report)
 └──────────────────┘
 ```
@@ -307,7 +286,6 @@ near zero: only PRs that actually moved are re-fetched.
 
 | Consumer                      | Where it runs                      | Uses the cache? |
 | ----------------------------- | ---------------------------------- | --------------- |
-| `pr-nudge` action             | GitHub-hosted runner, per PR event | No              |
 | `pr-quota` action (P6)        | GitHub-hosted runner, per PR event | No              |
 | `pr-weekly-digest` action     | GitHub-hosted runner, daily cron   | No              |
 | `maintainer-tools triage` CLI | Maintainer's laptop, on demand     | Yes             |
@@ -338,18 +316,18 @@ main barrel; the action runtime never imports `node:sqlite`.
 Each top-level `<tool>/` folder is one GitHub Action:
 
 ```
-pr-nudge/
+pr-weekly-digest/
 ├── action.yml          declares inputs, the `node20` runtime, and `dist/index.js`
-├── src/index.ts        thin glue: parse inputs, fetch PR, evaluate the rules, emit Check Runs
+├── src/index.ts        thin glue: parse inputs, list the PRs, evaluate the rules, publish the comment
 ├── dist/index.js       COMMITTED — @vercel/ncc bundle of src + deps
 └── tsconfig.json
 ```
 
 The `dist/index.js` file is committed. That's how GitHub JS actions ship:
-the workflow `uses: jaegertracing/maintainer-tools/pr-nudge@<sha>` clones
+the workflow `uses: jaegertracing/maintainer-tools/pr-weekly-digest@<sha>` clones
 the action subfolder at that ref and runs `dist/index.js` directly — no
 `make install`, no build step on the consumer side. The `lint-build` CI
-job rebuilds and fails on `git diff --quiet pr-nudge/dist`, which is what
+job rebuilds and fails on `git diff --quiet pr-weekly-digest/dist`, which is what
 guarantees the committed bundle matches its source.
 
 An action subfolder is intentionally a _thin_ layer:
@@ -360,14 +338,14 @@ An action subfolder is intentionally a _thin_ layer:
 - Call `fetchPullRequest` from the shared library.
 - Call `ruleSet.evaluate(pr, { now })` from the shared library.
 - Read the facts of the verdict and dispatch to the appropriate surface
-  (Check Run, label, comment).
+  (label, comment).
 
 The bulk of the work — fetching, predicate evaluation, summary text —
 lives in `packages/checks`. The action is just plumbing.
 
 ### Why per-tool subfolders, not one mega-action
 
-Two reasons. (a) Independent release cadence: `pr-nudge` and
+Two reasons. (a) Independent release cadence: `pr-weekly-digest` and
 `pr-quota` can hit v1.x at different times. (b) Independent
 permission scope in consuming workflows: `pr-quota` needs label-write
 and comment-write; `pr-weekly-digest` only needs comment-write. Granting
@@ -389,15 +367,13 @@ self-heal on the next trigger; double-fires are idempotent.
 
 ## Surfaces
 
-Three output surfaces, in decreasing volume:
+Two output surfaces. No fact is published as a check run, because no fact
+of a lifecycle policy blocks a merge (RFC 0003).
 
-1. **Checks panel** — primary. Every requested check that has a check run and applies becomes
-   a `checks.create` call on the PR's head SHA. Zero notifications,
-   native UI affordance.
-2. **Labels** — state. `waiting-for-author`, `awaiting-maintainer-input`,
-   `pr-quota-reached`. Searchable, filterable. Currently read-only;
-   write support lands in P5 (`pr-nudge` migration) and P6 (`pr-quota`).
-3. **Comments** — rare. Weekly digest, slash-command acks, `over_quota`'s
+1. **Labels** — state. `waiting-for-author`, `awaiting-maintainer-input`,
+   `pr-quota-reached`. Searchable, filterable. Currently read-only; the
+   reconciler of RFC 0003 writes them once it has a write path.
+2. **Comments** — rare. Weekly digest, slash-command acks, `over_quota`'s
    one-shot explanation. Every bot comment ends with an HTML-comment
    footer the bot uses to find and **edit in place** rather than reposting.
 
@@ -468,7 +444,7 @@ GitHub, cache, clock ──▶ gatherSnapshot() ──▶ TriageSnapshot ──�
 `cli/src/quota.ts` gathers the merged-PR counts with `fetchMergedCounts()`,
 and the `over_quota` check decides the quota from them in
 `packages/checks/src/quota.ts`. A consumer that does not gather the open PRs
-as a set, such as `pr-nudge` and the weekly digest, evaluates a PR without
+as a set, such as the weekly digest, evaluates a PR without
 `openPullRequests`, so for it `over_quota`, `is_duplicate` and `authors_turn` never hold. The `over_quota` check does not
 read the `pr-quota-reached` label, because the label is the output of a
 separate evaluation of the quota policy by the pr-quota-manager workflow.
@@ -594,7 +570,7 @@ its reports.
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Add a new check         | New predicate file in `packages/checks/src/predicates/`, its fact and rules in `packages/checks/src/policy.ts`, its ID in `CHECK_IDS` in `types.ts` |
 | Expose a new PR field   | Extend `PullRequest` in `types.ts` + the GraphQL query in `graphql.ts`                                                                              |
-| Add a new action        | New top-level `<tool>/` subfolder following `pr-nudge/`'s layout                                                                                    |
+| Add a new action        | New top-level `<tool>/` subfolder following `pr-weekly-digest/`'s layout                                                                            |
 | Change a surface        | Which facts lead to it: the rules in `packages/checks/src/policy.ts`. How it is written: each action's `src/index.ts`                               |
 | Add a new event trigger | Update `resolvePrRef()` in the relevant action; document in `action.yml`                                                                            |
 | Add/rebalance a bucket  | `cli/src/buckets.ts` — adjust `BUCKET_ORDER` and the branches in `classify()`                                                                       |

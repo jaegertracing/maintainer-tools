@@ -7,7 +7,6 @@ pnpm-lock.yaml
 docs/
 
 # Ncc bundle output is generated; never format.
-pr-nudge/dist/
 pr-quota/dist/
 pr-weekly-digest/dist/
 .claude/

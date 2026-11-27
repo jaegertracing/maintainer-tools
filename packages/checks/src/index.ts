@@ -4,7 +4,6 @@
 export { CHECK_IDS, DEFAULT_POLICY_AGES, parsePolicyAges } from './types.js';
 export type {
   CheckId,
-  CheckConclusion,
   FileChange,
   IssueRef,
   LinkedIssue,
@@ -26,7 +25,6 @@ export {
   type FileClass,
 } from './composition.js';
 export { hasIssueRef, issueUrl, refKey } from './issue-refs.js';
-export { checkRunConclusion } from './predicates/index.js';
 export { commitsOfAuthor } from './predicates/authors_turn.js';
 export { pullRequestsOfSameIssue } from './predicates/is_duplicate.js';
 export {

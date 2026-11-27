@@ -234,18 +234,6 @@ importers:
         specifier: 15.26.0
         version: 15.26.0
 
-  pr-nudge:
-    dependencies:
-      '@actions/core':
-        specifier: 3.0.1
-        version: 3.0.1
-      '@actions/github':
-        specifier: 9.1.1
-        version: 9.1.1
-      '@jaegertracing/maintainer-tools-checks':
-        specifier: workspace:*
-        version: link:../packages/checks
-
   pr-weekly-digest:
     dependencies:
       '@actions/core':

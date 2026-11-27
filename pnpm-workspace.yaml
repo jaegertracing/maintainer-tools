@@ -1,6 +1,5 @@
 packages:
   - packages/*
-  - pr-nudge
   - pr-weekly-digest
   - cli
 

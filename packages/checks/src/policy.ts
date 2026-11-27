@@ -11,7 +11,7 @@ import { loadRuleSet } from './rules/evaluate.js';
 import { Policy } from './rules/model.js';
 import type { BaseFact } from './rules/model.js';
 import { assertRuleSetIsValid } from './rules/startup-check.js';
-import { agesOf, appliesFactName, CHECK_IDS } from './types.js';
+import { agesOf, CHECK_IDS } from './types.js';
 import type { CheckId } from './types.js';
 import { maintainerSpokeLastPredicate } from './predicates/authors_turn.js';
 import { ciFailingPredicate, labelOnlyFailurePredicate } from './predicates/ci_failing.js';
@@ -28,7 +28,6 @@ import {
   noIssueNeededPredicate,
 } from './predicates/needs_issue.js';
 import {
-  linkedIssueExemptPredicate,
   missingIssueLabelPredicate,
   noLinkedIssuePredicate,
 } from './predicates/no_linked_issue.js';
@@ -70,7 +69,7 @@ const maintainerSpokeLast = policy.baseFact('maintainer_spoke_last', maintainerS
 const descriptionEmpty = policy.baseFact('description_empty', descriptionEmptyPredicate, {
   changedBy: 'author',
 });
-// The digest and the check run of `pr-nudge` read `no_linked_issue`, which
+// The digest reads `no_linked_issue`, which
 // looks for a closing keyword in the PR description. The triage report
 // reads `needs_issue`, which looks at the issues that GitHub links.
 const noLinkedIssue = policy.baseFact('no_linked_issue', noLinkedIssuePredicate, {
@@ -107,12 +106,6 @@ const doNotExpire = policy.baseFact('do_not_expire', doNotExpirePredicate, {
 const missingIssueLabel = policy.baseFact('missing_issue_label', missingIssueLabelPredicate, {
   changedBy: 'author',
 });
-const linkedIssueExempt = policy.baseFact('linked_issue_exempt', linkedIssueExemptPredicate, {
-  changedBy: 'maintainer',
-});
-// A veto needs a reason to cancel. This fact holds for every PR, so that a
-// derived fact whose rules are all exemptions has a reason.
-const isPullRequest = policy.baseFact('is_pull_request', () => true, { changedBy: 'maintainer' });
 export const noTestsForCodeChange = policy.baseFact(
   'no_tests_for_code_change',
   noTestsForCodeChangePredicate,
@@ -157,15 +150,6 @@ const noLinkedIssueWithoutMissingIssueLabel = policy
   .derivedFact('no_linked_issue_without_missing_issue_label')
   .when(noLinkedIssue)
   .unless(missingIssueLabel);
-
-// The check run of `no_linked_issue` is published for a PR only when this
-// fact holds. A check run would repeat the `missing-issue` label, and an
-// exempt PR needs no issue.
-policy
-  .derivedFact(appliesFactName('no_linked_issue'))
-  .when(isPullRequest)
-  .unless(missingIssueLabel)
-  .unless(linkedIssueExempt);
 
 // The outputs of the reconciler of RFC 0003. Each policy keeps one label on
 // the pull requests that it holds for.
