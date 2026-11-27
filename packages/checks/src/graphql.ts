@@ -12,7 +12,7 @@
 import { graphql, type withCustomRequest } from '@octokit/graphql';
 import { retryRequest } from './retry.js';
 import { refKey } from './issue-refs.js';
-import { isPolicyComment } from './policy-comments.js';
+import { ACTIONS_BOT_LOGIN, isPolicyComment } from './policy-comments.js';
 import type {
   AuthorAssociation,
   AuthorTypename,
@@ -144,10 +144,6 @@ interface PullRequestNode {
     }>;
   };
 }
-
-// The login that GraphQL returns for `github-actions[bot]`, the account
-// that posts the comments of the lifecycle actions.
-const ACTIONS_BOT_LOGIN = 'github-actions';
 
 // The `pr-linked-issue` action of jaeger reads the first 20 closing issue
 // references, and the lifecycle policies keep that limit.

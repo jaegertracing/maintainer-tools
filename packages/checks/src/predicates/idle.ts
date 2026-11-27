@@ -30,7 +30,7 @@ export function lastActivityByPersonAt(pr: PullRequest): number {
 }
 
 export function quietPredicate(pr: PullRequest, context: PredicateContext): BaseFactValue {
-  const { idleDays, idleNoticeDays } = agesOf(context);
+  const { idleDays } = agesOf(context);
   const quietDays = Math.floor(
     (context.now.getTime() - lastActivityByPersonAt(pr)) / MILLISECONDS_PER_DAY,
   );
@@ -40,7 +40,9 @@ export function quietPredicate(pr: PullRequest, context: PredicateContext): Base
     summary: holds
       ? `No person has acted on the PR for ${quietDays} days (threshold: ${idleDays})`
       : `A person acted on the PR ${quietDays} days ago`,
-    details: `No person has commented on this pull request or pushed to it for ${idleDays} days. It is closed ${idleNoticeDays} days after it was labelled \`stale\`, unless someone comments or pushes before that.`,
+    details: holds
+      ? `No person has commented on this pull request or pushed to it for ${idleDays} days.`
+      : undefined,
   };
 }
 
