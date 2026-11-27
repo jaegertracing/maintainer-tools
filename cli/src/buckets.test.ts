@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import type {
   GraphqlClient,
+  LinkedIssue,
   OpenPullRequests,
   PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
@@ -26,6 +27,23 @@ const context: ClassifyContext = {
   codeownerPaths: ['src/**'],
   now,
   ignoreReviewRequestedOnYou: false,
+};
+
+const contextWithCollaborators: ClassifyContext = {
+  ...context,
+  openPullRequests: {
+    pullRequests: [],
+    quotaExemptLogins: new Set(),
+    collaborators: {
+      'example/repo': {
+        admin: 'ADMIN',
+        maintainer: 'MAINTAIN',
+        writer: 'WRITE',
+        triager: 'TRIAGE',
+        reader: 'READ',
+      },
+    },
+  },
 };
 
 function pullRequest(overrides: Partial<PullRequest> = {}): PullRequest {
@@ -195,24 +213,96 @@ test('a review request makes a blocked priority-author PR actionable', () => {
   assert.equal(classify(pr, { ...context, ignoreReviewRequestedOnYou: true }).bucket, 'hidden');
 });
 
-test('a missing-issue PR carries the NO-ISSUE flag although its body references an issue', () => {
-  const result = classify(pullRequest({ labels: ['missing-issue'] }), context);
+function linkedIssue(overrides: Partial<LinkedIssue> = {}): LinkedIssue {
+  return {
+    owner: 'example',
+    repo: 'repo',
+    number: 100,
+    state: 'OPEN',
+    labels: ['help wanted'],
+    ...overrides,
+  };
+}
 
-  assert.ok(result.flags.includes('NO-ISSUE'));
+function isFlaggedNoIssue(
+  pr: PullRequest,
+  ctx: ClassifyContext = contextWithCollaborators,
+): boolean {
+  const result = classify(pr, ctx);
+  const isFlagged = result.flags.includes('NO-ISSUE');
+  assert.equal(result.facets.hideReasons.includes('hide:no_approved_issue'), isFlagged);
+  return isFlagged;
+}
+
+const linkedIssuesCases: Array<[string, LinkedIssue[], boolean]> = [
+  ['no issue', [], true],
+  ['a closed issue', [linkedIssue({ state: 'CLOSED' })], true],
+  ['an issue without `help wanted`', [linkedIssue({ labels: ['bug'] })], true],
+  ['an issue of another organization', [linkedIssue({ owner: 'other' })], true],
+  [
+    'an approved issue whose owner GitHub spells in another case',
+    [linkedIssue({ owner: 'Example' })],
+    false,
+  ],
+  ['an open `help wanted` issue of another repository', [linkedIssue({ repo: 'ui' })], false],
+  [
+    'an approved issue beside a closed one',
+    [linkedIssue({ state: 'CLOSED' }), linkedIssue()],
+    false,
+  ],
+];
+
+for (const [linked, linkedIssues, expected] of linkedIssuesCases) {
+  test(`a PR of an outside contributor that links ${linked} ${expected ? 'needs' : 'does not need'} an issue`, () => {
+    assert.equal(isFlaggedNoIssue(pullRequest({ linkedIssues })), expected);
+  });
+}
+
+test('a PR whose linked issues were not gathered does not need an issue', () => {
+  assert.equal(isFlaggedNoIssue(pullRequest({ labels: ['missing-issue'], body: '' })), false);
 });
 
-test('the no-issue-needed label exempts a PR without an issue reference', () => {
-  const pr = pullRequest({ body: 'A fix for a typo.', labels: ['no-issue-needed'] });
+test('the no-issue-needed label exempts a PR that links no issue', () => {
+  const pr = pullRequest({ linkedIssues: [], labels: ['no-issue-needed'] });
 
-  assert.equal(classify(pr, context).flags.includes('NO-ISSUE'), false);
-  assert.ok(classify({ ...pr, labels: [] }, context).flags.includes('NO-ISSUE'));
+  assert.equal(isFlaggedNoIssue(pr), false);
+  assert.equal(isFlaggedNoIssue({ ...pr, labels: ['docs'] }), true);
+});
+
+test('an author who can write to the repository needs no issue', () => {
+  const authorCases: Array<[string, boolean]> = [
+    ['admin', false],
+    ['MAINTAINER', false],
+    ['writer', false],
+    ['triager', true],
+    ['reader', true],
+  ];
+
+  for (const [login, expected] of authorCases) {
+    const pr = pullRequest({ linkedIssues: [], author: { login, typename: 'User' } });
+    assert.equal(isFlaggedNoIssue(pr), expected, login);
+  }
+});
+
+test('a dependency bot needs no issue', () => {
+  const pr = pullRequest({ linkedIssues: [], author: { login: 'renovate-bot', typename: 'Bot' } });
+
+  assert.equal(isFlaggedNoIssue(pr), false);
+});
+
+test('no PR needs an issue when the collaborators of its repository were not gathered', () => {
+  const pr = pullRequest({ linkedIssues: [] });
+  const otherRepository = { ...pr, repo: { owner: 'example', name: 'ui' } };
+
+  assert.equal(isFlaggedNoIssue(pr, context), false);
+  assert.equal(isFlaggedNoIssue(otherRepository), false);
 });
 
 const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   ['draft', { isDraft: true }, 'draft'],
   ['waiting for author', { labels: ['waiting-for-author'] }, 'waiting-for-author'],
   ['merge conflict', { mergeable: 'CONFLICTING' }, 'hide:merge_conflict'],
-  ['missing issue', { labels: ['missing-issue'] }, 'hide:no_linked_issue'],
+  ['missing issue', { linkedIssues: [] }, 'hide:no_approved_issue'],
   [
     'requested changes still await the author',
     {
@@ -235,7 +325,7 @@ for (const [state, overrides, reason] of hiddenCases) {
       ...overrides,
     });
 
-    const result = classify(pr, context);
+    const result = classify(pr, contextWithCollaborators);
 
     assert.equal(result.bucket, 'hidden');
     assert.deepEqual(result.reasons, [reason]);
