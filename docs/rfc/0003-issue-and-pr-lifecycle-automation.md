@@ -215,7 +215,7 @@ The rules are written in TypeScript, in a fluent form. ([Why TypeScript](#typesc
 These statements are in `packages/checks/src/rules`, and `triage_hidden` is one of the outputs. The reconciler adds the following in the same shape:
 
 - `policy.label(name)`, which is a method because each label is an output, and the outputs `policy.comment` and `policy.close`.
-- `policy.labelAge(name, { of, days })`, which declares the age of a label as a base fact, and `policy.exclusive()`, which declares two outputs that must not hold together.
+- `policy.labelAge(name, { of, days })`, which declares the age of a label as a base fact and takes the number of days as a function of the context of the predicates, and `policy.exclusive()`, which declares two outputs that must not hold together.
 
 The rule form has no facts of an issue. The one sketch of this RFC that uses them, in "Derived facts, not a stored state machine", is of a later step.
 
@@ -224,13 +224,16 @@ The calls chain. A base fact has no `.when` and no `.unless`, so no rule can dec
 The whole policy is declared in one file, `packages/checks/src/policy.ts`, and each predicate is a function in `predicates/`. The idle policy reads as follows there:
 
 ```ts
-const quiet = policy.baseFact(`quiet_for_${IDLE_DAYS}_days`, quietPredicate, { changedBy: 'author' });
+const quiet = policy.baseFact('quiet', quietPredicate, { changedBy: 'author' });
 const doNotExpire = policy.baseFact('do_not_expire', doNotExpirePredicate, { changedBy: 'maintainer' });
 
 export const idle = policy.derivedFact('idle').when(quiet).unless(doNotExpire);
 const staleLabelOutput = policy.label('stale').when(idle);
 
-const staleLabelOld = policy.labelAge('stale_label_old', { of: [staleLabelOutput], days: IDLE_NOTICE_DAYS });
+const staleLabelOld = policy.labelAge('stale_label_old', {
+  of: [staleLabelOutput],
+  days: (context) => agesOf(context).idleNoticeDays,
+});
 const idleExpired = policy.derivedFact('idle_expired').when(idle, staleLabelOld);
 ```
 
@@ -251,7 +254,7 @@ policy.exclusive(missingIssueLabelOutput, unapprovedIssueLabelOutput);
 
 const flagLabelOld = policy.labelAge('flag_label_old', {
   of: [missingIssueLabelOutput, unapprovedIssueLabelOutput],
-  days: FLAG_NOTICE_DAYS,
+  days: (context) => agesOf(context).flagNoticeDays,
 });
 const flagExpired = policy.derivedFact('flag_expired').when(needsIssue, flagLabelOld);
 ```
@@ -271,7 +274,7 @@ A third reason to close a PR is one more `.when(...)` on `policy.close`. A new e
 
 Three properties of the form follow from the code.
 
-- **A veto reaches every rule that names the derived fact.** A rule that names `idle` gets `idle` after `do-not-expire`. A rule can also name the base fact `quiet_for_60_days`, which is `quiet` in the code above, and it then reads the value before the veto. The form does not prevent that, and the different name is the only thing that shows it to a reviewer.
+- **A veto reaches every rule that names the derived fact.** A rule that names `idle` gets `idle` after `do-not-expire`. A rule can also name the base fact `quiet`, and it then reads the value before the veto. The form does not prevent that, and the different name is the only thing that shows it to a reviewer.
 - **Negation exists only as a veto.** A negative statement about the inputs, such as "no linked issue is open and carries `help wanted`", is computed inside a predicate. `missing-issue` is `needs_issue` with the veto `links_open_issue`.
 - **The statements record the policy as data.** `policy.rules` holds one entry for each reason and each veto, such as `{ conclusion: 'idle', premises: ['do_not_expire'], isVeto: true }`, and `policy.baseFacts` holds each base fact with what it declares. The evaluator, the startup check and the decision tables read those two lists and nothing else.
 
@@ -338,6 +341,8 @@ The policies use one definition of a maintainer: a person whom the repository li
 
 A time rule is an invariant like the others. The clock is an input, so an age is a function of the inputs, and "closed a week after flagging" is `Age ≥ days(7) ⇒ closed`. Nothing counts down and nothing has to fire. The thresholds are inclusive: a PR that has been flagged for exactly 7 days is closed, and one that has been idle for exactly 60 days is stale.
 
+**Every age is a setting.** The `ages` key of the config holds `idleDays`, `idleNoticeDays` and `flagNoticeDays`, and 60, 14 and 7 days are their defaults. This RFC states the policies with the defaults. The context that every predicate receives carries the configured ages, so no age is a constant of the code, and the name of a fact contains none: the base fact of the idle policy is `quiet`. An age is a whole number of days and at least 1. The config loader rejects an age of zero days, because a label age of zero days holds as soon as the label is applied, and the plan would then change with its own label.
+
 **A deadline starts at a label event.** For the issue-link deadline the base timestamp is `flagged_since`: the start of the current unbroken period in which the PR carries a flag label. GitHub records it. Both the REST endpoint `issues/{number}/events` and the GraphQL `timelineItems` connection return a `labeled` and an `unlabeled` event for every label change, with the label name, the actor and a timestamp to the second. On jaeger-ui PR 4815 the two interfaces return the same five label events. The events are kept: issues of jaeger created in 2017 still return theirs. The GraphQL connection filters by event type, so the query costs one small connection per PR. A run gathers the last 100 label events of a PR and finds the start of the period by undoing them from the newest one. When the period started before the oldest gathered event, it has no date, and a label age over it does not hold. ([Why the label event and not the comment](#a-deadline-starts-at-the-label-event).)
 
 The cost is that the label has two roles: it shows the conclusion, and its event time is the start of the deadline. A maintainer who removes the label by hand restarts the week when the reconciler puts it back, and a maintainer who applies it by hand starts one. Both are visible in the timeline with the actor's name.
@@ -378,22 +383,25 @@ The name of a rule does not carry the data that a comment needs. The comment of 
 
 ```ts
 // predicates/idle.ts
-export function quietPredicate(pr: PullRequest, { now }: PredicateContext): BaseFactValue {
-  const quietDays = Math.floor((now.getTime() - lastActivityByPersonAt(pr)) / MILLISECONDS_PER_DAY);
-  const holds = quietDays >= IDLE_DAYS;
+export function quietPredicate(pr: PullRequest, context: PredicateContext): BaseFactValue {
+  const { idleDays } = agesOf(context);
+  const quietDays = Math.floor(
+    (context.now.getTime() - lastActivityByPersonAt(pr)) / MILLISECONDS_PER_DAY,
+  );
+  const holds = quietDays >= idleDays;
   return {
     holds,
     summary: holds
-      ? `No person has acted on the PR for ${quietDays} days (threshold: ${IDLE_DAYS})`
+      ? `No person has acted on the PR for ${quietDays} days (threshold: ${idleDays})`
       : `A person acted on the PR ${quietDays} days ago`,
     details: holds
-      ? `No person has commented on this pull request or pushed to it for ${IDLE_DAYS} days.`
+      ? `No person has commented on this pull request or pushed to it for ${idleDays} days.`
       : undefined,
   };
 }
 ```
 
-The comment has one line for each base fact that leads to it, through `blocked` or directly: the details of the fact, or its summary when the predicate returns no details. While the PR stays open, the comment ends with the deadline of each notice period that runs, and it states none for a PR that carries `do-not-expire`. The cost of these texts is that they are code that the decision tables do not show: a table says that a PR gets a comment, and not what the comment says.
+The comment has one line for each base fact that leads to it, through `blocked` or directly: the details of the fact, or its summary when the predicate returns no details. While the PR stays open, the comment ends with the deadline of each notice period that runs, stated with the configured age, and it states none for a PR that carries `do-not-expire`. The cost of these texts is that they are code that the decision tables do not show: a table says that a PR gets a comment, and not what the comment says.
 
 The reconciler posts a new comment, which notifies the author, in three cases, and it then minimizes its older comments:
 
@@ -412,6 +420,14 @@ The reconciler does four things in one run, and only the last one changes GitHub
 3. **Compare.** It subtracts what the PR has from the plan. The difference is a list of six kinds of change: add a label, remove a label, create a comment, edit a comment, minimize a comment, close. Minimizing applies to the older comments of the replaced actions and of the reconciler, once a newer comment has taken their place.
 4. **Apply.** It makes those changes. A PR whose plan matches its state receives no API call that changes it, so its `updated_at` does not move.
 
+Step 4 is the function `applyChanges()`. It makes the changes of each PR in the order in which the difference lists them, through a `ChangeWriter`, an interface with one method for each kind of change. The CLI implements the interface with GraphQL mutations, and the tests implement it with a stand-in that keeps the PRs in memory. Three rules bound a run in write mode:
+
+- A change that GitHub refuses ends the run with an error. The later changes of the PR depend on it, and the next run observes what was made and makes the rest.
+- A mutation is sent once and never retried, because a request that failed may have reached GitHub, and a second comment would notify the author again.
+- A run makes at most 400 changes and pauses a second after each one. The changes of one PR are made in one run or in none, so a PR whose changes do not fit is left to the next run.
+
+`maintainer-tools reconcile --write` is the run in write mode, and without the flag the command is the run in shadow mode. `--write` excludes `--snapshot`, because a saved snapshot is not the state of GitHub.
+
 The terms come from Terraform's `plan` and `apply`. A run in shadow mode stops after step 3 and reports the difference.
 
 Steps 1 to 3 are two layers with one data structure between them. "Gathering" is step 1. It is the only layer that talks to GitHub, uses the cache or reads the clock, and it returns a "snapshot": everything that the run observed, with the time of the run, as plain data. "Deciding" is steps 2 and 3. It is a function of the snapshot and the config, and it makes no call. A run can save its snapshot to a file, and a later run can decide from that file. The triage CLI has both layers in this form: `triage --save-snapshot <file>` writes the snapshot, and `triage --snapshot <file>` decides from it.
@@ -423,8 +439,8 @@ Two runs are compared by a JSON report that holds the decisions for each PR and 
 Three things remain outside the rules. Each is in the machinery once, not in each policy.
 
 - **Creating a comment cannot be repeated safely.** Adding a label twice is harmless. Creating a comment twice leaves two comments, and each notifies the author. The notification invariant makes a single run correct. Two runs at the same time would both observe that the comment is missing. The reconciler therefore runs under one concurrency group per repository. This is also why the invariant speaks of the creation time of the comment: GitHub notifies for a new comment and not for an edit, so "the author was told about this label" is the fact that a policy comment exists that was created after the PR got the label. GitHub records both times to the second, and the reconciler writes the label before the comment, so a comment that was created in the same second as the label counts. The time at which the PR got the label is the start of the current unbroken period of the label in the timeline, and the two flag labels count as one. A label that was removed and applied again has a new period, so the author is told again.
-- **The order of changes within one run.** A run can fail between two changes. The next run observes the half-finished item as it would any other and finishes the work, provided that no intermediate state makes a rule hold by accident. `apply()` therefore uses one fixed order: add labels, remove labels, create or edit the comment, minimize older comments, close. Adding before removing keeps the flagged period unbroken across a swap from `missing-issue` to `unapproved-issue`. The label precedes the comment so that the comment is newer than the label. Closing is last, after the comment that says that the PR is closed. A run that stopped between the two finds its newest comment with the text of the plan, so the next run closes the PR and posts no second comment.
-- **Closing reaches a person and cannot be taken back.** `close` is derived like any other output, but a wrong conclusion has already sent a notification by the time the next run sees better facts. Three guards follow. A run with incomplete facts ends before it derives anything. And the rules never conclude "open": the reconciler does not reopen a PR. A person reopens it, and if it still violates and its label is still at least seven days old, the next run closes it again, as #10257 specifies. A run also fetches fresh, in the same run, every PR that the plan closes from cached facts, and derives the plan again.
+- **The order of changes within one run.** A run can fail between two changes. The next run observes the half-finished item as it would any other and finishes the work, provided that no intermediate state makes a rule hold by accident. The difference therefore lists the changes of a PR in one fixed order, and `applyChanges()` makes them in that order: add labels, remove labels, create or edit the comment, minimize older comments, close. Adding before removing keeps the flagged period unbroken across a swap from `missing-issue` to `unapproved-issue`. The label precedes the comment so that the comment is newer than the label. Closing is last, after the comment that says that the PR is closed. A run that stopped between the two finds its newest comment with the text of the plan, so the next run closes the PR and posts no second comment.
+- **Closing reaches a person and cannot be taken back.** `close` is derived like any other output, but a wrong conclusion has already sent a notification by the time the next run sees better facts. Three guards follow. A run with incomplete facts ends before it derives anything. The rules never conclude "open": the reconciler does not reopen a PR. A person reopens it, and if it still violates and its label is still at least seven days old, the next run closes it again, as #10257 specifies. And a run in write mode fetches again every PR that the plan closes, because its facts may come from the cache, and derives the plans once more before it changes anything.
 
 ### Decision tables
 
@@ -436,9 +452,9 @@ Nothing guarantees that a set of rules is complete, and the word has three meani
 
 A **decision table** is generated for each output. A generator enumerates the combinations of the base facts that the output depends on through the layers, evaluates the rules, and writes one row per combination: the result, and the names of the reasons and vetoes of that output that held. Rows that differ only in a base fact that does not matter are merged. The tables are committed files. A PR that adds a rule changes them, and the reviewer reads the consequences as a diff: which combinations now close, and which no longer carry a label. A row with no reason is a combination that the rules say nothing about, and it is there to be read.
 
-The table of `label:stale` in the prototype is the smallest one. It is shown here with the base fact under the name `quiet_for_60_days`:
+The table of `label:stale` in the prototype is the smallest one:
 
-| quiet_for_60_days | do_not_expire | `label:stale` | reasons that held | vetoes that held |
+| quiet | do_not_expire | `label:stale` | reasons that held | vetoes that held |
 |---|---|---|---|---|
 | yes | yes | no | | |
 | yes | no | **yes** | idle | |
@@ -485,14 +501,14 @@ seeded: label-age-outside-notice-form
 
 **The representation that this requires.** A check at load time cannot look inside a function. The statements of the builder therefore produce data, in two parts.
 
-- A **base fact** is a named boolean, such as `quiet_for_60_days` for "no person has acted on the pull request for 60 days". Its predicate is opaque code. What the check knows about it is declared: its change source (`changedBy`) and, for a label age, which labels it measures.
+- A **base fact** is a named boolean, such as `quiet` for "no person has acted on the pull request for the configured number of days". Its predicate is opaque code. What the check knows about it is declared: its change source (`changedBy`) and, for a label age, which labels it measures.
 - A **rule** is data: its conclusion, its premises, which are the names of the facts that must all hold, and whether it is a veto. It contains no code.
 
 A threshold lives inside a predicate, so the check sees booleans only. A base fact whose predicate reads other items, such as `is_duplicate`, is one free boolean of the enumeration.
 
 One change source per base fact is a simplification that the check for an output that no person can clear depends on. `no_approved_issue` has the change source `author`, although a maintainer who adds `help wanted` to the issue changes it too.
 
-**The size of the space.** The figures of this paragraph are measured on the prototype. It declares a base fact and its vetoes in one statement, so its count has no reason from `quiet_for_60_days` to `idle`, and it does not hold the facts of the checks. Its policies are 25 rules over 14 base facts. The check does not enumerate the full product of 16,384 combinations. It enumerates, for each output and each declared exclusion, only the base facts that the output depends on through the layers: eight for `close` and eight for `comment`, which is 256 rows each. The cost then grows with the widest single output and not with the number of policies. The structural part and the enumeration together take about 40 ms.
+**The size of the space.** The figures of this paragraph are measured on the prototype. It declares a base fact and its vetoes in one statement, so its count has no reason from `quiet` to `idle`, and it does not hold the facts of the checks. Its policies are 25 rules over 14 base facts. The check does not enumerate the full product of 16,384 combinations. It enumerates, for each output and each declared exclusion, only the base facts that the output depends on through the layers: eight for `close` and eight for `comment`, which is 256 rows each. The cost then grows with the widest single output and not with the number of policies. The structural part and the enumeration together take about 40 ms.
 
 Enumeration of booleans is a complete decision procedure at this size, so the check proves what it reports and needs no solver. Both parts therefore run whenever the rule set is loaded: the structural part and, when it passes, the enumeration.
 
@@ -500,7 +516,7 @@ Enumeration of booleans is a complete decision procedure at this size, so the ch
 
 **Where the check runs.** The rules live in `maintainer-tools` and nowhere else, and every repository gets the same rules. The check and the decision-table tests run in the CI of `maintainer-tools` on every change to the rules, and a change that fails them is not merged or released. A calling repository carries no rule definitions and needs no lint action of its own: the version that it pins has already passed. The reconciler runs the same check again when it loads, which costs milliseconds and stops a build that reached a repository without passing CI.
 
-**Per-repository input.** The policies of today need none. The label names, the thresholds, the quota tiers, the dependency bots and the link to the contributing guidelines are the same in jaeger and jaeger-ui, so they are part of the rules. Who is a maintainer and which organization the repository belongs to are observed from GitHub. A calling workflow passes two operational inputs: the token and the mode, shadow or write. The action validates the mode when it starts and stops on a value that it does not know. If a value ever has to differ between repositories, it is added as a named parameter of a predicate, with a declared type and range that the action validates at startup, and never as a rule.
+**Per-repository input.** The label names, the quota tiers, the dependency bots and the link to the contributing guidelines are the same in jaeger and jaeger-ui, so they are part of the rules. The ages are settings of the config, as "Time and history" states, and the policies of today are their defaults. Who is a maintainer and which organization the repository belongs to are observed from GitHub. A calling workflow passes two operational inputs: the token and the mode, shadow or write. The action validates the mode when it starts and stops on a value that it does not know. If another value ever has to differ between repositories, it is added as the ages are: a named setting that the predicates read from their context, with a declared type and range that the loader validates at startup, and never as a rule.
 
 **On failure** the reconciler exits with an error before its first query. The message names the kind of violation and the rules involved, and for a failure found by enumeration it prints the row: the value of each base fact, and the rules that held.
 
@@ -622,8 +638,11 @@ The comment is where the author reads the flags against the PR. "The comment" de
 The reconciler takes the place of the digest with a reminder policy. ([Why a policy and not the action](#the-reminder-is-a-policy-of-the-reconciler).) The reminder is one more reason for the comment, in the same form as the other policies. The sketch is of step 8 of the migration, and none of it is built:
 
 ```ts
-const quietForAWeek = policy.baseFact('quiet_for_a_week', quietForAWeekPredicate, { changedBy: 'author' });
-const reminderDue = policy.derivedFact('reminder_due').when(authorsTurn, quietForAWeek);
+// The age of the reminder, a week by default, is one more setting of `ages`.
+const quietForReminder = policy.baseFact('quiet_for_reminder', quietForReminderPredicate, {
+  changedBy: 'author',
+});
+const reminderDue = policy.derivedFact('reminder_due').when(authorsTurn, quietForReminder);
 policy.comment.when(reminderDue);
 ```
 
@@ -954,7 +973,7 @@ The migration is one switch-over per repository and not a takeover policy by pol
 1. ✅ **Move the checks and the triage CLI to the fact layer.** This step is a refactoring. It adds no policy and no output of the reconciler. The first PR ([#101](https://github.com/jaegertracing/maintainer-tools/pull/101)) is the foundation for regression testing and changes no production logic. It adds the decisions-only JSON report, `--save-snapshot`, `--snapshot` and a fixture, and its `--snapshot` runs the unchanged fetching and deciding functions against a GitHub client that answers each call by a lookup in the snapshot. The second PR ([#107](https://github.com/jaegertracing/maintainer-tools/pull/107)) is the refactoring into gathering and deciding, which removes that client, and the snapshot comparison of the first PR verifies it. The next PRs add the rule form, the evaluator and the startup check ([#102](https://github.com/jaegertracing/maintainer-tools/pull/102)) and declare the predicates as facts ([#103](https://github.com/jaegertracing/maintainer-tools/pull/103)). The last PR ([#106](https://github.com/jaegertracing/maintainer-tools/pull/106)) makes `pr-nudge` and the triage CLI read the facts directly and removes the result record of each check. Every PR after the first is verified in the same way: the JSON report of the code before it and of the code after it, both decided from one saved snapshot of the open PRs of jaeger and jaeger-ui, must be identical.
 2. ✅ **The policies that the triage CLI computes itself.** Quota, duplicates, the turn and the issue link become policies, and the copies in the CLI and in the predicates are deleted. The same comparison of reports guards each PR. A difference is either a defect of the old copy, which the PR description lists, or a defect of the policy. Delivered by the quota ([#111](https://github.com/jaegertracing/maintainer-tools/pull/111), [#114](https://github.com/jaegertracing/maintainer-tools/pull/114)), the issue link ([#115](https://github.com/jaegertracing/maintainer-tools/pull/115)), duplicates ([#116](https://github.com/jaegertracing/maintainer-tools/pull/116)), the turn ([#123](https://github.com/jaegertracing/maintainer-tools/pull/123)) and the issue column of the report ([#126](https://github.com/jaegertracing/maintainer-tools/pull/126)), with the PRs that gather their inputs between them.
 3. **The reconciler in shadow mode.** The outputs (labels, the comment, the closing), the plan, the difference and the `reconcile` command, on the facts of steps 1 and 2. `reconcile` saves a snapshot and decides from one as `triage` does. The backtest below is repeated on this code. This step also deletes the `pr-nudge` action, the `applies` facts and the table of results, and nothing replaces them, as "No fact of the policy blocks a merge" describes. The deletion removes the fields `publishesCheck` and `checkConclusion` of each check from the JSON report of the triage CLI, which is why it is not part of step 1.
-4. **The write path.** No `apply()` function exists: a run ends with the difference and reports it. `apply()` gets the fixed order of changes, the pacing of comment creation, and the behaviour of a run that stops halfway, and it is tested against the in-memory stand-in for GitHub.
+4. **The write path.** Two layers. `applyChanges()` makes the changes of the difference through a `ChangeWriter`, with the fixed order of changes, the limit and the pause of a run, and the behaviour of a run that stops halfway, and it is tested against an in-memory stand-in for GitHub. `reconcile --write` sends the changes to GitHub as GraphQL mutations, after it has fetched again every PR that the plan closes. "Plan and apply" and "What is not declarative" state the rules of both.
 5. **The workflow and the action.** One action bundle and one workflow file per repository, with the real triggers, the lock for the whole repository, and the cache as an artifact of the previous run behind the `FactCache` interface. This step also checks that the token of a workflow may list the collaborators of the repository, which the backtest did not show because it used a maintainer's token.
 6. **Shadow mode in Actions, in jaeger and jaeger-ui.** Each repository gets the final workflow in shadow mode. It repeats the backtest on every event and every day, so it shows the event load, the API cost with the cache and without it, and the deadlines as they pass. Every difference is assigned to one of three classes: a defect in the rules, which is fixed; a defect of the existing actions, such as a label that a missed event left wrong; or an intended change of behaviour.
 7. **Cut over each repository in one PR.** When every remaining difference is an intended change, one PR per repository removes the old workflows and actions, restricts `actions/stale` to issues, and switches the reconciler to write mode. jaeger-ui goes first, because it has fewer open PRs and its backfill is already applied. The old actions that jaeger-ui pins by commit stay reachable after jaeger deletes them, so the order is a choice and not a constraint. Replacing `actions/stale` for PRs supersedes the decision of the `maintainer-tools` RFC to keep `stale.yml` as it is [\[10\]](https://github.com/jaegertracing/maintainer-tools/blob/main/docs/rfc/0001-maintainer-pr-triage-tooling.md).
@@ -1026,7 +1045,7 @@ The first defect is the motivating case once more: one actor read what another a
 - **Label ages.** A flag label or a `stale` label that an old action applied has its event in the timeline. The notice periods continue from those events and do not restart. A PR that receives its label from the reconciler's first run gets the full period from that run.
 - **Existing bot comments.** The reconciler recognizes a "policy comment" in two ways. A hidden marker identifies one whoever posted it: the linked-issue marker, the duplicate marker, and the reconciler's own marker. The comments of the quota workflow and of `actions/stale` carry no marker, so their visible phrases identify one only in a comment of `github-actions[bot]`, which also posts comments about no policy. The reconciler edits and minimizes only the comments of `github-actions[bot]`, and its own marker makes a comment its own only there. The newest of them becomes its one comment and is rewritten in place, which sends no notification, and the others are minimized. An old comment that was created after the PR got the label counts as the notification, so a PR that was already told is not told again. `pr-linked-issue` and `actions/stale` post their comment up to one second before their label, so a comment of a replaced action also counts when it precedes the label by less than a minute. The comment of the reconciler follows its label and gets no such allowance. A marked comment that a maintainer's account posted through the local script counts as the notification too. The reconciler does not edit or minimize it, so it stays visible with its text; "Open Questions" asks whether it should be minimized. When the rules derive no comment for a PR, a comment of a replaced action is left as it is too, because nothing says that its text is wrong. The recognition of the old texts is deleted when no open PR carries one.
 - **The `duplicate` ownership marker.** It is ignored. A `duplicate` label on a PR that the rules do not derive is removed, whoever applied it. The shadow report lists these PRs before the cutover.
-- **The first run in write mode.** The shadow report of the day is the list of what that run does. It is read for two things before the cutover: the PRs that the run would close, and the number of comments that it would create. In the backtest the run would close no PR, and it would create 142 comments in jaeger, for the PRs that were never flagged, and 2 in jaeger-ui. GitHub allows 80 content-creating requests per minute and 500 per hour [\[8\]](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api), so `apply()` paces itself, and a run that stops early is continued by the next one, because a half-applied plan is an observed state like any other.
+- **The first run in write mode.** The shadow report of the day is the list of what that run does. It is read for two things before the cutover: the PRs that the run would close, and the number of comments that it would create. In the backtest the run would close no PR, and it would create 142 comments in jaeger, for the PRs that were never flagged, and 2 in jaeger-ui. GitHub allows 80 content-creating requests per minute and 500 per hour [\[8\]](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api), so `applyChanges()` limits and paces a run, and a run that stops early is continued by the next one, because a half-applied plan is an observed state like any other.
 
 ### Rollback
 
@@ -1038,7 +1057,7 @@ The cutover is one PR per repository, and reverting it is the rollback: the old 
 - **Deadlines that start with the reconciler's own label.** In shadow mode no label is applied, so the notice period of a PR that the old actions never flagged does not start. Its closing a week later is not backtested. The decision tables and the scenario tests cover that path.
 - **Closing, so far.** The backtest planned no closing, because no deadline had passed. The oldest flag label in either repository was applied on November 20, two days before the run. Of the idle PRs that carry `stale`, none had carried it for 14 days: in jaeger-ui the label had been removed and was applied again on November 21. Shadow mode in Actions shows the first closings as the deadlines pass.
 - **The event load.** The backtest was two runs per repository from a laptop. The wait for the lock, the replaced pending runs and the API cost of a busy hour are not exercised until the workflow exists.
-- **The write path.** Creating the comment, the order of changes, a run that fails halfway and GitHub's limits on content creation are not exercised, and `apply()` is not written.
+- **The write path.** Creating the comment, the order of changes, a run that fails halfway and GitHub's limits on content creation are not exercised by a run that changes nothing.
 - **Whether a difference is a defect of the rules or of the old actions.** The observed state is itself partly wrong, so each difference has to be read by a person.
 - **How contributors react** to one combined comment and to labels that return after a hand edit.
 
@@ -1048,7 +1067,7 @@ The cutover is one PR per repository, and reverting it is the rollback: the old 
 
 - **Events that GitHub does not send stay unsent.** Linking an issue through the sidebar and labelling an issue in another repository still fire nothing. The scheduled run bounds the delay to a day, as #10257 does.
 - **The cutover is one large change per repository.** Every policy changes hands in one PR, and the first run in write mode creates a notifying comment on every PR that was never flagged, 142 in jaeger on the day of the backtest, and closes the PRs whose deadline has passed. The shadow report lists both beforehand. A rollback stops further changes and does not undo these.
-- **Nothing has changed GitHub yet.** No write mode exists, and no workflow or action bundle. The cache is the SQLite file of the CLI and not an artifact of a previous run. Whether the token of a workflow may list the collaborators of a repository was not checked.
+- **Nothing has changed GitHub yet.** No run in write mode has been made against a repository, and no workflow or action bundle exists. The cache is the SQLite file of the CLI and not an artifact of a previous run. Whether the token of a workflow may list the collaborators of a repository was not checked.
 - **The backtest covers the rules, and not closing, the event load or the write path.** "What shadow mode cannot show" lists the gaps.
 - **The comment does not list every fact that holds against a PR.** It lists the base facts behind `blocked` and `idle`, and the facts of the checks only when the reminder is due. A fact of the checks on a PR that has none of these reasons, such as `description_empty` on a new PR, reaches the maintainer through the triage report and does not reach the author.
 - **`stale_on_author` reads what the reconciler writes.** Its predicate tests the `stale` label and `updatedAt` of the PR. Only `triage_hidden` reads the fact, so the plan does not depend on it, and the Hidden bucket of the triage report follows the writes of the reconciler through it.
