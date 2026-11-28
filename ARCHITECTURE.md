@@ -537,6 +537,12 @@ first three steps, and a run changes nothing on GitHub.
   which a run in write mode would make them: labels added, labels removed,
   the comment, the closing. `reconcile()` in `reconciler/reconcile.ts` does
   both steps for every open PR.
+- **Apply.** `applyChanges()` in `reconciler/apply.ts` makes the changes
+  through a `ChangeWriter`, one PR after the other, with a pause after each
+  change. A change that GitHub refuses ends the run, and the next run
+  observes what was made and makes the rest. A run makes at most
+  `MAX_CHANGES_PER_RUN` changes and postpones the PRs that do not fit. It
+  changes no PR that was closed or merged after it observed the PR.
 
 A change to the comment is one of three. A new comment is posted when the
 author was not told about a reason, when the PR is closed, and when nothing
