@@ -1,0 +1,23 @@
+{
+  "_comment": "Example config for the Jaeger org. Copy to ~/.config/maintainer-tools/config.json. `viewer` is omitted — the CLI fetches it from the GraphQL `viewer` query when not set.",
+  "repos": [
+    "jaegertracing/jaeger",
+    "jaegertracing/jaeger-ui",
+    "jaegertracing/jaeger-idl",
+    "jaegertracing/documentation"
+  ],
+  "maintainers": ["yurishkuro", "albertteoh", "jkowall", "joe-elliott", "mahadzaryab1"],
+  "interns": [
+    "Nabil-Salah",
+    "parship12",
+    "parshipcy",
+    "SoumyaRaikwar",
+    "swetalin-10",
+    "Manik2708",
+    "lopster568",
+    "sksingh2005"
+  ],
+  "priorityAuthors": ["ysh-bot"],
+  "priorityLabels": ["priority:high", "priority:medium", "priority:low"],
+  "ignoreReviewRequestedOnYou": false
+}

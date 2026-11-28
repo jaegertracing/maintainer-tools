@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - pr-weekly-digest
+  - lifecycle-reconciler
   - cli
 
 allowBuilds:

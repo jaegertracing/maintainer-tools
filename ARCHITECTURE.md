@@ -289,27 +289,32 @@ near zero: only PRs that actually moved are re-fetched.
 | `pr-quota` action (P6)        | GitHub-hosted runner, per PR event | No              |
 | `pr-weekly-digest` action     | GitHub-hosted runner, daily cron   | No              |
 | `maintainer-tools triage` CLI | Maintainer's laptop, on demand     | Yes             |
+| `lifecycle-reconciler` action | GitHub-hosted runner, every event  | Yes             |
 
-Two reasons the actions don't use it. (a) Ephemeral filesystem: GitHub-hosted
+Two reasons the first two do not use it. (a) Ephemeral filesystem: GitHub-hosted
 runners are wiped after every job, so a SQLite file would never survive to
 the next invocation without `actions/cache`. (b) Wrong access pattern: each
 action fires on one PR and exits — cache hit rate is approximately zero. The
 cache's value comes from amortizing "fetch 250 PRs across 5 repos" down to
 "fetch the 3 that moved overnight," which is a CLI scenario.
 
-If we ever want multi-PR scanning inside an action (e.g. an org-wide nightly
-job), the options are (a) accept the cold-fetch cost, (b) plug in
-`actions/cache` around the SQLite file, or (c) keep state in a GitHub issue
-body / gist. None of those are on the roadmap.
+The `lifecycle-reconciler` action has the access pattern of the CLI: every
+run covers all open PRs of the repository, and few of them changed since
+the previous run. It keeps the SQLite file between runs as a workflow
+artifact. Each run uploads the file, and the next run downloads it from the
+previous run of the same workflow. An artifact is used and not
+`actions/cache` because any workflow of the default branch can save a cache
+entry, while an artifact belongs to the run that uploaded it.
 
 The cache is backed by Node's built-in `node:sqlite` module (added in
 22.5.0, stable in recent releases). No native compilation, no install
 scripts, no platform-specific binaries. Repo engines requirement is
-`>=22.5.0` for that reason; GitHub Actions still ship on the `node20`
-runtime since they don't touch the cache. To keep the cache out of every
-action's ncc bundle, it is exposed via a **subpath** import
+`>=22.5.0` for that reason. `pr-weekly-digest` declares the `node20`
+runtime, which lacks the module. To keep the cache out of its ncc bundle,
+the cache is exposed via a **subpath** import
 (`@jaegertracing/maintainer-tools-checks/cache`) rather than from the
-main barrel; the action runtime never imports `node:sqlite`.
+main barrel. `lifecycle-reconciler` is a composite action that sets up
+Node.js 24 and runs its bundle with it.
 
 ## Actions: layout and bundling
 
@@ -342,6 +347,23 @@ An action subfolder is intentionally a _thin_ layer:
 
 The bulk of the work — fetching, predicate evaluation, summary text —
 lives in `packages/checks`. The action is just plumbing.
+
+### The `lifecycle-reconciler` action
+
+```
+lifecycle-reconciler/
+├── action.yml          composite: set up Node.js, restore the cache, run the bundle, save the cache
+├── src/index.ts        the `reconcile` command of the CLI as the entry point of the bundle
+├── dist/               COMMITTED — @vercel/ncc bundle of src, cli/src and packages/checks
+└── example-*.yml       the two workflow files of a repository that uses the action
+```
+
+The action is the `reconcile` command of `cli/` with the repository of the
+workflow as its only repo. `action.yml` writes the config of that command
+from the inputs, so the action and the CLI share the gathering, the cache,
+the plan and the write path. The action is composite and not a JavaScript
+action because the steps that restore and save the cache call the `gh` CLI
+and `actions/upload-artifact`.
 
 ### Why per-tool subfolders, not one mega-action
 

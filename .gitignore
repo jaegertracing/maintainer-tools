@@ -12,6 +12,8 @@ triage.xlsx
 !pr-quota/dist/**
 !pr-weekly-digest/dist/
 !pr-weekly-digest/dist/**
+!lifecycle-reconciler/dist/
+!lifecycle-reconciler/dist/**
 
 # Logs and runtime artifacts
 *.log

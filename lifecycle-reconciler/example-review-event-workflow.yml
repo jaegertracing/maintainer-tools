@@ -1,0 +1,24 @@
+# Example of the second workflow of a repository that uses the
+# lifecycle-reconciler action. It goes to
+# `.github/workflows/lifecycle-reconciler-review-event.yml`.
+#
+# GitHub runs a review event of a pull request from a fork with the workflow
+# file of the fork and a read-only token. This workflow therefore does
+# nothing, and its completion starts the reconciler through `workflow_run`,
+# which runs the workflow file of the default branch.
+
+name: 'Lifecycle Reconciler Review Event'
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request_review_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  signal-review-event:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'true'

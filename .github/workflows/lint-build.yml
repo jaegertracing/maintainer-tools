@@ -36,9 +36,9 @@ jobs:
       # Committed action bundles must match their source because GitHub runs them directly.
       - name: Ensure action bundles are in sync with src
         run: |
-          if ! git diff --quiet --exit-code -- pr-weekly-digest/dist; then
+          if ! git diff --quiet --exit-code -- pr-weekly-digest/dist lifecycle-reconciler/dist; then
             echo "::error::Action bundles are out of date. Run \`make build\` and commit the result."
-            git --no-pager diff -- pr-weekly-digest/dist | head -200
+            git --no-pager diff -- pr-weekly-digest/dist lifecycle-reconciler/dist | head -200
             exit 1
           fi
 

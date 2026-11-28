@@ -26,6 +26,11 @@
       "@jaegertracing/maintainer-tools-checks/digest": ["./packages/checks/src/digest.ts"]
     }
   },
-  "include": ["packages/*/src/**/*", "pr-weekly-digest/src/**/*", "cli/src/**/*"],
+  "include": [
+    "packages/*/src/**/*",
+    "pr-weekly-digest/src/**/*",
+    "lifecycle-reconciler/src/**/*",
+    "cli/src/**/*"
+  ],
   "exclude": ["**/dist/**", "**/node_modules/**"]
 }

@@ -15,13 +15,14 @@ event-reactive logic, no surprises on re-runs.
 
 ## What's shipped
 
-| Component                                                        | Lives in            | Who runs it                     | Output                                                                                      |
-| ---------------------------------------------------------------- | ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
-| **[Triage report (CLI)](#triage-report-cli)**                    | `cli/`              | A maintainer, locally on demand | Self-contained HTML file grouping open PRs by attention category                            |
-| **[Reconciler shadow run (CLI)](#reconciler-shadow-run-cli)**    | `cli/`              | A maintainer, locally on demand | Report of the labels, comments and closings that the lifecycle reconciler would apply       |
-| **[`pr-weekly-digest` action](#pr-weekly-digest-github-action)** | `pr-weekly-digest/` | GitHub Actions, daily cron      | One PR comment per `waiting-for-author` PR per ISO week, edited in place when state changes |
+| Component                                                                | Lives in                | Who runs it                                               | Output                                                                                      |
+| ------------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **[Triage report (CLI)](#triage-report-cli)**                            | `cli/`                  | A maintainer, locally on demand                           | Self-contained HTML file grouping open PRs by attention category                            |
+| **[Reconciler shadow run (CLI)](#reconciler-shadow-run-cli)**            | `cli/`                  | A maintainer, locally on demand                           | Report of the labels, comments and closings that the lifecycle reconciler would apply       |
+| **[`lifecycle-reconciler` action](#lifecycle-reconciler-github-action)** | `lifecycle-reconciler/` | GitHub Actions, on PR, issue and comment events and daily | The same report in the job summary, and in write mode the changes themselves                |
+| **[`pr-weekly-digest` action](#pr-weekly-digest-github-action)**         | `pr-weekly-digest/`     | GitHub Actions, daily cron                                | One PR comment per `waiting-for-author` PR per ISO week, edited in place when state changes |
 
-All three read the facts of the same [predicate catalog](#predicate-catalog).
+All of them read the facts of the same [predicate catalog](#predicate-catalog).
 
 ---
 
@@ -274,6 +275,45 @@ each, and the points left are those of the budget that has the fewest.
 
 ---
 
+## `lifecycle-reconciler` GitHub Action
+
+The action runs the [reconciler](#reconciler-shadow-run-cli) on the open
+PRs of the repository that calls it. It writes the report of the run to the
+job summary. A run is a shadow run unless the `write` input is `true`.
+
+### Use it from your workflow
+
+A repository needs two workflow files, which are copied from
+[`lifecycle-reconciler/example-workflow.yml`](lifecycle-reconciler/example-workflow.yml)
+and
+[`lifecycle-reconciler/example-review-event-workflow.yml`](lifecycle-reconciler/example-review-event-workflow.yml).
+The first one runs the action on PR, issue and comment events and once a
+day, under one concurrency group for the whole repository. GitHub runs a
+review event of a PR from a fork with the workflow file of the fork. The
+second workflow therefore does nothing on a review event, and its
+completion starts the first one.
+
+### Inputs
+
+| Input          | Default               | Meaning                                                                                                      |
+| -------------- | --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `github-token` | `${{ github.token }}` | Token of the workflow. Write mode refuses any other token, see [the reconciler](#reconciler-shadow-run-cli). |
+| `write`        | `false`               | If `true`, the run makes the changes that it reports.                                                        |
+| `ages`         | `{}`                  | The [`ages`](#configuration) of the CLI config as a JSON object, for example `{"idleDays": 90}`.             |
+
+### The cache between runs
+
+A run fetches in full only the PRs that changed since the previous run. It
+keeps the rest in the SQLite cache of the CLI, which each run uploads as
+the workflow artifact `lifecycle-reconciler-cache` and the next run
+downloads. A run takes the cache only from a run that executed the workflow
+file of the default branch, which excludes the runs of a PR that changes
+the file. A cache is used for one day, and the next run then starts from an
+empty one. A cache that is missing or expired costs requests and changes no
+result.
+
+---
+
 ## `pr-weekly-digest` GitHub Action
 
 Cron-driven action that nudges contributors whose PR has been stuck
@@ -513,10 +553,11 @@ identity, e.g. a fine-grained PAT stored in `secrets.MY_PAT`.
 
 Required scopes / permissions:
 
-| Component                   | Required permissions                                      |
-| --------------------------- | --------------------------------------------------------- |
-| Triage CLI                  | `repo` (read), `read:user`                                |
-| `pr-weekly-digest` workflow | `contents: read`, `pull-requests: write`, `issues: write` |
+| Component                       | Required permissions                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Triage CLI                      | `repo` (read), `read:user`                                                                                                                |
+| `pr-weekly-digest` workflow     | `contents: read`, `pull-requests: write`, `issues: write`                                                                                 |
+| `lifecycle-reconciler` workflow | `actions`, `checks`, `contents` and `statuses`: `read`, and `pull-requests` and `issues`: `read` for a shadow run, `write` for write mode |
 
 ---
 
@@ -525,8 +566,8 @@ Required scopes / permissions:
 The CLI's local cache uses Node's built-in `node:sqlite` module, which
 landed in **Node 22.5**. Older Node versions will run the CLI with the
 cache disabled (a warning is logged, every PR is re-fetched). The
-GitHub Actions ship on the `node20` runtime — they don't touch the
-cache, so they're unaffected.
+`pr-weekly-digest` action runs on the `node20` runtime and does not touch
+the cache. The `lifecycle-reconciler` action sets up Node.js 24 itself.
 
 ---
 
