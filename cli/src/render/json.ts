@@ -6,7 +6,6 @@
 import {
   CHECK_FACTS,
   CHECK_IDS,
-  checkRunConclusion,
   labelOnlyFailure,
   supportingFacts,
   OutputName,
@@ -46,14 +45,11 @@ function checksOf(verdict: Verdict): object[] {
   const factsSupportingHidden = supportingFacts(verdict, OutputName.TriageHidden);
   return CHECK_IDS.map((id) => {
     const triggered = verdict.holds(CHECK_FACTS[id]);
-    const checkConclusion = checkRunConclusion(id, verdict);
     return {
       id,
       triggered,
       summary: verdict.summary(id),
       details: verdict.details(id),
-      publishesCheck: checkConclusion !== undefined,
-      checkConclusion,
       inDigest: factsSupportingDigest.includes(id),
       hidesFromTriage: factsSupportingHidden.includes(id),
       ...(id === 'ci_failing' && triggered

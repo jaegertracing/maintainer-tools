@@ -1,7 +1,7 @@
 // Shared types for the predicate library.
 //
 // Every check is a base fact of a PR, declared in predicates/ with the surfaces
-// (Checks panel, weekly digest, triage report) that it appears on.
+// (weekly digest, triage report) that it appears on.
 // See the RFC: docs/rfc/0001-maintainer-pr-triage-tooling.md ("Predicate library").
 
 // The checks, in the order in which the JSON report lists them.
@@ -19,14 +19,6 @@ export const CHECK_IDS = [
 ] as const;
 
 export type CheckId = (typeof CHECK_IDS)[number];
-
-// A check "applies" to a pull request when `pr-nudge` publishes a check run
-// of the check for it. A check for which the policy declares the fact
-// `<id>_applies` applies to the pull requests that the fact holds for, and a
-// check with a check run and no such fact applies to every pull request.
-export function appliesFactName(id: CheckId): string {
-  return `${id}_applies`;
-}
 
 // Predicates are pure functions of the PR, so a predicate that compares
 // against the current time takes it from here instead of the wall clock.
@@ -109,8 +101,6 @@ export interface OpenPullRequests {
   // field existed, and for a consumer that gathers no collaborators.
   collaborators?: Record<string, Record<string, RepositoryPermission>>;
 }
-
-export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'skipped' | 'action_required';
 
 // GitHub's PR-author association enum.
 export type AuthorAssociation =

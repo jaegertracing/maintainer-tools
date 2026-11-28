@@ -1,6 +1,6 @@
 // Comment publisher: the one place that decides whether to POST, PATCH,
-// or SKIP. Every action subfolder (pr-nudge slash-acks, pr-quota
-// blocked/unblocked, pr-weekly-digest weekly) calls this with an intent
+// or SKIP. Every action subfolder (pr-quota blocked/unblocked,
+// pr-weekly-digest weekly) calls this with an intent
 // and gets back a decision.
 //
 // Decision tree (per intent.kind+scope tuple, prior = most recent match):

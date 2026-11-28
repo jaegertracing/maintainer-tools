@@ -19,10 +19,9 @@ event-reactive logic, no surprises on re-runs.
 | ---------------------------------------------------------------- | ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | **[Triage report (CLI)](#triage-report-cli)**                    | `cli/`              | A maintainer, locally on demand | Self-contained HTML file grouping open PRs by attention category                            |
 | **[Reconciler shadow run (CLI)](#reconciler-shadow-run-cli)**    | `cli/`              | A maintainer, locally on demand | Report of the labels, comments and closings that the lifecycle reconciler would apply       |
-| **[`pr-nudge` action](#pr-nudge-github-action)**                 | `pr-nudge/`         | GitHub Actions, per PR event    | GitHub Checks panel entries summarising mechanical issues                                   |
 | **[`pr-weekly-digest` action](#pr-weekly-digest-github-action)** | `pr-weekly-digest/` | GitHub Actions, daily cron      | One PR comment per `waiting-for-author` PR per ISO week, edited in place when state changes |
 
-All three consume the same [predicate catalog](#predicate-catalog).
+All three read the facts of the same [predicate catalog](#predicate-catalog).
 
 ---
 
@@ -264,77 +263,6 @@ each, and the points left are those of the budget that has the fewest.
 
 ---
 
-## `pr-nudge` GitHub Action
-
-Runs the predicate library on a single PR and publishes a **GitHub
-Checks panel** entry for each predicate that opts into that surface (the
-mechanical pass/fail ones — see the [catalog](#predicate-catalog)).
-Predicates that don't publish a Check Run are still evaluated and
-logged. Triggered per PR event.
-
-The Checks panel is the right place for mechanical pass/fail signals
-because (a) the contributor already looks there for CI status,
-(b) it doesn't produce notifications, and (c) it doesn't clutter the PR
-conversation.
-
-### Use it from your workflow
-
-```yaml
-# .github/workflows/pr-nudge.yml
-name: 'PR Nudge'
-
-# `pull_request_target` (not `pull_request`) so workflows triggered by
-# fork PRs receive a write-scoped GITHUB_TOKEN — the default
-# `pull_request` event gives forks a read-only token, which would
-# silently strip `checks: write` and the action would 403. pr-nudge
-# never checks out the PR's code, so the usual `pull_request_target`
-# caveat (don't execute untrusted code with elevated permissions)
-# doesn't apply.
-on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  contents: read
-  checks: write
-
-jobs:
-  nudge:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: jaegertracing/maintainer-tools/pr-nudge@v0.1.0
-        with:
-          rules: dco_missing,ci_failing,merge_conflict
-```
-
-Pin the `@ref` to a tagged release for stability; Renovate / Dependabot
-will surface upgrade PRs.
-
-### Inputs
-
-| Input          | Default                                                 | Description                                                                                                                                                                                                                                        |
-| -------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `github-token` | `${{ github.token }}`                                   | Token for reads and Check Run writes.                                                                                                                                                                                                              |
-| `rules`        | `dco_missing,ci_failing,merge_conflict,stale_on_author` | Comma-separated predicate IDs to run. Defaults to the four most load-bearing predicates; pass the explicit list to opt into more (e.g. `description_empty,no_linked_issue,no_tests_for_code_change`). See [Predicate catalog](#predicate-catalog). |
-| `dry-run`      | `false`                                                 | If `true`, log every would-be Check Run but don't create them.                                                                                                                                                                                     |
-
-### What it does
-
-1. Resolves the PR from the triggering event (`pull_request` /
-   `pull_request_target` / `issue_comment` on a PR).
-2. Fetches the PR via one GraphQL query.
-3. Runs the requested predicates.
-4. Publishes one Check Run on the PR's head SHA per requested check that
-   has a check run and applies to the PR (currently `dco_missing`,
-   `merge_conflict`, `description_empty`, `no_linked_issue`,
-   `no_tests_for_code_change`).
-
-Predicate results are **state-based**: re-running on the same PR state
-produces the same Check Runs, so out-of-order events and missed webhooks
-self-heal.
-
----
-
 ## `pr-weekly-digest` GitHub Action
 
 Cron-driven action that nudges contributors whose PR has been stuck
@@ -442,26 +370,24 @@ nothing needs to be said.
 The shared library of PR-state checks. Each predicate is a pure function
 of a PR's current GraphQL state.
 
-| ID                         | What it detects                                                                                                                                                                                                                          | Used by                                                                              |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `dco_missing`              | A non-merge commit lacks `Signed-off-by:`.                                                                                                                                                                                               | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                            |
-| `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                                                                                                                                                             | Triage (hides), pr-weekly-digest (item)                                              |
-| `merge_conflict`           | `mergeable === CONFLICTING`.                                                                                                                                                                                                             | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                            |
-| `stale_on_author`          | PR carries the `stale` label or has not been updated for `staleOnAuthorDays` of the config.                                                                                                                                              | Triage (hides)                                                                       |
-| `over_quota`               | The PR is beyond the tiered quota of open PRs of its author, by its rank among them.                                                                                                                                                     | Triage (hides)                                                                       |
-| `description_empty`        | PR body is empty or just template stubs.                                                                                                                                                                                                 | Triage (hides), pr-nudge (Check), pr-weekly-digest (item)                            |
-| `no_linked_issue`          | A PR that carries the `missing-issue` label, whatever its other labels. Otherwise, a PR with no `Fixes/Closes/Resolves #N` in the body, unless it is labelled `docs` / `documentation` / `ci` / `trivial` / `chore` / `no-issue-needed`. | Without the `missing-issue` label: pr-nudge (neutral Check), pr-weekly-digest (item) |
-| `no_tests_for_code_change` | Source files changed but no test files touched. Exempt for `docs` / `documentation` / `ci` / `trivial` / `chore` labelled PRs.                                                                                                           | pr-nudge (neutral Check), pr-weekly-digest (item), triage (row flag)                 |
-| `unresolved_from_reviewer` | A review thread is unresolved and the author pushed commits since the last reviewer comment.                                                                                                                                             | pr-weekly-digest (item), triage (row flag)                                           |
-| `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                                                                                                                                      | Triage (row flag with count)                                                         |
+| ID                         | What it detects                                                                                                                                                                                                                          | Used by                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `dco_missing`              | A non-merge commit lacks `Signed-off-by:`.                                                                                                                                                                                               | Triage (hides), pr-weekly-digest (item)                    |
+| `ci_failing`               | Status check rollup is `FAILURE` or `ERROR`.                                                                                                                                                                                             | Triage (hides), pr-weekly-digest (item)                    |
+| `merge_conflict`           | `mergeable === CONFLICTING`.                                                                                                                                                                                                             | Triage (hides), pr-weekly-digest (item)                    |
+| `stale_on_author`          | PR carries the `stale` label or has not been updated for `staleOnAuthorDays` of the config.                                                                                                                                              | Triage (hides)                                             |
+| `over_quota`               | The PR is beyond the tiered quota of open PRs of its author, by its rank among them.                                                                                                                                                     | Triage (hides)                                             |
+| `description_empty`        | PR body is empty or just template stubs.                                                                                                                                                                                                 | Triage (hides), pr-weekly-digest (item)                    |
+| `no_linked_issue`          | A PR that carries the `missing-issue` label, whatever its other labels. Otherwise, a PR with no `Fixes/Closes/Resolves #N` in the body, unless it is labelled `docs` / `documentation` / `ci` / `trivial` / `chore` / `no-issue-needed`. | Without the `missing-issue` label: pr-weekly-digest (item) |
+| `no_tests_for_code_change` | Source files changed but no test files touched. Exempt for `docs` / `documentation` / `ci` / `trivial` / `chore` labelled PRs.                                                                                                           | pr-weekly-digest (item), triage (row flag)                 |
+| `unresolved_from_reviewer` | A review thread is unresolved and the author pushed commits since the last reviewer comment.                                                                                                                                             | pr-weekly-digest (item), triage (row flag)                 |
+| `resolved_without_reply`   | Author resolved one or more review threads without posting a reply to the reviewer.                                                                                                                                                      | Triage (row flag with count)                               |
 
 "Hides" means the predicate sends matching PRs to the triage report's
 **Hidden** bucket (still visible if you expand it; the reason chip(s) show
 every predicate that hid it — a PR can be both stale and quota-exceeded at
-once, and both show up rather than one masking the other). "Check" means
-it emits a Check Run via
-`pr-nudge`. "Item" means it shows up as a bullet in the weekly digest
-comment.
+once, and both show up rather than one masking the other). "Item" means
+it shows up as a bullet in the weekly digest comment.
 
 A bot-author check (`renovate`, `dependabot`, `renovate-bot`, etc.) is handled
 directly in the triage classifier rather than as a predicate — those PRs
@@ -569,7 +495,7 @@ quota.
 
 If `gh auth login` is configured, the CLI just works with no extra setup.
 
-**GitHub Actions** (`pr-nudge`, `pr-weekly-digest`) — each takes a
+**GitHub Action** (`pr-weekly-digest`) — it takes a
 `github-token` input that defaults to `${{ github.token }}` (the
 workflow-issued token). Override only if you need an alternative
 identity, e.g. a fine-grained PAT stored in `secrets.MY_PAT`.
@@ -579,7 +505,6 @@ Required scopes / permissions:
 | Component                   | Required permissions                                      |
 | --------------------------- | --------------------------------------------------------- |
 | Triage CLI                  | `repo` (read), `read:user`                                |
-| `pr-nudge` workflow         | `contents: read`, `checks: write`                         |
 | `pr-weekly-digest` workflow | `contents: read`, `pull-requests: write`, `issues: write` |
 
 ---
