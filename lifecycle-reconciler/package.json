@@ -1,0 +1,14 @@
+{
+  "name": "@jaegertracing/maintainer-tools-lifecycle-reconciler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist --minify --license licenses.txt",
+    "tsc-lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@jaegertracing/maintainer-tools-checks": "workspace:*"
+  }
+}

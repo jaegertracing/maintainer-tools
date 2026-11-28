@@ -1,0 +1,57 @@
+# Example workflow of a repository that uses the lifecycle-reconciler action.
+# It goes to `.github/workflows/lifecycle-reconciler.yml`, beside
+# `lifecycle-reconciler-review-event.yml`, with the action pinned to a commit.
+
+name: 'Lifecycle Reconciler'
+
+on:
+  # Every event below runs the workflow file of the default branch. The
+  # workflow never checks out or runs the code of a pull request.
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - closed
+      - synchronize
+      - ready_for_review
+      - converted_to_draft
+      - labeled
+      - unlabeled
+  issues:
+    types: [opened, edited, reopened, closed, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited, deleted]
+  # A review of a pull request from a fork runs the workflow file of the
+  # fork, so reviews arrive through the completion of a second workflow.
+  workflow_run:
+    workflows: ['Lifecycle Reconciler Review Event']
+    types: [completed]
+  schedule:
+    # The daily run covers what no event reports, such as a deadline that
+    # expires.
+    - cron: '23 5 * * *'
+  # A manual run of a branch runs the workflow file of that branch.
+  workflow_dispatch:
+
+# The permissions of a shadow run. A run with `write: true` needs
+# `issues: write` and `pull-requests: write`.
+permissions:
+  actions: read # to restore the cache of the previous run
+  checks: read # the gathering reads the check status of each pull request
+  contents: read
+  issues: read
+  pull-requests: read
+  statuses: read
+
+# One run at a time for the whole repository. Every run covers all open pull
+# requests, so a pending run that a newer one replaces loses nothing.
+concurrency:
+  group: lifecycle-reconciler
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: jaegertracing/maintainer-tools/lifecycle-reconciler@COMMIT_SHA

@@ -30,8 +30,8 @@ action is laid out. Record a layout change there, not in this file.
 ## Development Setup
 
 - Node.js >= 22.5 (the CLI's SQLite cache uses the built-in `node:sqlite`
-  module, added in 22.5.0). Actions still ship on the `node20` runtime —
-  they don't touch the cache.
+  module, added in 22.5.0). `pr-weekly-digest` ships on the `node20` runtime —
+  it does not touch the cache.
 - pnpm (use the repo root). Enable it with `corepack enable pnpm`;
   Corepack downloads and runs the version pinned in `package.json`.
 

@@ -1,0 +1,100 @@
+name: 'Jaeger maintainer-tools Lifecycle Reconciler'
+description: >
+  Derives the labels, the comment and the closing of every open pull request
+  of the repository from its state on GitHub, and reports what differs. It
+  changes the repository only when `write` is `true`.
+author: 'Jaeger maintainers'
+inputs:
+  github-token:
+    description: 'Token of the workflow, used for every request to GitHub.'
+    required: false
+    default: ${{ github.token }}
+  write:
+    description: >
+      If `true`, the run makes the changes that it reports. If `false` (the
+      default), the run is a shadow run and changes nothing.
+    required: false
+    default: 'false'
+  ages:
+    description: >
+      The ages at which the policies act, as the JSON object of the `ages`
+      key of the CLI config, for example `{"idleDays": 90}`. An age that is
+      left out has its default.
+    required: false
+    default: '{}'
+
+runs:
+  using: 'composite'
+  steps:
+    # The cache of the reconciler is an SQLite file, and `node:sqlite` needs
+    # a newer Node.js than the runner image provides.
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 24
+        # The action installs nothing, and a job that `pull_request_target`
+        # starts must not restore from `actions/cache`.
+        package-manager-cache: false
+
+    - name: Restore the cache of the previous run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        CACHE_DIRECTORY: ${{ runner.temp }}/lifecycle-reconciler-cache
+      run: |
+        workflow_file="${GITHUB_WORKFLOW_REF%@*}"
+        workflow_file="${workflow_file##*/}"
+        # GitHub runs each event of this list with the workflow file of the
+        # default branch. A pull request can run its own copy of the file
+        # only on `pull_request`, `pull_request_review` and
+        # `pull_request_review_comment`, and a branch only on
+        # `workflow_dispatch`. The cache is therefore taken only from a run
+        # of the workflow file of the default branch.
+        if ! previous_run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow_file" \
+          --status success --limit 100 --json databaseId,event \
+          --jq '[.[] | select(.event | IN("pull_request_target", "issues", "issue_comment", "workflow_run", "schedule"))][0].databaseId // empty'); then
+          echo "::warning::The previous runs could not be listed. The token may lack 'actions: read'."
+        elif [ -z "$previous_run" ]; then
+          echo "No previous run found."
+        elif gh run download "$previous_run" --repo "$GITHUB_REPOSITORY" \
+          --name lifecycle-reconciler-cache --dir "$CACHE_DIRECTORY"; then
+          echo "Restored the cache of run $previous_run."
+        else
+          echo "Run $previous_run has no cache."
+        fi
+        # The signals that say whether a cached row is current may miss a
+        # change, so a cache is used for one day and then filled again from
+        # GitHub. The file holds the time at which the cache was empty.
+        mkdir -p "$CACHE_DIRECTORY"
+        started_empty_at=$(cat "$CACHE_DIRECTORY/started-empty-at" 2>/dev/null || echo 0)
+        if [ $(($(date +%s) - started_empty_at)) -gt 86400 ]; then
+          echo "The run starts from an empty cache."
+          rm -rf "${CACHE_DIRECTORY:?}"/*
+          date +%s > "$CACHE_DIRECTORY/started-empty-at"
+        fi
+
+    - name: Reconcile
+      shell: bash
+      env:
+        # The command reads GH_TOKEN before GITHUB_TOKEN.
+        GH_TOKEN: ${{ inputs.github-token }}
+        WRITE: ${{ inputs.write }}
+        AGES: ${{ inputs.ages }}
+        CACHE_DIRECTORY: ${{ runner.temp }}/lifecycle-reconciler-cache
+        CONFIG_PATH: ${{ runner.temp }}/lifecycle-reconciler-config.json
+      run: |
+        jq -n --arg repo "$GITHUB_REPOSITORY" --arg cache "$CACHE_DIRECTORY/prs.sqlite" --argjson ages "$AGES" \
+          '{repos: [$repo], cachePath: $cache, ages: $ages}' > "$CONFIG_PATH"
+        arguments=(--config "$CONFIG_PATH" --format md --output "$GITHUB_STEP_SUMMARY")
+        if [ "$WRITE" = "true" ]; then
+          arguments+=(--write)
+        fi
+        node "$GITHUB_ACTION_PATH/dist/index.js" "${arguments[@]}"
+
+    - name: Save the cache for the next run
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: lifecycle-reconciler-cache
+        path: ${{ runner.temp }}/lifecycle-reconciler-cache
+        # Only the newest cache is ever restored.
+        retention-days: 3
+        if-no-files-found: ignore

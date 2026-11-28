@@ -225,6 +225,12 @@ importers:
         specifier: 6.7.1
         version: 6.7.1
 
+  lifecycle-reconciler:
+    dependencies:
+      '@jaegertracing/maintainer-tools-checks':
+        specifier: workspace:*
+        version: link:../packages/checks
+
   packages/checks:
     dependencies:
       '@octokit/graphql':

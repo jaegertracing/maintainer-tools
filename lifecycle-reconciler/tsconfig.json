@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // The bundle is built from the source of the CLI and of packages/checks,
+    // as the bundle of pr-weekly-digest is built from the source of
+    // packages/checks, so rootDir is the repository root.
+    "rootDir": "..",
+    "outDir": "dist",
+    "composite": false,
+    "declaration": false,
+    "sourceMap": false,
+    "paths": {}
+  },
+  "include": ["src/**/*", "../cli/src/**/*", "../packages/checks/src/**/*"],
+  "exclude": ["dist", "node_modules", "../**/*.test.ts"]
+}
