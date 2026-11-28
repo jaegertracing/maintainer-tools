@@ -257,6 +257,7 @@
               "triggered": false
             },
             {
+              "details": "The author has more open pull requests than the limit for new contributors allows, so this one is on hold until an older one is merged or closed. See the [pull request limits](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#pull-request-limits-for-new-contributors).",
               "hidesFromTriage": true,
               "id": "over_quota",
               "inDigest": false,

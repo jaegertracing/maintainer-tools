@@ -72,5 +72,8 @@ export function isDuplicatePredicate(
     summary: holds
       ? `An older open PR closes the same issue (${olderPullRequests.map((other) => `#${other.number}`).join(', ')})`
       : 'No older open PR closes the same issue',
+    details: holds
+      ? `An older open pull request closes the same issue (${olderPullRequests.map((other) => `#${other.number}`).join(', ')}), and one pull request per issue is reviewed. A maintainer can label the issue \`${ALLOW_MULTIPLE_PRS_LABEL}\`.`
+      : undefined,
   };
 }
