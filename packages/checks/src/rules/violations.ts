@@ -3,7 +3,12 @@
 // the others.
 
 export type RuleSetViolationKind =
-  'dependency cycle' | 'output that no person can clear' | 'rule that never holds';
+  | 'dependency cycle'
+  | 'rule that reads an output'
+  | 'exclusive outputs that both hold'
+  | 'output that no person can clear'
+  | 'plan that does not converge'
+  | 'rule that never holds';
 
 // A violation is a defect that makes a rule set unusable.
 export interface RuleSetViolation {

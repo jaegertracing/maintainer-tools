@@ -9,7 +9,7 @@
 
 import { derivedFactNamesWithRule } from './evaluate.js';
 import type { BaseFacts, RuleSet, Verdict } from './evaluate.js';
-import { isSameConclusion, OutputName, ruleText } from './model.js';
+import { isSameConclusion, OutputName, RECONCILER_OUTPUT_NAMES, ruleText } from './model.js';
 import type { Conclusion, Rule } from './model.js';
 import { InvalidRuleSetError } from './violations.js';
 import type { RuleSetViolation } from './violations.js';
@@ -67,8 +67,26 @@ function structuralViolations(ruleSet: RuleSet): RuleSetViolation[] {
   const derivedFactNames = derivedFactNamesWithRule(ruleSet.rules);
   const baseFactNames = new Set(ruleSet.baseFacts.map((baseFact) => baseFact.name));
 
+  const labelAges = new Map(
+    ruleSet.baseFacts
+      .filter((baseFact) => baseFact.ageOf.length > 0)
+      .map((baseFact) => [baseFact.name, baseFact.ageOf]),
+  );
+
   for (const rule of ruleSet.rules) {
+    // A label age is what the reconciler wrote, read back. The notice form
+    // keeps a rule from holding on that alone: the age is a premise of a
+    // reason, beside a fact that says why the label is there.
+    const hasFactBesideLabelAge = rule.premises.some((name) => !labelAges.has(name));
     for (const name of rule.premises) {
+      const ageOf = labelAges.get(name);
+      if (ageOf && (rule.isVeto || !hasFactBesideLabelAge)) {
+        violations.push({
+          kind: 'rule that reads an output',
+          rules: [ruleText(rule)],
+          detail: `a rule reads the age of ${ageOf.join(' or ')} through ${name} outside the notice form, which is a reason with a fact beside the age`,
+        });
+      }
       if (!baseFactNames.has(name) && !derivedFactNames.has(name)) {
         violations.push({
           kind: 'rule that never holds',
@@ -152,6 +170,94 @@ function outputThatNoPersonCanClearViolations(ruleSet: RuleSet): RuleSetViolatio
   return violations;
 }
 
+function exclusiveOutputsThatBothHoldViolations(ruleSet: RuleSet): RuleSetViolation[] {
+  const violations: RuleSetViolation[] = [];
+  for (const [left, right] of ruleSet.exclusions) {
+    const leftOutput = { kind: 'output', name: left } as const;
+    const rightOutput = { kind: 'output', name: right } as const;
+    const names = [
+      ...new Set([
+        ...baseFactsAffecting(ruleSet.rules, leftOutput),
+        ...baseFactsAffecting(ruleSet.rules, rightOutput),
+      ]),
+    ];
+    const combinations = allPossibleBaseFacts(names);
+    const verdicts = ruleSet.evaluateBaseFacts(combinations);
+    const index = verdicts.findIndex(
+      (verdict) =>
+        verdict.outputsThatHold.includes(left) && verdict.outputsThatHold.includes(right),
+    );
+    if (index >= 0) {
+      violations.push({
+        kind: 'exclusive outputs that both hold',
+        rules: [
+          ...new Set([
+            ...heldRuleTexts(ruleSet, verdicts[index]!, leftOutput),
+            ...heldRuleTexts(ruleSet, verdicts[index]!, rightOutput),
+          ]),
+        ],
+        detail: `${left} and ${right} both hold for ${baseFactsText(combinations[index]!, names)}`,
+      });
+    }
+  }
+  return violations;
+}
+
+// A run can stop after it changed the labels and before it closed the pull
+// request. The next run must derive the same plan from that state. The check
+// therefore derives the plan of each combination again with the label ages
+// that the first plan leaves: a label age does not hold once the plan keeps
+// none of its labels.
+function planThatDoesNotConvergeViolations(ruleSet: RuleSet): RuleSetViolation[] {
+  const outputs = RECONCILER_OUTPUT_NAMES.filter((name) =>
+    ruleSet.rules.some((rule) => isSameConclusion(rule.conclusion, { kind: 'output', name })),
+  );
+  const names = [
+    ...new Set(
+      outputs.flatMap((name) => baseFactsAffecting(ruleSet.rules, { kind: 'output', name })),
+    ),
+  ];
+  const labelAges = ruleSet.baseFacts.filter(
+    (baseFact) => baseFact.ageOf.length > 0 && names.includes(baseFact.name),
+  );
+  if (labelAges.length === 0) return [];
+  const planOf = (verdict: Verdict): string =>
+    outputs.filter((name) => verdict.outputsThatHold.includes(name)).join(', ');
+  const combinations = allPossibleBaseFacts(names);
+  const firstVerdicts = ruleSet.evaluateBaseFacts(combinations);
+  const combinationsAfterLabels = combinations.map((baseFacts, index) => {
+    const after = { ...baseFacts };
+    for (const labelAge of labelAges) {
+      const keepsLabel = labelAge.ageOf.some((label) =>
+        firstVerdicts[index]!.outputsThatHold.includes(label),
+      );
+      if (!keepsLabel) after[labelAge.name] = false;
+    }
+    return after;
+  });
+  const secondVerdicts = ruleSet.evaluateBaseFacts(combinationsAfterLabels);
+  const index = combinations.findIndex(
+    (_, at) => planOf(firstVerdicts[at]!) !== planOf(secondVerdicts[at]!),
+  );
+  if (index < 0) return [];
+  const changedLabelAges = labelAges
+    .filter(({ name }) => combinations[index]![name] !== combinationsAfterLabels[index]![name])
+    .map(({ name }) => name);
+  return [
+    {
+      kind: 'plan that does not converge',
+      rules: ruleSet.rules
+        .filter(
+          (rule) =>
+            rule.premises.some((name) => changedLabelAges.includes(name)) &&
+            firstVerdicts[index]!.rulesThatHold.includes(rule),
+        )
+        .map(ruleText),
+      detail: `${baseFactsText(combinations[index]!, names)} gives the plan [${planOf(firstVerdicts[index]!)}], and after the labels of that plan are applied it gives [${planOf(secondVerdicts[index]!)}], because ${changedLabelAges.join(', ')} no longer holds`,
+    },
+  ];
+}
+
 function ruleThatNeverHoldsViolations(ruleSet: RuleSet): RuleSetViolation[] {
   const violations: RuleSetViolation[] = [];
   for (const conclusion of distinctConclusions(ruleSet.rules)) {
@@ -181,14 +287,16 @@ function ruleThatNeverHoldsViolations(ruleSet: RuleSet): RuleSetViolation[] {
   return violations;
 }
 
-// Each of the two checks evaluates 2^n combinations for a conclusion that
+// Each check that enumerates evaluates 2^n combinations for a conclusion that
 // depends on n base facts, which took about 1 s for 18 base facts and 5 s
 // for 20 on a laptop. Every consumer pays that time when it starts, so a
 // conclusion that depends on about 20 base facts needs another way to be
 // checked.
 function enumeratedViolations(ruleSet: RuleSet): RuleSetViolation[] {
   return [
+    ...exclusiveOutputsThatBothHoldViolations(ruleSet),
     ...outputThatNoPersonCanClearViolations(ruleSet),
+    ...planThatDoesNotConvergeViolations(ruleSet),
     ...ruleThatNeverHoldsViolations(ruleSet),
   ];
 }
