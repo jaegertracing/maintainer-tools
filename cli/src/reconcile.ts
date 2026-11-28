@@ -1,13 +1,21 @@
 // `maintainer-tools reconcile` subcommand: a run of the reconciler of RFC
-// 0003 in shadow mode. It derives the plan of every open pull request and
-// reports the changes that a run in write mode would make. It changes
-// nothing on GitHub.
+// 0003. It derives the plan of every open pull request and
+// reports the changes that bring each one to its plan. It makes them only
+// with `--write`; without it the run is in shadow mode.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { reconcile } from '@jaegertracing/maintainer-tools-checks';
+import {
+  ACTIONS_BOT_LOGIN,
+  applyChanges,
+  createChangeWriter,
+  type GraphqlClient,
+  reconcileBeforeWrite,
+  reconcile,
+} from '@jaegertracing/maintainer-tools-checks';
 import { loadConfigInteractive } from './config-setup.js';
 import { log } from './log.js';
 import { openCacheIfEnabled } from './open-cache.js';
@@ -19,9 +27,9 @@ import { resolveToken } from './token.js';
 
 const RECONCILE_HELP = `Usage: maintainer-tools reconcile [options]
 
-Run the lifecycle reconciler in shadow mode: derive the labels, the comment
+Run the lifecycle reconciler: derive the labels, the comment
 and the closing of every open pull request, and report what differs from
-its state on GitHub. Nothing is changed on GitHub.
+its state on GitHub. Without --write nothing is changed on GitHub.
 
 Options:
   --config <path>     Path to JSON config (overrides discovery).
@@ -39,10 +47,17 @@ Options:
   --snapshot <path>   Reconcile a snapshot written by --save-snapshot
                       instead of gathering one from GitHub. Needs no token
                       and no cache.
+  --write             Make the reported changes on GitHub: labels, the
+                      comment, and the closing. Needs the token of a
+                      GitHub Actions workflow.
   --help              Show this help.
 
 Token lookup order: $GH_TOKEN, $GITHUB_TOKEN, \`gh auth token\`.
 `;
+
+// GitHub asks for at least a second between two requests that change
+// something.
+const MILLISECONDS_BETWEEN_CHANGES = 1000;
 
 type ReconcileFormat = 'html' | 'md' | 'json';
 
@@ -64,6 +79,7 @@ export async function runReconcile(argv: string[]): Promise<void> {
       'no-cache': { type: 'boolean', default: false },
       'save-snapshot': { type: 'string' },
       snapshot: { type: 'string' },
+      write: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h' },
     },
     allowPositionals: false,
@@ -74,6 +90,9 @@ export async function runReconcile(argv: string[]): Promise<void> {
   }
   if (values.snapshot && (values['save-snapshot'] || values['no-cache'])) {
     throw new Error('--snapshot excludes --save-snapshot and --no-cache.');
+  }
+  if (values.snapshot && values.write) {
+    throw new Error('--snapshot excludes --write: a saved snapshot is not the state of GitHub.');
   }
   const format = parseReconcileFormat(values.format);
   const output = values.output ?? `reconcile.${format}`;
@@ -89,6 +108,9 @@ export async function runReconcile(argv: string[]): Promise<void> {
   const repos = values.repo ? [values.repo] : cfg.repos;
 
   let snapshot: TriageSnapshot;
+  // The client and the token of a run that gathers from GitHub, which a
+  // run in write mode uses again.
+  let gitHub: { client: GraphqlClient; token: string } | undefined;
   if (values.snapshot) {
     log(`snapshot: ${values.snapshot}`);
     const saved = readSnapshot(values.snapshot, cfg.repos);
@@ -118,7 +140,19 @@ export async function runReconcile(argv: string[]): Promise<void> {
     log(`token: ${source}`);
     const cache = await openCacheIfEnabled(cfg.cachePath, values['no-cache']);
     log(cache ? `cache: ${cfg.cachePath}` : 'cache: disabled');
-    snapshot = await gatherSnapshot(makeClient(token), cache, {
+    gitHub = { client: makeClient(token), token };
+    if (values.write) {
+      // The reconciler takes a comment for its own only when the bot of
+      // GitHub Actions posted it. Comments under another login would be
+      // posted again by every run.
+      const login = await gitHub.client.fetchViewerLogin();
+      if (login !== `${ACTIONS_BOT_LOGIN}[bot]`) {
+        throw new Error(
+          `--write needs the token of a GitHub Actions workflow, and this token is of ${login}.`,
+        );
+      }
+    }
+    snapshot = await gatherSnapshot(gitHub.client, cache, {
       repos,
       viewer: cfg.viewer,
       // The quota workflow that the reconciler replaces exempts nobody by
@@ -144,16 +178,23 @@ export async function runReconcile(argv: string[]): Promise<void> {
     log(`wrote snapshot ${resolve(values['save-snapshot'])}`);
   }
 
-  const reconciliations = reconcile(
-    {
-      pullRequests: snapshot.pullRequests,
-      mergedCounts: snapshot.mergedCounts,
-      quotaExemptLogins: new Set(),
-      collaborators: snapshot.collaborators,
-    },
-    new Date(snapshot.now),
-    cfg.ages,
-  );
+  const openPullRequests = {
+    pullRequests: snapshot.pullRequests,
+    mergedCounts: snapshot.mergedCounts,
+    quotaExemptLogins: new Set<string>(),
+    collaborators: snapshot.collaborators,
+  };
+  const now = new Date(snapshot.now);
+  const client = gitHub?.client;
+  const reconciliations =
+    values.write && client
+      ? await reconcileBeforeWrite(openPullRequests, now, cfg.ages, (pr) => {
+          log(
+            `write: fetching ${pr.repo.owner}/${pr.repo.name}#${pr.number} again before it is closed`,
+          );
+          return client.fetchPullRequest(pr.repo.owner, pr.repo.name, pr.number);
+        })
+      : reconcile(openPullRequests, now, cfg.ages);
   const changed = reconciliations.filter(({ changes }) => changes.length > 0);
   log(`reconcile: ${reconciliations.length} open PR(s), ${changed.length} differ from the plan`);
 
@@ -165,10 +206,19 @@ export async function runReconcile(argv: string[]): Promise<void> {
         : renderReconcileHtml(reconciliations, snapshot.now);
   if (output === '-') {
     process.stdout.write(payload);
-    return;
+  } else {
+    const absPath = resolve(output);
+    mkdirSync(dirname(absPath), { recursive: true });
+    writeFileSync(absPath, payload);
+    log(`wrote ${absPath} (${payload.length} bytes)`);
   }
-  const absPath = resolve(output);
-  mkdirSync(dirname(absPath), { recursive: true });
-  writeFileSync(absPath, payload);
-  log(`wrote ${absPath} (${payload.length} bytes)`);
+
+  if (values.write && gitHub) {
+    const applied = await applyChanges(reconciliations, createChangeWriter(gitHub.token), () =>
+      setTimeout(MILLISECONDS_BETWEEN_CHANGES),
+    );
+    log(
+      `write: made ${applied.changesMade} change(s), left ${applied.postponed.length} PR(s) to the next run, and changed none of ${applied.noLongerOpen.length} PR(s) that are no longer open`,
+    );
+  }
 }

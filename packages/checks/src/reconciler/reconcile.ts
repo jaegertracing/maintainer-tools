@@ -26,3 +26,29 @@ export function reconcile(
     return { pr, plan, changes: changesOf(pr, plan) };
   });
 }
+
+// The reconciliations of a run in write mode. A closing cannot be taken
+// back, and the facts of a pull request can come from the cache, so each
+// pull request that the plan closes is fetched again with
+// `fetchPullRequest` and the plans are derived once more.
+export async function reconcileBeforeWrite(
+  openPullRequests: OpenPullRequests,
+  now: Date,
+  ages: PolicyAges,
+  fetchPullRequest: (pr: PullRequest) => Promise<PullRequest>,
+): Promise<Reconciliation[]> {
+  const reconciliations = reconcile(openPullRequests, now, ages);
+  const refetchedByUrl = new Map<string, PullRequest>();
+  for (const { pr, plan } of reconciliations) {
+    if (plan.shouldClose) refetchedByUrl.set(pr.url, await fetchPullRequest(pr));
+  }
+  if (refetchedByUrl.size === 0) return reconciliations;
+  return reconcile(
+    {
+      ...openPullRequests,
+      pullRequests: openPullRequests.pullRequests.map((pr) => refetchedByUrl.get(pr.url) ?? pr),
+    },
+    now,
+    ages,
+  );
+}
