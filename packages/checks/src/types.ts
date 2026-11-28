@@ -124,6 +124,9 @@ export interface PullRequest {
     author: string | null;
     state: ReviewState;
     submittedAt: string;
+    // Whether the author of the review is a bot account, such as GitHub
+    // Copilot. Absent in a snapshot file from before the field existed.
+    authorIsBot?: boolean;
     // Review URL and body. Only the triage CLI reads them (GitHub Copilot's
     // review overview); the actions carry them because the query is shared.
     // Optional so consumers degrade gracefully when they are absent.
@@ -136,10 +139,22 @@ export interface PullRequest {
     author: string | null;
     createdAt: string;
     // The text of a comment that `isPolicyComment()` recognizes as a
-    // policy comment. The text of any other comment is not kept, because
-    // nothing reads it.
+    // policy comment, and of every comment of the bot of GitHub Actions. The
+    // text of any other comment is not kept, because nothing reads it.
     body?: string;
+    // The node ID by which the reconciler edits or minimizes the comment,
+    // whether GitHub shows it minimized, and whether its author is a bot
+    // account. All three are absent in a snapshot file from before they
+    // existed.
+    id?: string;
+    isMinimized?: boolean;
+    authorIsBot?: boolean;
   }>;
+
+  // When a label was added to the PR or removed from it (last 100 events),
+  // from which the reconciler dates a notice period. Optional because a
+  // snapshot file from before the field existed does not have it.
+  labelEvents?: LabelEvent[];
 
   // The issues that GitHub closes when the PR is merged, which GitHub calls
   // the closing issue references (first 20). Optional because a snapshot
@@ -192,6 +207,12 @@ export interface LinkedIssue extends IssueRef {
   // snapshot file from before they existed.
   title?: string;
   author?: string | null;
+}
+
+export interface LabelEvent {
+  label: string;
+  event: 'labeled' | 'unlabeled';
+  at: string;
 }
 
 // What a collaborator may do in a repository, in GitHub's terms.
