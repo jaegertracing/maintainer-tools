@@ -223,6 +223,7 @@ make reconcile                                        # writes ./reconcile.html
 make reconcile ARGS="--repo jaegertracing/jaeger-ui"  # one configured repository
 make reconcile ARGS="--save-snapshot snapshot.json"   # keep what was gathered
 make reconcile ARGS="--snapshot snapshot.json"        # decide again, without GitHub
+make reconcile ARGS=--write                           # make the changes on GitHub
 make reconcile ARGS=--help
 ```
 
@@ -251,7 +252,17 @@ The run posts a new comment when the author has not been told about a
 reason, when it closes the PR, and when nothing blocks the PR any more. It
 edits its comment in place when a reason goes away and others remain.
 
-The last line of the gathering log gives the cost of the run:
+With `--write` the run makes the reported changes, one PR after the other
+and one change a second. It needs the token of a GitHub Actions workflow,
+because the reconciler takes a comment for its own only when
+`github-actions[bot]` posted it. Every
+label of the reconciler has to exist in the repository. A PR that the
+plan closes is fetched again first, so that it is not closed for a fact
+from the cache. A change that GitHub refuses ends the run, and a run makes
+at most 400 changes; in both cases the next run makes the rest.
+
+The last line of the gathering log gives the cost of the gathering. It
+leaves out the requests of a run in write mode:
 
 ```
 GitHub API: 10 request(s), 92 point(s) of the hourly budget, 4220 left

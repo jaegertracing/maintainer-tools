@@ -521,8 +521,8 @@ collapsed.
 
 The reconciler of RFC 0003 replaces the lifecycle actions of the Jaeger
 repositories with one loop: observe the open PRs, derive what each should
-look like, compare, and apply the difference. This repository holds the
-first three steps, and a run changes nothing on GitHub.
+look like, compare, and apply the difference. A run changes GitHub only
+with `reconcile --write`.
 
 - **Observe** is the gathering of the triage CLI. `gatherSnapshot()`
   returns the same `TriageSnapshot`, and `reconcile --snapshot` decides
@@ -543,6 +543,10 @@ first three steps, and a run changes nothing on GitHub.
   observes what was made and makes the rest. A run makes at most
   `MAX_CHANGES_PER_RUN` changes and postpones the PRs that do not fit. It
   changes no PR that was closed or merged after it observed the PR.
+  `createChangeWriter()`
+  in `reconciler/graphql-writer.ts` is the writer over GraphQL. It sends
+  each mutation once, because a comment that is created twice notifies
+  the author twice.
 
 A change to the comment is one of three. A new comment is posted when the
 author was not told about a reason, when the PR is closed, and when nothing

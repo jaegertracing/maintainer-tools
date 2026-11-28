@@ -123,6 +123,49 @@ test('reconcile --repo reports one repository of a snapshot of several', (t) => 
   assert.deepEqual(JSON.parse(run.stdout), []);
 });
 
+test('reconcile refuses to write the changes of a saved snapshot', () => {
+  const run = reconcile('--write');
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /--snapshot excludes --write/);
+});
+
+function reconcileInWriteModeAs(viewerLogin: string): SpawnSyncReturns<string> {
+  return spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      '--import',
+      fileURLToPath(new URL('../testdata/reconcile/github-as-viewer.mjs', import.meta.url)),
+      fileURLToPath(new URL('./index.ts', import.meta.url)),
+      'reconcile',
+      '--config',
+      `${TRIAGE_TESTDATA}config.json`,
+      '--no-cache',
+      '--output',
+      '-',
+      '--write',
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, GH_TOKEN: 'token-of-the-test', VIEWER_LOGIN: viewerLogin },
+    },
+  );
+}
+
+test('reconcile --write refuses a token that is not of a workflow', () => {
+  const run = reconcileInWriteModeAs('some-maintainer');
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /--write needs the token of a GitHub Actions workflow/);
+  assert.doesNotMatch(run.stderr, /scanning/);
+});
+
+test('reconcile --write gathers with the token of a workflow', () => {
+  const run = reconcileInWriteModeAs('github-actions[bot]');
+  assert.match(run.stderr, /scanning/);
+  assert.doesNotMatch(run.stderr, /--write needs the token/);
+});
+
 test('reconcile refuses a format that it does not write', () => {
   const run = reconcile('--format', 'xlsx');
   assert.equal(run.status, 1);
