@@ -126,6 +126,10 @@ well-named identifiers cover that.
 - `codeql.yml` — JS/TS static analysis.
 - `dco_merge_group.yml` — fake DCO check that satisfies the required status
   in merge-queue runs (the real DCO check doesn't trigger from merge groups).
+- `lifecycle-reconciler.yml` — runs the `lifecycle-reconciler` action of the
+  default branch on this repository in shadow mode.
+- `lifecycle-reconciler-review-event.yml` — does nothing; its completion
+  starts `lifecycle-reconciler.yml` after a review event.
 
 ## Dependencies
 
