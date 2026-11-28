@@ -165,7 +165,9 @@ function decisionTables(ruleSet: RuleSet): Map<string, string> {
       isSameConclusion(rule.conclusion, { kind: 'output', name: output }),
     ),
   );
-  return new Map(outputs.map((output) => [`${output}.md`, decisionTable(ruleSet, output)]));
+  return new Map(
+    outputs.map((output) => [`${output.replace(':', '-')}.md`, decisionTable(ruleSet, output)]),
+  );
 }
 
 test('the committed decision tables are the ones that the rules generate', () => {

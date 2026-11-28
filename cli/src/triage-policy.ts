@@ -1,4 +1,4 @@
-import type { OpenPullRequests } from '@jaegertracing/maintainer-tools-checks';
+import type { OpenPullRequests, PolicyAges } from '@jaegertracing/maintainer-tools-checks';
 
 import { classify, type ClassifiedPR } from './buckets.js';
 import type { TriageConfig } from './config.js';
@@ -10,6 +10,7 @@ export interface TriagePolicy {
   priorityAuthors: Set<string>;
   codeowners: Record<string, string[]>;
   ignoreReviewRequestedOnYou: boolean;
+  ages: PolicyAges;
 }
 
 export function buildTriagePolicy(config: TriageConfig): TriagePolicy {
@@ -18,6 +19,7 @@ export function buildTriagePolicy(config: TriageConfig): TriagePolicy {
     priorityAuthors: new Set([...config.maintainers, ...config.interns, ...config.priorityAuthors]),
     codeowners: config.codeowners,
     ignoreReviewRequestedOnYou: config.ignoreReviewRequestedOnYou,
+    ages: config.ages,
   };
 }
 
@@ -49,6 +51,7 @@ export function classifyAll(
       codeownerPaths: policy.codeowners[`${pr.repo.owner}/${pr.repo.name}`] ?? [],
       now,
       ignoreReviewRequestedOnYou: policy.ignoreReviewRequestedOnYou,
+      ages: policy.ages,
       openPullRequests,
     }),
   );

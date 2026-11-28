@@ -8,6 +8,7 @@ import type {
   PullRequest,
 } from '@jaegertracing/maintainer-tools-checks';
 
+import { DEFAULT_POLICY_AGES } from '@jaegertracing/maintainer-tools-checks';
 import { classify, type ClassifyContext } from './buckets.js';
 import type { TriageConfig } from './config.js';
 import { fetchMergedCounts } from './quota.js';
@@ -92,6 +93,7 @@ const triageConfig: TriageConfig = {
   cachePath: ':memory:',
   priorityLabels: [],
   ignoreReviewRequestedOnYou: false,
+  ages: DEFAULT_POLICY_AGES,
 };
 
 test('triage policy wires every priority source into classification and quota', async () => {
@@ -415,7 +417,7 @@ test('the allow-multiple-prs label of one issue does not exempt another issue of
 function isAuthorsTurn(overrides: Partial<PullRequest>): boolean {
   const result = classify(pullRequest(overrides), contextWithCollaborators);
   const isFlagged = result.flags.includes('AUTHORS-TURN');
-  assert.equal(result.facets.hideReasons.includes('hide:authors_turn'), isFlagged);
+  assert.equal(result.facets.hideReasons.includes('hide:maintainer_spoke_last'), isFlagged);
   return isFlagged;
 }
 
@@ -606,6 +608,13 @@ for (const [activity, overrides, expected] of authorsTurnCases) {
   });
 }
 
+test('it is the turn of the author of a PR that a policy blocks, although no maintainer spoke', () => {
+  const result = classify(pullRequest({ linkedIssues: [] }), contextWithCollaborators);
+
+  assert.ok(result.flags.includes('AUTHORS-TURN'));
+  assert.ok(!result.facets.hideReasons.includes('hide:maintainer_spoke_last'));
+});
+
 test('it is the turn of no author when the collaborators were not gathered', () => {
   const result = classify(pullRequest(commentedBy('writer', 0.5)), context);
 
@@ -669,7 +678,7 @@ const hiddenCases: Array<[string, Partial<PullRequest>, string]> = [
   [
     'waiting for author',
     { comments: [{ author: 'writer', createdAt: hoursAgo(0.5) }] },
-    'hide:authors_turn',
+    'hide:maintainer_spoke_last',
   ],
   ['merge conflict', { mergeable: 'CONFLICTING' }, 'hide:merge_conflict'],
   ['missing issue', { linkedIssues: [] }, 'hide:no_approved_issue'],
@@ -799,7 +808,7 @@ test('facets record every hide reason even though the bucket stops at the first'
   assert.deepEqual(result.facets.hideReasons, [
     'draft',
     'hide:merge_conflict',
-    'hide:authors_turn',
+    'hide:maintainer_spoke_last',
   ]);
   assert.equal(result.facets.priorityAuthor, true);
   assert.equal(result.copilot, null);

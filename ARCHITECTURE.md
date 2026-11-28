@@ -247,7 +247,7 @@ The full set of checks: `dco_missing`, `ci_failing`, `merge_conflict`,
 `resolved_without_reply`. The triage report also reads the derived fact
 `needs_issue`, which the predicates in `predicates/needs_issue.ts` and the
 rules in `policy.ts` decide; it has no check ID, because only the base fact
-of a check has one. The triage report also reads the base facts `is_duplicate` and
+of a check has one. The triage report also reads the base fact `is_duplicate` and the derived fact
 `authors_turn`, which are not checks, because no action publishes them. To add a check, export its
 predicate from a new file in `src/predicates/`, declare its base fact and its
 rules in `src/policy.ts` with the ID of the check as the name of the fact, and add

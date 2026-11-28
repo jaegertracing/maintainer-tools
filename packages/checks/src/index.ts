@@ -1,7 +1,7 @@
 // Main entry. Predicates + GraphQL only — cache is a sub-path import
 // (`@jaegertracing/maintainer-tools-checks/cache`) so action bundles built
 // with @vercel/ncc do not statically pull in the native SQLite module.
-export { CHECK_IDS } from './types.js';
+export { CHECK_IDS, DEFAULT_POLICY_AGES, parsePolicyAges } from './types.js';
 export type {
   CheckId,
   CheckConclusion,
@@ -11,6 +11,7 @@ export type {
   OpenPullRequests,
   RepositoryPermission,
   PullRequest,
+  PolicyAges,
   PredicateContext,
 } from './types.js';
 export { hasLogin, isDependencyBotLogin, sameLogin } from './logins.js';

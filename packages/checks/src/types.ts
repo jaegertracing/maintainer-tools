@@ -37,6 +37,60 @@ export interface PredicateContext {
   // pull requests as a set omits the field, and the fact of such a predicate
   // then does not hold.
   openPullRequests?: OpenPullRequests;
+  // The ages that the config sets. An age that it leaves out has the value
+  // of `DEFAULT_POLICY_AGES`.
+  ages?: Partial<PolicyAges>;
+}
+
+// The ages, in days, at which the policies act. Each is a setting of the
+// config, see `ages` in the README.
+export interface PolicyAges {
+  // A pull request on which no person has acted for this long is idle.
+  idleDays: number;
+  // The time between the `stale` label and the closing of an idle pull
+  // request.
+  idleNoticeDays: number;
+  // The time between the flag label and the closing of a pull request
+  // without an approved issue.
+  flagNoticeDays: number;
+  // The triage report marks a pull request whose last update is older than
+  // this as stale on its author.
+  staleOnAuthorDays: number;
+}
+
+export const DEFAULT_POLICY_AGES: PolicyAges = {
+  idleDays: 60,
+  idleNoticeDays: 14,
+  flagNoticeDays: 7,
+  staleOnAuthorDays: 30,
+};
+
+export function agesOf(context: Pick<PredicateContext, 'ages'>): PolicyAges {
+  return { ...DEFAULT_POLICY_AGES, ...context.ages };
+}
+
+// The ages of a config, with the default for each one that `settings`
+// leaves out. An age is a whole number of days and at least one: a label
+// age of no days would hold as soon as the label is applied, and the plan
+// of a pull request would then change with its own label.
+export function parsePolicyAges(settings: unknown): PolicyAges {
+  const ages = { ...DEFAULT_POLICY_AGES };
+  if (settings === undefined || settings === null) return ages;
+  if (typeof settings !== 'object' || Array.isArray(settings)) {
+    throw new Error('"ages" must be an object.');
+  }
+  for (const [name, days] of Object.entries(settings)) {
+    if (!Object.hasOwn(DEFAULT_POLICY_AGES, name)) {
+      throw new Error(
+        `"ages.${name}" is not one of ${Object.keys(DEFAULT_POLICY_AGES).join(', ')}.`,
+      );
+    }
+    if (typeof days !== 'number' || !Number.isInteger(days) || days < 1) {
+      throw new Error(`"ages.${name}" must be a whole number of days, at least 1.`);
+    }
+    ages[name as keyof PolicyAges] = days;
+  }
+  return ages;
 }
 
 // The open pull requests that one run evaluates together, with the merged-PR

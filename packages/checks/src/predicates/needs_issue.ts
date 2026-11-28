@@ -33,6 +33,15 @@ export function noApprovedIssuePredicate(pr: PullRequest): BaseFactValue {
   };
 }
 
+// Whether the pull request links an open issue of the organization. With
+// `needs_issue`, it tells an issue that a maintainer has not approved from
+// no issue at all.
+export function linksOpenIssuePredicate(pr: PullRequest): boolean {
+  return (pr.linkedIssues ?? []).some(
+    (issue) => sameLogin(issue.owner, pr.repo.owner) && issue.state === 'OPEN',
+  );
+}
+
 export function noIssueNeededPredicate(pr: PullRequest): boolean {
   return pr.labels.includes(NO_ISSUE_NEEDED_LABEL);
 }
