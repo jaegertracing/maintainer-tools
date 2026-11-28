@@ -37,6 +37,9 @@ export interface TriageSnapshot {
   // to a token without push access. Absent in a snapshot file from before
   // the field existed.
   collaborators?: Record<string, Record<string, RepositoryPermission>>;
+  // The run gathered one pull request (--pr) or the first ones of each
+  // repository (--limit), and not every open one.
+  isPartial?: true;
 }
 
 export interface GatherOptions {
@@ -102,6 +105,7 @@ export async function gatherSnapshot(
     pullRequests,
     mergedCounts,
     collaborators,
+    ...(opts.singlePr || opts.limit !== undefined ? { isPartial: true as const } : {}),
   };
 }
 

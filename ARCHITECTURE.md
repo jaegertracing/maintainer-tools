@@ -541,6 +541,42 @@ as-is. The HTML output is self-contained (inline CSS, no external assets),
 organized repo → bucket, with high-signal buckets expanded and low-signal
 collapsed.
 
+## Reconciler: plan and difference
+
+The reconciler of RFC 0003 replaces the lifecycle actions of the Jaeger
+repositories with one loop: observe the open PRs, derive what each should
+look like, compare, and apply the difference. This repository holds the
+first three steps, and a run changes nothing on GitHub.
+
+- **Observe** is the gathering of the triage CLI. `gatherSnapshot()`
+  returns the same `TriageSnapshot`, and `reconcile --snapshot` decides
+  from a saved one.
+- **Derive.** `planOf()` in `packages/checks/src/reconciler/plan.ts` reads
+  the verdict of a PR and returns its `Plan`: the labels of the reconciler
+  that the PR should carry, the text of the comment, and whether the PR is
+  closed. The comment lists the `details` of the base facts that make the
+  output `comment` hold.
+- **Compare.** `changesOf()` in `reconciler/difference.ts` subtracts the
+  state of the PR from its plan and returns the changes in the order in
+  which a run in write mode would make them: labels added, labels removed,
+  the comment, the closing. `reconcile()` in `reconciler/reconcile.ts` does
+  both steps for every open PR.
+
+A change to the comment is one of three. A new comment is posted when the
+author was not told about a reason, when the PR is closed, and when nothing
+blocks the PR any more, and the older policy comments of the bot of GitHub
+Actions are then minimized. The existing comment is edited when the author knows every
+reason and only the text differs. The author counts as told about a label
+when a policy comment is newer than the label, which is why a PR carries
+its label events. `policy-comments.ts` recognizes a policy comment: one
+with the marker of the reconciler, one with the marker of a replaced
+action, or a comment of the bot of GitHub Actions with a phrase of the
+quota workflow or of `actions/stale`.
+
+`cli/src/reconcile.ts` is the `reconcile` command, and
+`cli/src/render/reconcile-html.ts` and `cli/src/render/reconcile.ts` write
+its reports.
+
 ## Repository conventions
 
 - ES modules everywhere (`"type": "module"`, NodeNext resolution). Relative

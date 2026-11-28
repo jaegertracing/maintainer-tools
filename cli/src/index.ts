@@ -23,12 +23,15 @@ import { gatherSnapshot, readSnapshot, type TriageSnapshot, writeSnapshot } from
 import { resolveToken } from './token.js';
 import { buildTriagePolicy, classifySnapshot } from './triage-policy.js';
 import { runNudge } from './nudge.js';
+import { openCacheIfEnabled } from './open-cache.js';
+import { runReconcile } from './reconcile.js';
 
 const HELP = `Usage: maintainer-tools <command> [options]
 
 Commands:
   triage    Scan configured repos and emit a triage report.
   nudge     Dry-run the weekly digest nudge (HTML report).
+  reconcile Run the lifecycle reconciler in shadow mode (report only).
 
 Run \`maintainer-tools <command> --help\` for command-specific flags.
 `;
@@ -96,6 +99,10 @@ async function main(): Promise<void> {
   }
   if (cmd === 'nudge') {
     await runNudge(process.argv.slice(3));
+    return;
+  }
+  if (cmd === 'reconcile') {
+    await runReconcile(process.argv.slice(3));
     return;
   }
   process.stderr.write(`unknown command: ${cmd}\n${HELP}`);
@@ -296,26 +303,6 @@ function formatBucketTotals(classified: ClassifiedPR[]): string {
   return (
     '\n' + rows.map(([l, n]) => `  ${l.padEnd(labelW)}    ${String(n).padStart(countW)}`).join('\n')
   );
-}
-
-async function openCacheIfEnabled(
-  path: string,
-  disabled: boolean,
-): Promise<import('@jaegertracing/maintainer-tools-checks/cache').PrCache | null> {
-  if (disabled) return null;
-  try {
-    const cacheMod = await import('@jaegertracing/maintainer-tools-checks/cache');
-    mkdirSync(dirname(path), { recursive: true });
-    return cacheMod.openCache(path);
-  } catch (err) {
-    // `node:sqlite` is built into Node 22.5+, so the realistic failure modes
-    // here are (a) running on an older Node where the module isn't available,
-    // or (b) a filesystem error opening the cache file (perms, full disk,
-    // path unwritable). Either way, fall back to cacheless rather than
-    // crashing; the triage still works, just pays full GraphQL cost.
-    log(`warning: cache disabled (${err instanceof Error ? err.message : String(err)})`);
-    return null;
-  }
 }
 
 function computePerRepoOpenCounts(prs: PullRequest[]): Map<string, Map<string, number>> {

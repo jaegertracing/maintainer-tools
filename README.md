@@ -18,6 +18,7 @@ event-reactive logic, no surprises on re-runs.
 | Component                                                        | Lives in            | Who runs it                     | Output                                                                                      |
 | ---------------------------------------------------------------- | ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | **[Triage report (CLI)](#triage-report-cli)**                    | `cli/`              | A maintainer, locally on demand | Self-contained HTML file grouping open PRs by attention category                            |
+| **[Reconciler shadow run (CLI)](#reconciler-shadow-run-cli)**    | `cli/`              | A maintainer, locally on demand | Report of the labels, comments and closings that the lifecycle reconciler would apply       |
 | **[`pr-nudge` action](#pr-nudge-github-action)**                 | `pr-nudge/`         | GitHub Actions, per PR event    | GitHub Checks panel entries summarising mechanical issues                                   |
 | **[`pr-weekly-digest` action](#pr-weekly-digest-github-action)** | `pr-weekly-digest/` | GitHub Actions, daily cron      | One PR comment per `waiting-for-author` PR per ISO week, edited in place when state changes |
 
@@ -206,6 +207,50 @@ updatedAt, headSha, headRollup, linkedIssues)`. A PR is re-fetched if any of
 those changed — that includes CI status flipping on the head commit and a
 linked issue being closed or relabelled, even when GitHub doesn't bump
 `updatedAt`. Use `--no-cache` to force a full refresh.
+
+---
+
+## Reconciler shadow run (CLI)
+
+`make reconcile` runs the lifecycle reconciler of
+[RFC 0003](docs/rfc/0003-issue-and-pr-lifecycle-automation.md) in shadow
+mode. It gathers the open PRs of the configured repositories as the triage
+report does, derives for each PR the labels that it should carry, the
+comment that tells the author why, and whether it is closed, and reports
+what differs from the PR as it is on GitHub. It changes nothing on GitHub.
+
+```bash
+make reconcile                                        # writes ./reconcile.html
+make reconcile ARGS="--repo jaegertracing/jaeger-ui"  # one configured repository
+make reconcile ARGS="--save-snapshot snapshot.json"   # keep what was gathered
+make reconcile ARGS="--snapshot snapshot.json"        # decide again, without GitHub
+make reconcile ARGS=--help
+```
+
+The HTML report has one card for each PR that a run in write mode would
+change. A card links the PR and shows the labels that stay, that are added
+and that are removed, the list of changes with the rule behind each label,
+and the comment as the author would see it. The caption of the comment
+says whether it would be posted, which notifies the author, or whether the
+existing comment would be edited, which does not. The buttons at the top
+show only the cards with one kind of change, such as the PRs that would be
+closed. `--format md` and `--format json` write the same decisions as
+Markdown and as JSON; the JSON report has no time in it, so two runs over
+one snapshot can be compared byte for byte.
+
+The reconciler owns six labels: `missing-issue`, `unapproved-issue`,
+`duplicate`, `pr-quota-reached`, `waiting-for-author` and `stale`. The
+tables in [`docs/decision-tables/`](docs/decision-tables/README.md) show
+when each one, the comment and the closing hold. A PR that still needs an
+issue is closed `flagNoticeDays` after it got its flag label. A PR on which
+no person has acted for `idleDays` gets `stale` and is closed
+`idleNoticeDays` later. The three are the [`ages`](#configuration) of the config,
+with the defaults 7, 60 and 14 days. The label `do-not-expire` exempts a PR
+from both.
+
+The run posts a new comment when the author has not been told about a
+reason, when it closes the PR, and when nothing blocks the PR any more. It
+edits its comment in place when a reason goes away and others remain.
 
 ---
 

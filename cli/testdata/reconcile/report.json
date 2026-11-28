@@ -1,0 +1,345 @@
+[
+  {
+    "repo": "example/repo",
+    "number": 1,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 2,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 3,
+    "labelsNow": [],
+    "plan": {
+      "labels": [
+        "missing-issue",
+        "pr-quota-reached",
+        "waiting-for-author"
+      ],
+      "comment": "<!-- jaeger-pr-lifecycle -->\n@newcomer, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: #101 is closed. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n- The author has more open pull requests than the limit for new contributors allows, so this one is on hold until an older one is merged or closed. See the [pull request limits](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#pull-request-limits-for-new-contributors).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that.",
+      "shouldClose": false,
+      "reasons": {
+        "label:missing-issue": [
+          "needs_issue"
+        ],
+        "label:pr-quota-reached": [
+          "over_quota"
+        ],
+        "label:waiting-for-author": [
+          "authors_turn"
+        ]
+      }
+    },
+    "changes": [
+      {
+        "kind": "add label",
+        "label": "missing-issue"
+      },
+      {
+        "kind": "add label",
+        "label": "pr-quota-reached"
+      },
+      {
+        "kind": "add label",
+        "label": "waiting-for-author"
+      },
+      {
+        "kind": "create comment",
+        "body": "<!-- jaeger-pr-lifecycle -->\n@newcomer, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: #101 is closed. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n- The author has more open pull requests than the limit for new contributors allows, so this one is on hold until an older one is merged or closed. See the [pull request limits](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#pull-request-limits-for-new-contributors).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that."
+      }
+    ]
+  },
+  {
+    "repo": "example/repo",
+    "number": 4,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 5,
+    "labelsNow": [],
+    "plan": {
+      "labels": [
+        "missing-issue",
+        "waiting-for-author"
+      ],
+      "comment": "<!-- jaeger-pr-lifecycle -->\n@carol, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: no issue is linked. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that.",
+      "shouldClose": false,
+      "reasons": {
+        "label:missing-issue": [
+          "needs_issue"
+        ],
+        "label:waiting-for-author": [
+          "authors_turn"
+        ]
+      }
+    },
+    "changes": [
+      {
+        "kind": "add label",
+        "label": "missing-issue"
+      },
+      {
+        "kind": "add label",
+        "label": "waiting-for-author"
+      },
+      {
+        "kind": "create comment",
+        "body": "<!-- jaeger-pr-lifecycle -->\n@carol, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: no issue is linked. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that."
+      }
+    ]
+  },
+  {
+    "repo": "example/repo",
+    "number": 6,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 7,
+    "labelsNow": [],
+    "plan": {
+      "labels": [
+        "unapproved-issue",
+        "waiting-for-author"
+      ],
+      "comment": "<!-- jaeger-pr-lifecycle -->\n@frank, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: #104 is not labelled `help wanted`. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that.",
+      "shouldClose": false,
+      "reasons": {
+        "label:unapproved-issue": [
+          "needs_issue ∧ links_open_issue"
+        ],
+        "label:waiting-for-author": [
+          "authors_turn"
+        ]
+      }
+    },
+    "changes": [
+      {
+        "kind": "add label",
+        "label": "unapproved-issue"
+      },
+      {
+        "kind": "add label",
+        "label": "waiting-for-author"
+      },
+      {
+        "kind": "create comment",
+        "body": "<!-- jaeger-pr-lifecycle -->\n@frank, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: #104 is not labelled `help wanted`. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that."
+      }
+    ]
+  },
+  {
+    "repo": "example/repo",
+    "number": 8,
+    "labelsNow": [
+      "missing-issue"
+    ],
+    "plan": {
+      "labels": [
+        "unapproved-issue",
+        "duplicate",
+        "waiting-for-author"
+      ],
+      "comment": "<!-- jaeger-pr-lifecycle -->\n@grace, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: #104 is not labelled `help wanted`. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n- An older open pull request closes the same issue (#7), and one pull request per issue is reviewed. A maintainer can label the issue `allow-multiple-prs`.\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that.",
+      "shouldClose": false,
+      "reasons": {
+        "label:unapproved-issue": [
+          "needs_issue ∧ links_open_issue"
+        ],
+        "label:duplicate": [
+          "is_duplicate"
+        ],
+        "label:waiting-for-author": [
+          "authors_turn"
+        ]
+      }
+    },
+    "changes": [
+      {
+        "kind": "add label",
+        "label": "unapproved-issue"
+      },
+      {
+        "kind": "add label",
+        "label": "duplicate"
+      },
+      {
+        "kind": "add label",
+        "label": "waiting-for-author"
+      },
+      {
+        "kind": "remove label",
+        "label": "missing-issue"
+      },
+      {
+        "kind": "create comment",
+        "body": "<!-- jaeger-pr-lifecycle -->\n@grace, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: #104 is not labelled `help wanted`. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n- An older open pull request closes the same issue (#7), and one pull request per issue is reviewed. A maintainer can label the issue `allow-multiple-prs`.\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that."
+      }
+    ]
+  },
+  {
+    "repo": "example/repo",
+    "number": 9,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 10,
+    "labelsNow": [
+      "pr-quota-reached",
+      "waiting-for-author"
+    ],
+    "plan": {
+      "labels": [
+        "missing-issue",
+        "waiting-for-author"
+      ],
+      "comment": "<!-- jaeger-pr-lifecycle -->\n@ivan, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: no issue is linked. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that.",
+      "shouldClose": false,
+      "reasons": {
+        "label:missing-issue": [
+          "needs_issue"
+        ],
+        "label:waiting-for-author": [
+          "authors_turn"
+        ]
+      }
+    },
+    "changes": [
+      {
+        "kind": "add label",
+        "label": "missing-issue"
+      },
+      {
+        "kind": "remove label",
+        "label": "pr-quota-reached"
+      },
+      {
+        "kind": "create comment",
+        "body": "<!-- jaeger-pr-lifecycle -->\n@ivan, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: no issue is linked. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that."
+      }
+    ]
+  },
+  {
+    "repo": "example/repo",
+    "number": 11,
+    "labelsNow": [],
+    "plan": {
+      "labels": [
+        "missing-issue",
+        "waiting-for-author"
+      ],
+      "comment": "<!-- jaeger-pr-lifecycle -->\n@judy, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: no issue is linked. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that.",
+      "shouldClose": false,
+      "reasons": {
+        "label:missing-issue": [
+          "needs_issue"
+        ],
+        "label:waiting-for-author": [
+          "authors_turn"
+        ]
+      }
+    },
+    "changes": [
+      {
+        "kind": "add label",
+        "label": "missing-issue"
+      },
+      {
+        "kind": "add label",
+        "label": "waiting-for-author"
+      },
+      {
+        "kind": "create comment",
+        "body": "<!-- jaeger-pr-lifecycle -->\n@judy, this pull request needs attention.\n\n- This pull request must link an open issue that is labelled `help wanted`: no issue is linked. See the [linked issue policy](https://github.com/jaegertracing/jaeger/blob/main/CONTRIBUTING_GUIDELINES.md#link-each-pull-request-to-an-issue).\n\nThis pull request is closed 7 days after it was flagged, unless it links an approved issue before that."
+      }
+    ]
+  },
+  {
+    "repo": "example/repo",
+    "number": 12,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 13,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 14,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  },
+  {
+    "repo": "example/repo",
+    "number": 15,
+    "labelsNow": [],
+    "plan": {
+      "labels": [],
+      "comment": null,
+      "shouldClose": false,
+      "reasons": {}
+    },
+    "changes": []
+  }
+]
