@@ -99,6 +99,14 @@ export async function gatherSnapshot(
 
   const collaborators = await fetchCollaboratorsOfRepos(pullRequests, client);
 
+  const { requests, pointsSpent, pointsRemaining } = client.usage();
+  log(
+    `GitHub API: ${requests} request(s)` +
+      (pointsRemaining !== undefined
+        ? `, ${pointsSpent} point(s) of the hourly budget, ${pointsRemaining} left`
+        : ''),
+  );
+
   return {
     now: new Date().toISOString(),
     viewer,

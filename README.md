@@ -252,6 +252,16 @@ The run posts a new comment when the author has not been told about a
 reason, when it closes the PR, and when nothing blocks the PR any more. It
 edits its comment in place when a reason goes away and others remain.
 
+The last line of the gathering log gives the cost of the run:
+
+```
+GitHub API: 10 request(s), 92 point(s) of the hourly budget, 4220 left
+```
+
+GitHub charges the requests of one token to more than one hourly budget.
+The points are the sum over those budgets, without the first request of
+each, and the points left are those of the budget that has the fewest.
+
 ---
 
 ## `pr-nudge` GitHub Action

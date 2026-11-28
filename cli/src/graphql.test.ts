@@ -19,6 +19,50 @@ test('GraphQL retries a GOAWAY transport failure and returns the response', asyn
   assert.equal(requests[0], requests[1]);
 });
 
+test('the usage counts the requests and the points that each budget lost', async (t) => {
+  // The responses alternate between two budgets, as those of GitHub do, and
+  // the last two of the first budget arrive in the reverse order.
+  const budgetOfResponses: Array<[resetTime: string, used: string, remaining: string]> = [
+    ['1000', '690', '4310'],
+    ['1250', '186', '4814'],
+    ['1000', '712', '4288'],
+    ['1250', '188', '4812'],
+    ['1000', '701', '4299'],
+  ];
+  t.mock.method(globalThis, 'fetch', async () => {
+    const [resetTime, used, remaining] = budgetOfResponses.shift()!;
+    return new Response(JSON.stringify({ data: { viewer: { login: 'maintainer' } } }), {
+      headers: {
+        'content-type': 'application/json',
+        'x-ratelimit-reset': resetTime,
+        'x-ratelimit-used': used,
+        'x-ratelimit-remaining': remaining,
+      },
+    });
+  });
+  const client = createGraphqlClient('test-token');
+  assert.deepEqual(client.usage(), { requests: 0, pointsSpent: 0 });
+  for (let request = 0; request < 5; request++) await client.fetchViewerLogin();
+
+  assert.deepEqual(client.usage(), { requests: 5, pointsSpent: 24, pointsRemaining: 4288 });
+});
+
+test('the usage counts a request that GitHub refused', async (t) => {
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response(JSON.stringify({ message: 'Bad credentials' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      }),
+  );
+  const client = createGraphqlClient('test-token');
+  await assert.rejects(client.fetchViewerLogin());
+
+  assert.deepEqual(client.usage(), { requests: 1, pointsSpent: 0 });
+});
+
 for (const status of [500, 502, 503, 504]) {
   test(`retries status ${status} with bounded backoff and preserves the final error`, async () => {
     const error = Object.assign(new Error('unavailable'), { status });
