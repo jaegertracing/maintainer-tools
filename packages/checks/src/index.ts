@@ -49,6 +49,8 @@ export { lastActivityByPersonAt } from './predicates/idle.js';
 export { reconcile } from './reconciler/reconcile.js';
 export type { Reconciliation } from './reconciler/reconcile.js';
 export type { Change } from './reconciler/difference.js';
+export { applyChanges } from './reconciler/apply.js';
+export type { AppliedChanges, ChangeWriter, PullRequestRef } from './reconciler/apply.js';
 export type { Plan } from './reconciler/plan.js';
 export { createGraphqlClient } from './graphql.js';
 export type { GraphqlClient, PrSummary } from './graphql.js';
